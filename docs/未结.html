@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>未结</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background-color: #f5f5f5;
+            color: #333333;
+            padding: 10px;
+        }
+        
+        .project-section {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .project-label {
+            font-size: 16px;
+            color: #333333;
+            margin-right: 10px;
+            white-space: nowrap;
+            font-weight: 500;
+        }
+        
+        /* 选择框通用样式 */
+        input[type="text"], select, input[type="date"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f5f5f5;
+        }
+        
+        /* 项目名称选择框样式 */
+        #projectName {
+            width: auto;
+            min-width: 200px;
+            background-color: #f5f5f5 !important;
+            cursor: pointer !important;
+            color: #333 !important;
+            border: 1px solid #ddd !important;
+            font-weight: 500 !important;
+            font-size: 16px !important;
+        }
+        
+        #projectName:focus {
+            outline: none !important;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+            border-color: #1890ff !important;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+        }
+        
+        .total {
+            margin-left: 20px;
+        }
+        
+        /* 工人/合计标签的样式 */
+        .work-type {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .work-type-option {
+            cursor: pointer;
+            padding: 8px 16px;
+            position: relative;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 8px;
+            backdrop-filter: blur(5px);
+            background: rgba(255, 255, 255, 0.1);
+            margin: 2px;
+            color: #333333;
+        }
+        
+        .work-type-option:hover {
+            transform: translateY(-1px) scale(1.05);
+            background: rgba(114, 46, 209, 0.2);
+            box-shadow: 0 4px 12px rgba(114, 46, 209, 0.3);
+        }
+        
+        .work-type-option.active {
+            color: white;
+            transform: translateY(-1px);
+        }
+        
+        .work-type-option.active:hover {
+            transform: translateY(-2px) scale(1.05);
+        }
+        
+        .work-type-option.active::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 0;
+            width: 100%;
+            height: 3px;
+        }
+        
+        /* 未结标签选中时的蓝色背景 */
+        .work-type-option:nth-child(1).active {
+            background: linear-gradient(135deg, rgba(24, 144, 255, 0.9), rgba(64, 169, 255, 0.8));
+            box-shadow: 0 4px 15px rgba(24, 144, 255, 0.4);
+        }
+        
+        /* 未结标签选中时的蓝色阴影 */
+        .work-type-option:nth-child(1).active::after {
+            background-color: #1890ff;
+        }
+        
+        /* 未结标签选中时的悬停效果 */
+        .work-type-option:nth-child(1).active:hover {
+            box-shadow: 0 6px 20px rgba(24, 144, 255, 0.5);
+        }
+        
+        /* 已结标签选中时的绿色背景 */
+        .work-type-option:nth-child(2).active {
+            background: linear-gradient(135deg, rgba(40, 167, 69, 0.9), rgba(64, 199, 100, 0.8));
+        }
+        
+        /* 已结标签选中时的绿色阴影 */
+        .work-type-option:nth-child(2).active::after {
+            background-color: #28a745;
+        }
+        
+        /* 已结标签选中时的悬停效果 */
+        .work-type-option:nth-child(2).active:hover {
+            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.5);
+        }
+        
+        .total {
+            display: flex;
+            align-items: center;
+            font-size: 16px;
+            color: #333333;
+            font-weight: bold;
+        }
+        
+        .total-amount {
+            color: #ff4d4f;
+            margin-left: 5px;
+            font-weight: bold;
+        }
+        
+        .eye-icon {
+            margin-left: 5px;
+            font-size: 24px;
+            color: #666666;
+        }
+        
+        .cards-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+        }
+        
+        .card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background-color: #ffffff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            max-width: 350px;
+        }
+        
+        
+        
+        .amount-arrow-container {
+            display: flex;
+            align-items: center;
+        }
+        
+        .card:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transform: translateY(-1px);
+        }
+        
+        .card-content {
+            display: flex;
+            align-items: center;
+        }
+        
+        .avatar {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            background-color: #1890ff;
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 500;
+            margin-right: 15px;
+        }
+        
+        .name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333333;
+        }
+        
+        .amount {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1890ff;
+            margin-right: 2px;
+        }
+        
+        .amount.negative {
+            color: #ff4d4f;
+        }
+        
+        .arrow {
+            font-size: 20px;
+            font-weight: bold;
+            color: #666666;
+            margin-left: 2px;
+        }
+        
+        /* 侧边栏样式 */
+        .employee-sidebar {
+            position: fixed;
+            top: 0;
+            right: -380px;
+            width: 380px;
+            height: 100vh;
+            background-color: white;
+            box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            transition: right 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        
+        .employee-sidebar.open {
+            right: 0;
+        }
+        
+        /* 侧边栏头部样式 */
+        .sidebar-header {
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .employee-info {
+            display: flex;
+            align-items: center;
+        }
+        
+        .employee-avatar {
+            width: 40px;
+            height: 40px;
+            background-color: #1890ff;
+            color: white;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 500;
+            margin-right: 10px;
+        }
+        
+        .employee-details {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .employee-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .employee-date-range {
+            font-size: 14px;
+            color: #666;
+            margin-top: 2px;
+        }
+        
+        .close-sidebar {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #666;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: background-color 0.2s ease;
+        }
+        
+        .close-sidebar:hover {
+            background-color: #f0f0f0;
+        }
+        
+        /* 侧边栏内容样式 */
+        .sidebar-content {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+        }
+        
+        /* 数据项样式 */
+        .data-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .data-item:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* 点工、包工、工量样式（蓝色背景） */
+        .data-item.work {
+            background-color: #EDF4FF;
+        }
+        
+        /* 借支、扣款、公司转账、结算样式（橙色背景） */
+        .data-item.expense {
+            background-color: #FFF5E7;
+        }
+        
+        .data-item-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .data-item-details {
+            font-size: 12px;
+            color: #666;
+            margin-top: 2px;
+        }
+        
+        .data-item-amount {
+            font-size: 16px;
+            font-weight: bold;
+            color: #1890ff;
+        }
+        
+        .data-item-amount.expense {
+            color: #ff7a45;
+        }
+        
+        .data-item-arrow {
+            margin-left: 5px;
+            font-size: 16px;
+            color: #666;
+        }
+        
+        /* 侧边栏底部样式 */
+        .sidebar-footer {
+            padding: 15px;
+            border-top: 1px solid #e0e0e0;
+            background-color: #f5f5f5;
+        }
+        
+        /* 按钮容器样式 */
+        .button-container {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-start;
+            padding: 10px 0;
+        }
+        
+        /* 设为未结按钮样式 */
+        .set-unsettled-btn {
+            width: auto;
+            padding: 10px 20px;
+            background-color: white;
+            color: #1890ff;
+            border: 1px solid #1890ff;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: block;
+            margin: 0;
+        }
+        
+        .set-unsettled-btn:hover {
+            background-color: #edf4ff;
+        }
+        
+        /* 结算按钮样式 */
+        .settlement-btn {
+            width: auto;
+            padding: 10px 20px;
+            background-color: white;
+            color: #1890ff;
+            border: 1px solid #1890ff;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: block;
+            margin: 0;
+        }
+        
+        .settlement-btn:hover {
+            background-color: #edf4ff;
+        }
+        
+        /* 未结工资样式 */
+        .unsettled-wage {
+            padding: 10px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .unsettled-label {
+            font-size: 14px;
+            color: black;
+        }
+        
+        .unsettled-amount {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1890ff;
+            margin-left: 5px;
+        }
+        
+        /* 遮罩层样式 */
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            display: none;
+        }
+        
+        .sidebar-overlay.open {
+            display: block;
+        }
+        
+        /* 确认模态框样式 */
+        .confirm-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            display: none;
+        }
+        
+        .confirm-modal.open {
+            display: flex;
+        }
+        
+        .confirm-modal-content {
+            background-color: white;
+            border-radius: 8px;
+            padding: 24px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .confirm-modal-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        
+        .confirm-modal-icon {
+            font-size: 24px;
+            margin-right: 12px;
+            color: #faad14;
+        }
+        
+        .confirm-modal-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .confirm-modal-message {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+        
+        .confirm-modal-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+        
+        .confirm-modal-btn {
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            border: 1px solid #d9d9d9;
+        }
+        
+        .confirm-modal-btn.cancel {
+            background-color: white;
+            color: #666;
+        }
+        
+        .confirm-modal-btn.cancel:hover {
+            background-color: #f5f5f5;
+        }
+        
+        .confirm-modal-btn.confirm {
+            background-color: #1890ff;
+            color: white;
+            border-color: #1890ff;
+        }
+        
+        .confirm-modal-btn.confirm:hover {
+            background-color: #40a9ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="project-section">
+        <div class="project-label">项目：</div>
+        <select id="projectName" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background-color: #f5f5f5;"></select>
+    </div>
+    
+    <div class="header">
+        <div class="work-type">
+            <div class="work-type-option active">未结 (4)</div>
+            <div class="work-type-option">已结 (0)</div>
+        </div>
+        <div class="total">
+            总未结：<span class="total-amount">¥-5614.76</span> <span class="eye-icon">👁️</span>
+        </div>
+    </div>
+    
+    <div class="main-container">
+        <div class="cards-container"></div>
+        <!-- 侧边栏组件 -->
+        <div id="employeeSidebar" class="employee-sidebar">
+            <div class="sidebar-header">
+                <div class="employee-info">
+                    <div class="employee-avatar" id="sidebarAvatar"></div>
+                    <div class="employee-details">
+                        <div class="employee-name" id="sidebarName"></div>
+                        <div class="employee-date-range" id="sidebarDateRange"></div>
+                    </div>
+                </div>
+                <button class="close-sidebar" id="closeSidebar">&times;</button>
+            </div>
+            <div class="sidebar-content" id="sidebarContent">
+                <!-- 侧边栏内容将通过JavaScript动态生成 -->
+            </div>
+            <div class="sidebar-footer">
+                <div class="unsettled-wage">
+                    <span class="unsettled-label">未结工资:</span>
+                    <span class="unsettled-amount" id="unsettledAmount">0</span>
+                </div>
+                <div class="button-container">
+                    <button class="set-unsettled-btn" id="setUnsettledBtn">设为未结</button>
+                    <button class="settlement-btn" id="settlementBtn">记结算</button>
+                </div>
+            </div>
+        </div>
+        <!-- 遮罩层 -->
+        <div id="sidebarOverlay" class="sidebar-overlay"></div>
+    </div>
+    
+    <!-- 确认模态框 -->
+    <div id="confirmModal" class="confirm-modal">
+        <div class="confirm-modal-content">
+            <div class="confirm-modal-header">
+                <div class="confirm-modal-icon">⚠️</div>
+                <div class="confirm-modal-title">确定设为已结清吗?</div>
+            </div>
+            <div class="confirm-modal-message">设为已结清后，此员工将从项目退场</div>
+            <div class="confirm-modal-buttons">
+                <button id="cancelBtn" class="confirm-modal-btn cancel">取消</button>
+                <button id="confirmBtn" class="confirm-modal-btn confirm">确定</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="JavaScript/supabase/supabase.min.js"></script>
+    <script src="JavaScript/supabase/supabase-client.js"></script>
+    <script src="JavaScript/未结/employee-status-manager.js"></script>
+    <script src="JavaScript/未结/unsettled.js"></script>
+</body>
+</html>
