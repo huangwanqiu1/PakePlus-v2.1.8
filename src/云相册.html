@@ -1,0 +1,4565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>云相册</title>
+    <!-- 本地加载完整的Supabase库 -->
+    <script src="JavaScript/supabase/supabase.min.js"></script>
+    <!-- 加载浏览器环境的Supabase配置 -->
+    <script src="JavaScript/supabase/supabase-client.js"></script>
+    <script src="JavaScript/云相册/invalid-image-cleaner.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #e0e7ff 0%, #d1e0ff 100%);
+            min-height: 100vh;
+            padding: 0;
+            margin: 0;
+        }
+
+        .container {
+            width: 100%;
+            min-height: 100vh;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            border-radius: 0;
+            padding: 0;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-sizing: border-box;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+
+        .form-row {
+            margin-bottom: 20px;
+        }
+
+        .form-row label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input[type="date"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f5f5f5;
+        }
+
+        /* 日期输入框容器样式 */
+        .date-input-container {
+            position: relative;
+            width: 250px;
+            height: 36px;
+        }
+
+        .date-input {
+            width: 100%;
+            height: 36px;
+            padding: 0 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f5f5f5;
+            position: relative;
+            z-index: 1;
+            box-sizing: border-box;
+        }
+
+        .date-display {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 36px;
+            padding: 0 8px 0 30px;
+            border: 1px solid #1890ff;
+            border-radius: 4px;
+            background-color: #e6f7ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            font-size: 16px;
+            color: #333;
+            z-index: 2;
+            box-sizing: border-box;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%231890ff'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: 8px center;
+            background-size: 16px 16px;
+        }
+
+        .today-text {
+            color: #1890ff;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+
+        /* 日期选择器模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .date-picker-content {
+            background-color: white;
+            border-radius: 12px;
+            width: 480px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .date-picker-body {
+            padding: 20px;
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .calendar-header button {
+            background: linear-gradient(135deg, rgba(240, 240, 240, 0.8), rgba(255, 255, 255, 0.6));
+            border: none;
+            border-radius: 8px;
+            width: auto;
+            height: 36px;
+            padding: 0 12px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #666;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+
+        #prevMonth,
+        #nextMonth {
+            width: 36px;
+            padding: 0;
+        }
+
+        .calendar-header button:hover {
+            background: linear-gradient(135deg, rgba(24, 144, 255, 0.9), rgba(64, 169, 255, 0.8));
+            color: white;
+            transform: translateY(-1px) scale(1.15);
+            box-shadow: 0 4px 15px rgba(24, 144, 255, 0.4);
+        }
+
+        #currentMonth {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            min-width: 100px;
+            text-align: center;
+        }
+
+        /* 月份选择器样式 */
+        .month-picker-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2001;
+        }
+
+        .month-picker {
+            background-color: white;
+            border-radius: 12px;
+            width: 320px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+
+        .picker-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .picker-year-btn {
+            background: transparent;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #6c757d;
+            transition: all 0.3s ease;
+        }
+
+        .picker-year-btn:hover {
+            background-color: #e9ecef;
+            border-color: #adb5bd;
+        }
+
+        #pickerYear {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: #343a40;
+        }
+
+        .month-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            padding: 20px;
+        }
+
+        .month-item {
+            padding: 12px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            color: #495057;
+            background-color: #ffffff;
+        }
+
+        .month-item:hover {
+            background-color: #e7f5ff;
+            border-color: #91d5ff;
+            color: #1890ff;
+        }
+
+        .month-item.selected {
+            background-color: #1890ff;
+            color: white;
+            border-color: #1890ff;
+        }
+
+        /* 禁用状态的月份样式 */
+        .month-item.disabled {
+            background-color: #f5f5f5;
+            color: #999;
+            border-color: #e0e0e0;
+            cursor: not-allowed !important;
+            opacity: 0.5 !important;
+            pointer-events: none !important;
+        }
+
+        /* 月份标题样式 */
+        .month-title {
+            cursor: pointer;
+            background: transparent;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #475569;
+            transition: all 0.3s ease;
+            appearance: none;
+            -webkit-appearance: none;
+            position: relative;
+        }
+
+        .month-title:hover {
+            border-color: #667eea;
+            color: #667eea;
+            background-color: #f8fafc;
+        }
+
+        .calendar-grid {
+            margin-bottom: 20px;
+        }
+
+        .weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+            margin-bottom: 10px;
+        }
+
+        .weekdays > div {
+            text-align: center;
+            padding: 8px;
+            font-weight: bold;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .calendar-days {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+        }
+
+        .day-cell {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .day-cell:hover {
+            background: linear-gradient(135deg, rgba(230, 247, 255, 0.8), rgba(240, 250, 255, 0.6));
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
+            backdrop-filter: blur(5px);
+        }
+
+        .day-cell.other-month {
+            color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .day-cell.disabled-future {
+            color: #d0d0d0;
+            background-color: #f9f9f9;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .day-cell.disabled-future:hover {
+            background-color: #f9f9f9;
+            transform: none;
+        }
+
+        .day-cell.today {
+            background: #fff2e6;
+            border: 2px solid #ff7a00;
+            font-weight: bold;
+            color: #ff7a00;
+            position: relative;
+        }
+
+        .day-cell.today::before {
+            content: '今天';
+            position: absolute;
+            top: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ff7a00;
+            color: white;
+            font-size: 10px;
+            padding: 1px 4px;
+            border-radius: 8px;
+            font-weight: bold;
+            white-space: nowrap;
+            z-index: 1;
+        }
+
+        .day-cell.selected-single {
+            background: #1890ff;
+            color: white;
+            font-weight: bold;
+        }
+
+        /* 多选模式选中日期样式 */
+        .day-cell.selected-multi {
+            background: linear-gradient(135deg, #52c41a, #389e0d);
+            color: white;
+            border-radius: 50%;
+            box-shadow: 0 4px 12px rgba(82, 196, 26, 0.3);
+            transform: scale(1.05);
+        }
+
+        /* 多选模式日期范围样式 */
+        .day-cell.selected-range {
+            background: linear-gradient(135deg, #95de64, #73d13d);
+            color: white;
+            border-radius: 50%;
+            box-shadow: 0 2px 6px rgba(149, 222, 100, 0.2);
+        }
+
+        /* 员工选择框样式 */
+        .employee-select-container {
+            margin-top: 0;
+        }
+
+        .employee-select-label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+            line-height: 36px;
+        }
+
+        .employee-select-wrapper {
+            position: relative;
+            width: 130px;
+            height: 36px;
+        }
+
+        #employeeListBtn {
+            width: 100%;
+            height: 36px;
+            padding: 0 30px 0 12px;
+            border: 1px solid #1890ff;
+            border-radius: 4px;
+            background-color: #e6f7ff;
+            color: #333;
+            font-size: 16px;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+            box-sizing: border-box;
+        }
+
+        #employeeListBtn:hover {
+            background-color: #bae7ff;
+        }
+
+        #employeeClearBtn {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #999;
+            font-size: 18px;
+            display: none;
+            font-weight: bold;
+            width: 20px;
+            height: 20px;
+            line-height: 20px;
+            text-align: center;
+        }
+
+        #employeeClearBtn:hover {
+            color: #f5222d;
+        }
+
+        /* 员工列表模态框样式 */
+        #employeeListModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 3000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #employeeListModal .employee-modal-content {
+            background-color: white;
+            border-radius: 12px;
+            width: 400px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        #employeeListModal .employee-modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 15px;
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        #employeeListModal .employee-modal-title {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: #343a40;
+            align-self: flex-start;
+        }
+
+        /* 搜索图标样式 */
+        .search-icon {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #adb5bd;
+            font-size: 14px;
+            pointer-events: none;
+        }
+
+        /* 筛选输入框样式 */
+        #employeeSearchInput {
+            padding: 8px 12px 8px 32px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+            width: 200px;
+        }
+
+        #employeeSearchInput::placeholder {
+            color: #adb5bd;
+        }
+
+        #employeeSearchInput:focus {
+            outline: none;
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        #employeeListModal .modal-header-actions {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            align-items: center;
+        }
+
+        #employeeListModal .modal-header-select-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        #employeeListModal .modal-header-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        #employeeListModal .close-btn {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #94a3b8;
+            transition: all 0.3s ease;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            padding: 0;
+            z-index: 1000;
+            position: relative;
+        }
+
+        #employeeListModal .close-btn:hover {
+            color: #ef4444;
+            background-color: #fee2e2;
+            transform: rotate(90deg);
+        }
+
+        #employeeListModal .employee-modal-body {
+            padding: 20px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        /* 员工列表样式 */
+        #employeeList {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .employee-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 20px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            font-size: 14px;
+            height: auto;
+        }
+
+        .employee-item:hover {
+            background-color: #f8f9fa;
+            border-color: #1890ff;
+        }
+
+        .employee-item.selected {
+            background: none;
+            border-color: #e9ecef;
+        }
+
+        .employee-item.selected .employee-id::after {
+            content: '✓';
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 18px;
+            height: 18px;
+            background-color: #f5222d;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 10;
+        }
+
+        .employee-info {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            position: relative;
+            width: 100%;
+        }
+
+        .employee-details {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            flex: 1;
+        }
+
+        .employee-id {
+            background-color: #f0f0f0;
+            color: #666;
+            width: 45px;
+            height: 45px;
+            border-radius: 3px;
+            font-size: 16px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
+            position: relative;
+        }
+
+        .employee-phone {
+            color: #6c757d;
+            font-size: 12px;
+            margin-top: 2px;
+        }
+
+        .employee-status {
+            color: #f5222d;
+            font-size: 12px;
+            padding: 4px 8px;
+            background-color: #fff1f0;
+            border: 1px solid #ffccc7;
+            border-radius: 4px;
+        }
+
+        .employee-item.selected .employee-id {
+            background-color: #1890ff;
+            color: white;
+            border: 2px solid #ff7a45;
+        }
+
+        .employee-name {
+            color: #343a40;
+            font-size: 16px;
+        }
+
+        #employeeListModal .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        #employeeListModal .btn-primary {
+            background-color: #1890ff;
+            color: white;
+        }
+
+        #employeeListModal .btn-primary:hover {
+            background-color: #40a9ff;
+        }
+
+        #employeeListModal .btn-secondary {
+            background-color: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #bbdefb;
+        }
+
+        #employeeListModal .btn-secondary:hover {
+            background-color: #bbdefb;
+            color: #1565c0;
+        }
+
+        /* 照片分类统计区域样式 */
+        .photo-category-stats {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .photo-category-item {
+            flex: 1 1 140px;
+            min-width: 140px;
+            text-align: center;
+            padding: 15px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background-color: #fff;
+            border: 2px solid transparent;
+        }
+
+        .photo-category-item:hover {
+            background-color: #e3f2fd;
+            transform: translateY(-2px);
+        }
+
+        .photo-category-item.active {
+            background-color: #e3f2fd;
+            border-color: #1890ff;
+        }
+
+        .photo-category-item.action-card {
+            background-color: #fff1f0;
+            border-color: #ff4d4f;
+        }
+
+        .photo-category-item.action-card:hover {
+            background-color: #ffccc7;
+            border-color: #ff4d4f;
+        }
+
+        .photo-category-item.action-card.is-disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            pointer-events: none;
+            transform: none;
+        }
+
+        .category-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .category-name {
+            font-size: 14px;
+            color: #333;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .category-count {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .category-count .count-num {
+            color: #1890ff;
+            font-size: 20px;
+            font-weight: bold;
+            margin: 0 2px;
+        }
+
+        /* 照片日期分组样式 */
+        .photo-date-group {
+            margin-top: 20px;
+        }
+
+        .photo-date-header {
+            padding: 10px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .photo-date {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .photo-count {
+            font-size: 14px;
+            color: #999;
+            margin-left: 5px;
+        }
+
+        /* 照片列表展示区域样式 */
+        .photo-list-container {
+            margin-top: 15px;
+        }
+
+        .photo-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .photo-item {
+            aspect-ratio: 4/3;
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: #f0f0f0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .photo-item:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .photo-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* 加载完毕提示样式 */
+        .load-complete-tip {
+            text-align: center;
+            padding: 30px 0;
+            color: #999;
+            font-size: 14px;
+        }
+
+        /* 移动端样式 */
+        @media (max-width: 768px) {
+            .form-row {
+                flex-direction: column !important;
+                gap: 15px !important;
+            }
+
+            #dateInputSection,
+            .employee-select-container {
+                width: 100%;
+            }
+
+            #dateInputSection label,
+            .employee-select-container label {
+                margin-left: 15px !important;
+            }
+
+            .date-input-container,
+            .employee-select-wrapper {
+                width: 100%;
+                margin-right: 15px;
+            }
+
+            #employeeListBtn {
+                width: 100%;
+            }
+
+            .photo-list {
+                grid-template-columns: repeat(2, 1fr) !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 日期和员工选择框一行显示 -->
+        <div class="form-row" style="display: flex; align-items: flex-start; gap: 20px; margin-top: 15px; padding-top: 0;">
+            <!-- 日期选择框 -->
+            <div id="dateInputSection" style="display: flex; align-items: flex-start;">
+                <label for="workDate" style="margin-bottom: 0; margin-left: 15px; margin-right: 8px; white-space: nowrap; height: 36px; line-height: 36px;">日期：</label>
+                <div class="date-input-container">
+                    <input type="date" id="workDate" class="date-input">
+                    <div id="dateDisplay" class="date-display"></div>
+                </div>
+            </div>
+
+            <!-- 员工选择框 -->
+            <div class="employee-select-container" style="display: flex; align-items: flex-start;">
+                <label class="employee-select-label" style="margin-bottom: 0; margin-right: 8px; white-space: nowrap; height: 36px; line-height: 36px;">员工：</label>
+                <div class="employee-select-wrapper">
+                    <button id="employeeListBtn">全部员工 ▼</button>
+                    <span id="employeeClearBtn">✕</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 照片分类统计区域 -->
+        <div class="photo-category-stats">
+            <div class="photo-category-item active" data-category="work">
+                <div class="category-icon">📅</div>
+                <div class="category-name">记工照片</div>
+                <div class="category-count">照片数量：<span class="count-num">0</span>张</div>
+            </div>
+            <div class="photo-category-item" data-category="settlement">
+                <div class="category-icon">💰</div>
+                <div class="category-name">借支照片</div>
+                <div class="category-count">照片数量：<span class="count-num">0</span>张</div>
+            </div>
+            <div class="photo-category-item" data-category="account">
+                <div class="category-icon">📒</div>
+                <div class="category-name">记账照片</div>
+                <div class="category-count">照片数量：<span class="count-num">0</span>张</div>
+            </div>
+            <div class="photo-category-item" data-category="workorder">
+                <div class="category-icon">📋</div>
+                <div class="category-name">点工单照片</div>
+                <div class="category-count">照片数量：<span class="count-num">0</span>张</div>
+            </div>
+            <div class="photo-category-item" data-category="construction">
+                <div class="category-icon">📝</div>
+                <div class="category-name">施工日志</div>
+                <div class="category-count">照片数量：<span class="count-num">0</span>张</div>
+            </div>
+            <div class="photo-category-item action-card" id="cleanInvalidImagesCard">
+                <div class="category-icon">🗑️</div>
+                <div class="category-name">删除无效图片</div>
+                <div class="category-count"><span id="cleanInvalidImagesStatus">点击清理（可选全局）</span></div>
+            </div>
+        </div>
+
+        <!-- 照片列表展示区域 -->
+        <div class="photo-list-container">
+            <div class="photo-list">
+                <div class="photo-item">
+                    <img src="" alt="照片" class="photo-img">
+                </div>
+            </div>
+        </div>
+
+        <!-- 加载完毕提示 -->
+        <div class="load-complete-tip">
+            已经全部加载完毕
+        </div>
+    </div>
+
+    <!-- 员工列表模态框 -->
+    <div id="employeeListModal" class="modal">
+        <div class="employee-modal-content">
+            <div class="employee-modal-header">
+                <div style="position: absolute; top: 15px; right: 20px;">
+                    <button type="button" class="close-btn" id="closeEmployeeListModal">&times;</button>
+                </div>
+                <div style="display: flex; align-items: center; width: 100%;">
+                    <h5 class="employee-modal-title">选择员工</h5>
+                    <div style="position: relative; margin-left: 20px; display: flex; align-items: center; gap: 10px;">
+                        <div style="position: relative;">
+                            <span class="search-icon">🔍</span>
+                            <input type="text" id="employeeSearchInput" placeholder="请输入工号或姓名" style="width: 150px; font-size: 12px;">
+                        </div>
+                        <button type="button" class="btn btn-secondary" id="toggleSettledEmployees" title="显示/隐藏结清员工">
+                            <span style="font-size: 16px;">👁️</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="employee-modal-body">
+                <div id="employeeList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图片预览模态框 -->
+    <div id="imagePreviewModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 3000; overflow: hidden;">
+        <img id="previewImage" src="" alt="预览图片" style="position: absolute; max-width: 90%; max-height: 90%; cursor: move; object-fit: contain;" ondragstart="return false;">
+        <button id="closePreviewBtn" style="position: fixed; top: 20px; right: 20px; background: #f5222d; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; z-index: 3001;">×</button>
+        <div id="previewBottomBar" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); color: white; font-size: 14px; background: rgba(0,0,0,0.5); padding: 8px 16px; border-radius: 4px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+            <span>滚轮缩放 | 拖动移动</span>
+            <button id="viewAttendanceBtn" style="display: none; background: #fa8c16; color: white; border: none; padding: 6px 16px; border-radius: 4px; font-size: 14px; cursor: pointer; transition: background 0.3s;">查看记工</button>
+            <button id="viewSettlementBtn" style="display: none; background: #52c41a; color: white; border: none; padding: 6px 16px; border-radius: 4px; font-size: 14px; cursor: pointer; transition: background 0.3s;">查看借支</button>
+            <button id="viewWorkOrderBtn" style="display: none; background: #1890ff; color: white; border: none; padding: 6px 16px; border-radius: 4px; font-size: 14px; cursor: pointer; transition: background 0.3s;">查看点工单</button>
+            <button id="viewAccountBtn" style="display: none; background: #52c41a; color: white; border: none; padding: 6px 16px; border-radius: 4px; font-size: 14px; cursor: pointer; transition: background 0.3s;">查看记账</button>
+        </div>
+    </div>
+
+    <script>
+        // 日期选择器模态框HTML
+        const datePickerModalHTML = `
+            <div id="datePickerModal" class="modal" style="display: none;">
+                <div class="date-picker-content">
+                    <div class="date-picker-body">
+                        <div class="calendar-header">
+                            <button id="prevMonth" class="month-btn">&lt;</button>
+                            <div style="display: flex; align-items: center; gap: 15px; flex: 1; justify-content: center;">
+                                <button id="selectAllDates" class="month-btn" title="选择全部日期" style="display: none;">📋 全部</button>
+                                <span id="currentMonth" class="month-title"></span>
+                                <button id="toggleMultiSelect" class="month-btn" title="切换多选模式">📅</button>
+                            </div>
+                            <button id="nextMonth" class="month-btn">&gt;</button>
+                        </div>
+                        <div class="calendar-grid">
+                            <div class="weekdays">
+                                <div>一</div>
+                                <div>二</div>
+                                <div>三</div>
+                                <div>四</div>
+                                <div>五</div>
+                                <div>六</div>
+                                <div>日</div>
+                            </div>
+                            <div class="calendar-days" id="calendarDays"></div>
+                        </div>
+                        <div id="multiSelectInfo" style="margin-top: 10px; padding: 10px; background-color: #f0f8ff; border-radius: 6px; display: none;">
+                            <span style="color: #1890ff; font-size: 12px;">多选模式：可选择两个日期作为起止日期</span>
+                        </div>
+                    </div>
+
+                    <!-- 月份选择器 -->
+                    <div class="month-picker-overlay" id="monthPickerOverlay">
+                        <div class="month-picker">
+                            <div class="picker-header">
+                                <button class="picker-year-btn" id="prevYear">&lt;</button>
+                                <h3 id="pickerYear">2025</h3>
+                                <button class="picker-year-btn" id="nextYear">&gt;</button>
+                            </div>
+                            <div class="month-grid" id="monthGrid">
+                                <div class="month-item" data-month="0">1月</div>
+                                <div class="month-item" data-month="1">2月</div>
+                                <div class="month-item" data-month="2">3月</div>
+                                <div class="month-item" data-month="3">4月</div>
+                                <div class="month-item" data-month="4">5月</div>
+                                <div class="month-item" data-month="5">6月</div>
+                                <div class="month-item" data-month="6">7月</div>
+                                <div class="month-item" data-month="7">8月</div>
+                                <div class="month-item" data-month="8">9月</div>
+                                <div class="month-item" data-month="9">10月</div>
+                                <div class="month-item" data-month="10">11月</div>
+                                <div class="month-item" data-month="11">12月</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // 在body末尾添加日期选择器模态框
+        document.body.insertAdjacentHTML('beforeend', datePickerModalHTML);
+
+        // 格式化日期为显示格式
+        function formatDateForDisplay(dateStr) {
+            const [year, month, day] = dateStr.split('-');
+            return `${year}年${parseInt(month)}月${parseInt(day)}日`;
+        }
+
+        // 更新日期显示（在框内显示今天标识）
+        function updateDateDisplay() {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            const formattedToday = `${yyyy}-${mm}-${dd}`;
+            const workDateInput = document.getElementById('workDate');
+            const dateDisplay = document.getElementById('dateDisplay');
+            
+            // 检查是否为"全部"状态
+            if (workDateInput.dataset.selectAll === 'true') {
+                dateDisplay.innerHTML = '全部';
+                dateDisplay.classList.remove('today');
+                workDateInput.removeAttribute('data-today');
+                // 清除其他显示值
+                delete workDateInput.dataset.displayValue;
+                return;
+            }
+            
+            if (workDateInput.value) {
+                // 检查是否有多选日期的显示值
+                let displayText;
+                if (workDateInput.dataset.displayValue) {
+                    displayText = workDateInput.dataset.displayValue;
+                } else {
+                    // 单选模式，格式化单个日期
+                    displayText = formatDateForDisplay(workDateInput.value);
+                    
+                    // 检查是否为今天
+                    if (workDateInput.value === formattedToday) {
+                        displayText += '<span class="today-text">（今天）</span>';
+                    }
+                }
+                
+                dateDisplay.innerHTML = displayText;
+                
+                // 检查是否为今天（只在单选模式下检查）
+                if (!workDateInput.dataset.displayValue && workDateInput.value === formattedToday) {
+                    dateDisplay.classList.add('today');
+                    workDateInput.setAttribute('data-today', 'true');
+                } else {
+                    dateDisplay.classList.remove('today');
+                    workDateInput.removeAttribute('data-today');
+                }
+            } else {
+                dateDisplay.innerHTML = '请选择日期';
+                dateDisplay.classList.remove('today');
+                workDateInput.removeAttribute('data-today');
+                // 清除多选显示值和其他状态
+                delete workDateInput.dataset.displayValue;
+                delete workDateInput.dataset.selectAll;
+            }
+        }
+
+        // 设置当前日期到日期输入框并添加"今天"标识
+        function setTodayDate() {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            const formattedToday = `${yyyy}-${mm}-${dd}`;
+            const workDateInput = document.getElementById('workDate');
+            
+            // 设置默认日期为今天
+            workDateInput.value = formattedToday;
+            
+            // 更新显示
+            updateDateDisplay();
+        }
+
+        // 处理日期输入框交互
+        function setupDateInteraction() {
+            const workDateInput = document.getElementById('workDate');
+            
+            // 点击显示区域时激活输入框或打开日期选择器
+            const dateDisplay = document.getElementById('dateDisplay');
+            dateDisplay.addEventListener('click', function() {
+                showDatePicker();
+            });
+            
+            // 输入框点击时打开日期选择器
+            workDateInput.addEventListener('click', function(e) {
+                e.preventDefault();
+                showDatePicker();
+            });
+            
+            // 防止原生日期输入框获得焦点
+            workDateInput.addEventListener('focus', function(e) {
+                e.preventDefault();
+                this.blur(); // 立即失去焦点
+                showDatePicker();
+            });
+            
+            // 日期改变时更新显示
+            workDateInput.addEventListener('change', function() {
+                updateDateDisplay();
+            });
+        }
+
+        // 日期选择器状态管理
+        let datePickerState = {
+            currentDate: new Date(),
+            displayDate: new Date(),
+            singleSelectedDate: null, // 单选模式下的选中日期
+            multiSelectedDates: [], // 多选模式下的选中日期数组
+            isMultiSelect: false // 是否多选模式
+        };
+
+        // 月份选择器状态变量
+        let selectedYear = datePickerState.displayDate.getFullYear();
+        let selectedMonth = datePickerState.displayDate.getMonth();
+
+        // 显示日期选择器
+        function showDatePicker() {
+            const modal = document.getElementById('datePickerModal');
+            modal.style.display = 'flex';
+            
+            // 初始化选择器状态
+            initializeDatePicker();
+            
+            // 渲染日历
+            renderCalendar();
+        }
+
+        // 隐藏日期选择器
+        function hideDatePicker() {
+            const modal = document.getElementById('datePickerModal');
+            modal.style.display = 'none';
+        }
+
+        // 初始化日期选择器
+        function initializeDatePicker() {
+            const workDateInput = document.getElementById('workDate');
+            
+            // 控制多选图标的显示/隐藏
+            const toggleBtn = document.getElementById('toggleMultiSelect');
+            const multiSelectInfo = document.getElementById('multiSelectInfo');
+            const selectAllBtn = document.getElementById('selectAllDates');
+            
+            if (toggleBtn) {
+                toggleBtn.style.setProperty('display', 'flex', 'important');
+                toggleBtn.style.setProperty('visibility', 'visible', 'important');
+                toggleBtn.style.setProperty('opacity', '1', 'important');
+                toggleBtn.style.setProperty('align-items', 'center', 'important');
+                toggleBtn.style.setProperty('justify-content', 'center', 'important');
+            }
+            
+            if (multiSelectInfo) {
+                multiSelectInfo.style.setProperty('display', 'none', 'important');
+            }
+            
+            // 控制全部按钮的显示/隐藏 - 只在多选模式下显示
+            if (selectAllBtn) {
+                selectAllBtn.style.setProperty('display', 'flex', 'important');
+                selectAllBtn.style.setProperty('align-items', 'center', 'important');
+                selectAllBtn.style.setProperty('justify-content', 'center', 'important');
+                selectAllBtn.style.setProperty('visibility', 'visible', 'important');
+                selectAllBtn.style.setProperty('opacity', '1', 'important');
+            }
+            
+            // 控制月份标题样式和功能
+            const currentMonthEl = document.getElementById('currentMonth');
+            if (currentMonthEl) {
+                currentMonthEl.classList.add('month-title');
+            }
+            
+            // 设置当前显示日期
+            if (workDateInput.value) {
+                datePickerState.displayDate = new Date(workDateInput.value + 'T00:00:00');
+                
+                // 检查是否为全部状态
+                if (workDateInput.dataset.selectAll === 'true') {
+                    datePickerState.singleSelectedDate = null;
+                    datePickerState.multiSelectedDates = [];
+                    datePickerState.isMultiSelect = false;
+                }
+                // 检查是否有多选日期
+                else if (workDateInput.dataset.displayValue && workDateInput.dataset.displayValue.includes('~')) {
+                    const dates = workDateInput.dataset.displayValue.split(' ~ ');
+                    if (dates.length === 2) {
+                        datePickerState.multiSelectedDates = dates;
+                        datePickerState.isMultiSelect = true;
+                        if (toggleBtn) {
+                            toggleBtn.innerHTML = '🔢';
+                            toggleBtn.title = '切换单选模式';
+                        }
+                        if (multiSelectInfo) multiSelectInfo.style.setProperty('display', 'block', 'important');
+                    }
+                } else {
+                    datePickerState.singleSelectedDate = workDateInput.value;
+                    datePickerState.isMultiSelect = false;
+                    if (toggleBtn) {
+                        toggleBtn.innerHTML = '📅';
+                        toggleBtn.title = '切换多选模式';
+                    }
+                }
+            } else {
+                datePickerState.displayDate = new Date();
+                datePickerState.isMultiSelect = false;
+                if (toggleBtn) {
+                    toggleBtn.innerHTML = '📅';
+                    toggleBtn.title = '切换多选模式';
+                }
+            }
+            
+            // 绑定事件监听器
+            bindDatePickerEvents();
+        }
+
+        // 绑定日期选择器事件
+        function bindDatePickerEvents() {
+            // 多选切换按钮
+            const toggleBtn = document.getElementById('toggleMultiSelect');
+            if (toggleBtn) toggleBtn.onclick = toggleMultiSelect;
+            
+            // 月份切换
+            document.getElementById('prevMonth').onclick = () => changeMonth(-1);
+            document.getElementById('nextMonth').onclick = () => changeMonth(1);
+            
+            // 全部按钮
+            const selectAllBtn = document.getElementById('selectAllDates');
+            if (selectAllBtn) {
+                selectAllBtn.onclick = selectAllDates;
+            }
+            
+            // 月份标题点击事件
+            const currentMonthEl = document.getElementById('currentMonth');
+            if (currentMonthEl) {
+                currentMonthEl.onclick = showMonthPicker;
+                currentMonthEl.classList.add('month-title');
+            }
+            
+            // 月份选择器事件
+            const prevYearBtn = document.getElementById('prevYear');
+            const nextYearBtn = document.getElementById('nextYear');
+            const monthPickerOverlay = document.getElementById('monthPickerOverlay');
+            
+            if (prevYearBtn) prevYearBtn.onclick = () => changePickerYear(-1);
+            if (nextYearBtn) nextYearBtn.onclick = () => changePickerYear(1);
+            
+            if (monthPickerOverlay) {
+                monthPickerOverlay.addEventListener('click', function(e) {
+                    if (e.target === monthPickerOverlay) {
+                        hideMonthPicker();
+                    }
+                });
+            }
+            
+            const monthItems = document.querySelectorAll('.month-item');
+            monthItems.forEach(item => {
+                item.onclick = function() {
+                    const month = parseInt(this.dataset.month);
+                    selectMonth(month);
+                };
+            });
+            
+            // 点击模态框外部关闭
+            const modal = document.getElementById('datePickerModal');
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    hideDatePicker();
+                }
+            });
+        }
+
+        // 显示月份选择器
+        function showMonthPicker() {
+            const monthPickerOverlay = document.getElementById('monthPickerOverlay');
+            const pickerYearEl = document.getElementById('pickerYear');
+            const monthItems = document.querySelectorAll('.month-item');
+            
+            if (monthPickerOverlay && pickerYearEl) {
+                selectedYear = datePickerState.displayDate.getFullYear();
+                selectedMonth = datePickerState.displayDate.getMonth();
+                pickerYearEl.textContent = selectedYear;
+                
+                // 获取当前日期
+                const today = new Date();
+                const currentYear = today.getFullYear();
+                const currentMonth = today.getMonth();
+                
+                monthItems.forEach(item => {
+                    item.classList.remove('selected');
+                    item.classList.remove('disabled');
+                    item.style.cursor = 'pointer';
+                    item.style.opacity = '1';
+                    item.style.pointerEvents = 'auto';
+                    
+                    const month = parseInt(item.dataset.month);
+                    
+                    // 检查是否是未来月份
+                    if (selectedYear > currentYear || (selectedYear === currentYear && month > currentMonth)) {
+                        // 未来月份，灰色显示并不可选择
+                        item.classList.add('disabled');
+                        item.style.cursor = 'not-allowed';
+                        item.style.opacity = '0.5';
+                        item.style.pointerEvents = 'none';
+                    } else if (month === selectedMonth) {
+                        item.classList.add('selected');
+                    }
+                });
+                
+                monthPickerOverlay.style.display = 'flex';
+            }
+        }
+        
+        // 隐藏月份选择器
+        function hideMonthPicker() {
+            const monthPickerOverlay = document.getElementById('monthPickerOverlay');
+            if (monthPickerOverlay) {
+                monthPickerOverlay.style.display = 'none';
+            }
+        }
+        
+        // 改变年份选择器的年份
+        function changePickerYear(delta) {
+            const pickerYearEl = document.getElementById('pickerYear');
+            if (pickerYearEl) {
+                selectedYear += delta;
+                pickerYearEl.textContent = selectedYear;
+                
+                // 更新月份禁用状态
+                const monthItems = document.querySelectorAll('.month-item');
+                const today = new Date();
+                const currentYear = today.getFullYear();
+                const currentMonth = today.getMonth();
+                
+                monthItems.forEach(item => {
+                    item.classList.remove('disabled');
+                    item.style.cursor = 'pointer';
+                    item.style.opacity = '1';
+                    item.style.pointerEvents = 'auto';
+                    
+                    const month = parseInt(item.dataset.month);
+                    
+                    // 检查是否是未来月份
+                    if (selectedYear > currentYear || (selectedYear === currentYear && month > currentMonth)) {
+                        // 未来月份，灰色显示并不可选择
+                        item.classList.add('disabled');
+                        item.style.cursor = 'not-allowed';
+                        item.style.opacity = '0.5';
+                        item.style.pointerEvents = 'none';
+                    }
+                });
+            }
+        }
+        
+        // 选择月份
+        function selectMonth(month) {
+            const pickerYearEl = document.getElementById('pickerYear');
+            if (pickerYearEl) {
+                const selectedYear = parseInt(pickerYearEl.textContent);
+                datePickerState.displayDate = new Date(selectedYear, month);
+                const firstDay = new Date(selectedYear, month, 1);
+                const lastDay = new Date(selectedYear, month + 1, 0);
+                
+                const formatDate = (date) => {
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                };
+                
+                const startDate = formatDate(firstDay);
+                const endDate = formatDate(lastDay);
+                
+                const workDateInput = document.getElementById('workDate');
+                workDateInput.value = startDate;
+                workDateInput.dataset.displayValue = `${startDate} ~ ${endDate}`;
+                delete workDateInput.dataset.selectAll;
+                
+                updateDateDisplay();
+                workDateInput.dispatchEvent(new Event('change', { bubbles: true }));
+                renderCalendar();
+                hideMonthPicker();
+                hideDatePicker();
+            }
+        }
+
+        // 选择全部日期
+        function selectAllDates() {
+            const workDateInput = document.getElementById('workDate');
+            workDateInput.value = '';
+            delete workDateInput.dataset.displayValue;
+            workDateInput.dataset.selectAll = 'true';
+            updateDateDisplay();
+            workDateInput.dispatchEvent(new Event('change', { bubbles: true }));
+            hideDatePicker();
+        }
+
+        // 切换多选模式
+        function toggleMultiSelect() {
+            datePickerState.isMultiSelect = !datePickerState.isMultiSelect;
+            
+            const toggleBtn = document.getElementById('toggleMultiSelect');
+            const multiSelectInfo = document.getElementById('multiSelectInfo');
+            const selectAllBtn = document.getElementById('selectAllDates');
+            
+            if (datePickerState.isMultiSelect) {
+                toggleBtn.innerHTML = '🔢';
+                toggleBtn.title = '切换单选模式';
+                multiSelectInfo.style.setProperty('display', 'block', 'important');
+                if (selectAllBtn) selectAllBtn.style.setProperty('display', 'flex', 'important');
+                datePickerState.multiSelectedDates = [];
+                datePickerState.singleSelectedDate = null;
+            } else {
+                toggleBtn.innerHTML = '📅';
+                toggleBtn.title = '切换多选模式';
+                if (selectAllBtn) selectAllBtn.style.setProperty('display', 'none', 'important');
+                multiSelectInfo.style.setProperty('display', 'none', 'important');
+                datePickerState.multiSelectedDates = [];
+                datePickerState.singleSelectedDate = null;
+            }
+            renderCalendar();
+        }
+
+        // 渲染日历
+        function renderCalendar() {
+            const currentMonthEl = document.getElementById('currentMonth');
+            const calendarDays = document.getElementById('calendarDays');
+            
+            const year = datePickerState.displayDate.getFullYear();
+            const month = datePickerState.displayDate.getMonth();
+            
+            currentMonthEl.textContent = `${year}年${month + 1}月`;
+            updateMonthNavigationButtons(year, month);
+            
+            calendarDays.innerHTML = '';
+            
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const firstDayOfWeek = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
+            const daysInMonth = lastDay.getDate();
+            
+            const prevMonth = new Date(year, month - 1, 0);
+            const daysInPrevMonth = prevMonth.getDate();
+            
+            for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+                const day = daysInPrevMonth - i;
+                const dateStr = formatDate(year, month - 1, day);
+                const dayEl = createDayElement(day, true, dateStr);
+                calendarDays.appendChild(dayEl);
+            }
+            
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = formatDate(year, month, day);
+                const dayEl = createDayElement(day, false, dateStr);
+                calendarDays.appendChild(dayEl);
+            }
+            
+            const totalCells = calendarDays.children.length;
+            const remainingCells = 42 - totalCells;
+            for (let day = 1; day <= remainingCells; day++) {
+                const dateStr = formatDate(year, month + 1, day);
+                const dayEl = createDayElement(day, true, dateStr);
+                calendarDays.appendChild(dayEl);
+            }
+        }
+
+        // 更新月份导航按钮状态
+        function updateMonthNavigationButtons(year, month) {
+            const today = new Date();
+            const currentYear = today.getFullYear();
+            const currentMonth = today.getMonth();
+            const nextMonthBtn = document.getElementById('nextMonth');
+            
+            if (year > currentYear || (year === currentYear && month >= currentMonth)) {
+                nextMonthBtn.disabled = true;
+                nextMonthBtn.style.opacity = '0.3';
+                nextMonthBtn.style.cursor = 'not-allowed';
+            } else {
+                nextMonthBtn.disabled = false;
+                nextMonthBtn.style.opacity = '1';
+                nextMonthBtn.style.cursor = 'pointer';
+            }
+        }
+
+        // 农历转换
+        function getLunarCalendar(dateStr) {
+            const date = new Date(dateStr + 'T00:00:00');
+            const year = date.getFullYear();
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            const lunarDays = ['初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十',
+                              '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十',
+                              '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十'];
+            const offset = (year - 2000) * 12 + month;
+            const lunarDayIndex = (day + offset) % 30;
+            return `${lunarDays[lunarDayIndex]}`;
+        }
+
+        // 创建日期元素
+        function createDayElement(day, isOtherMonth, dateStr) {
+            const dayEl = document.createElement('div');
+            dayEl.className = 'day-cell';
+            dayEl.dataset.date = dateStr;
+            
+            const dayContent = document.createElement('div');
+            dayContent.style.display = 'flex';
+            dayContent.style.flexDirection = 'column';
+            dayContent.style.alignItems = 'center';
+            dayContent.style.justifyContent = 'center';
+            dayContent.style.height = '100%';
+            dayContent.style.padding = '5px';
+            
+            const dayNumber = document.createElement('span');
+            dayNumber.textContent = day;
+            dayNumber.style.fontSize = '14px';
+            dayNumber.style.fontWeight = 'bold';
+            dayContent.appendChild(dayNumber);
+            
+            if (!isOtherMonth) {
+                const lunarCalendar = getLunarCalendar(dateStr);
+                const lunarElement = document.createElement('span');
+                lunarElement.textContent = lunarCalendar;
+                lunarElement.style.fontSize = '10px';
+                lunarElement.style.color = '#999';
+                lunarElement.style.marginTop = '2px';
+                dayContent.appendChild(lunarElement);
+            }
+            
+            dayEl.appendChild(dayContent);
+            
+            if (isOtherMonth) {
+                dayEl.classList.add('other-month');
+                return dayEl;
+            }
+            
+            const today = new Date();
+            const todayStr = formatDate(today.getFullYear(), today.getMonth(), today.getDate());
+            if (dateStr === todayStr) {
+                dayEl.classList.add('today');
+            }
+            
+            const selectedDate = new Date(dateStr + 'T00:00:00');
+            if (selectedDate > today) {
+                dayEl.classList.add('disabled-future');
+                dayEl.style.cursor = 'not-allowed';
+                return dayEl;
+            }
+            
+            if (!datePickerState.isMultiSelect && dateStr === datePickerState.singleSelectedDate) {
+                dayEl.classList.add('selected-single');
+            }
+            
+            if (datePickerState.isMultiSelect && datePickerState.multiSelectedDates.includes(dateStr)) {
+                dayEl.classList.add('selected-multi');
+            }
+            
+            dayEl.addEventListener('click', () => selectDate(dateStr));
+            return dayEl;
+        }
+
+        // 选择日期
+        function selectDate(dateStr) {
+            if (datePickerState.isMultiSelect) {
+                const index = datePickerState.multiSelectedDates.indexOf(dateStr);
+                if (index > -1) {
+                    datePickerState.multiSelectedDates.splice(index, 1);
+                } else {
+                    if (datePickerState.multiSelectedDates.length < 2) {
+                        datePickerState.multiSelectedDates.push(dateStr);
+                        datePickerState.multiSelectedDates.sort();
+                    } else {
+                        datePickerState.multiSelectedDates[0] = datePickerState.multiSelectedDates[1];
+                        datePickerState.multiSelectedDates[1] = dateStr;
+                    }
+                }
+                
+                if (datePickerState.multiSelectedDates.length === 2) {
+                    const startDate = datePickerState.multiSelectedDates[0];
+                    const endDate = datePickerState.multiSelectedDates[1];
+                    const workDateInput = document.getElementById('workDate');
+                    workDateInput.value = startDate;
+                    workDateInput.dataset.displayValue = `${startDate} ~ ${endDate}`;
+                    delete workDateInput.dataset.selectAll;
+                    updateDateDisplay();
+                    workDateInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    setTimeout(() => { hideDatePicker(); }, 500);
+                }
+            } else {
+                datePickerState.singleSelectedDate = dateStr;
+                const workDateInput = document.getElementById('workDate');
+                workDateInput.value = dateStr;
+                delete workDateInput.dataset.displayValue;
+                delete workDateInput.dataset.selectAll;
+                updateDateDisplay();
+                workDateInput.dispatchEvent(new Event('change', { bubbles: true }));
+                hideDatePicker();
+            }
+            renderCalendar();
+        }
+
+        // 改变月份
+        function changeMonth(delta) {
+            const newDate = new Date(datePickerState.displayDate);
+            newDate.setMonth(newDate.getMonth() + delta);
+            
+            const today = new Date();
+            const currentYear = today.getFullYear();
+            const currentMonth = today.getMonth();
+            const newYear = newDate.getFullYear();
+            const newMonth = newDate.getMonth();
+            
+            if (newYear > currentYear || (newYear === currentYear && newMonth > currentMonth)) {
+                return;
+            }
+            
+            datePickerState.displayDate = newDate;
+            renderCalendar();
+        }
+
+        // 格式化日期
+        function formatDate(year, month, day) {
+            const adjustedMonth = month < 0 ? 11 : (month > 11 ? 0 : month);
+            const adjustedYear = month < 0 ? year - 1 : (month > 11 ? year + 1 : year);
+            const yyyy = adjustedYear;
+            const mm = String(adjustedMonth + 1).padStart(2, '0');
+            const dd = String(day).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+
+        // ==================== 员工选择功能 ====================
+
+        // 保存原始员工数据
+        let originalEmployees = [];
+
+        // 是否显示结清的员工
+        let showSettledEmployees = false;
+
+        // 设置员工列表按钮事件
+        function setupEmployeeListEvents() {
+            const employeeListBtn = document.getElementById('employeeListBtn');
+            const employeeListModal = document.getElementById('employeeListModal');
+            const closeBtn = document.getElementById('closeEmployeeListModal');
+            const toggleSettledBtn = document.getElementById('toggleSettledEmployees');
+            const employeeClearBtn = document.getElementById('employeeClearBtn');
+
+            // 显示员工列表模态框
+            employeeListBtn.addEventListener('click', function() {
+                employeeListModal.style.display = 'flex';
+                loadEmployees();
+            });
+
+            // 员工清除按钮点击事件
+            employeeClearBtn.addEventListener('click', function(e) {
+                e.stopPropagation(); // 阻止事件冒泡，防止触发按钮点击
+
+                // 处理选中的员工，传入空数组，标记为全部选中
+                handleSelectedEmployees([], true);
+
+                // 更新清除按钮显示
+                employeeClearBtn.style.display = 'none';
+            });
+
+            // 关闭模态框
+            function closeModal() {
+                employeeListModal.style.display = 'none';
+            }
+
+            // 关闭按钮点击事件
+            closeBtn.addEventListener('click', function() {
+                closeModal();
+            });
+
+            // 切换显示结清员工按钮点击事件
+            toggleSettledBtn.addEventListener('click', function() {
+                // 切换状态
+                showSettledEmployees = !showSettledEmployees;
+
+                // 更新按钮样式或图标
+                const icon = this.querySelector('span');
+                if (showSettledEmployees) {
+                    icon.textContent = '👁️‍🗨️'; // 睁眼带斜杠，表示隐藏
+                    this.title = '隐藏结清员工';
+                } else {
+                    icon.textContent = '👁️'; // 睁眼，表示显示
+                    this.title = '显示结清员工';
+                }
+
+                // 重新加载员工列表
+                loadEmployees();
+            });
+
+            // 点击模态框外部关闭
+            employeeListModal.addEventListener('click', function(e) {
+                if (e.target === employeeListModal) {
+                    closeModal();
+                }
+            });
+        }
+
+        // 加载员工数据
+        async function loadEmployees() {
+            const employeeList = document.getElementById('employeeList');
+            employeeList.innerHTML = '<div style="text-align: center; color: #6c757d; padding: 20px;">加载中...</div>';
+
+            try {
+                // 从localStorage加载员工数据
+                const employees = await getEmployeesFromLocalStorage();
+
+                // 保存原始员工数据
+                originalEmployees = employees;
+
+                // 根据showSettledEmployees变量过滤员工数据
+                const filteredEmployees = showSettledEmployees ? employees : employees.filter(employee => {
+                    const status = employee.状态 || employee.status || '';
+                    return status !== '结清';
+                });
+
+                // 渲染员工列表
+                renderEmployeeList(filteredEmployees);
+
+                // 初始化员工筛选功能
+                initEmployeeSearch();
+            } catch (error) {
+                console.error('加载员工数据失败:', error);
+                employeeList.innerHTML = '<div style="text-align: center; color: #dc3545; padding: 20px;">加载员工数据失败</div>';
+            }
+        }
+
+        // 从localStorage获取员工数据（始终从本地获取）
+        async function getEmployeesFromLocalStorage() {
+            try {
+                // 获取当前项目ID
+                const projectId = localStorage.getItem('currentProjectId') || '';
+
+                if (!projectId) {
+                    return [];
+                }
+
+                // 从localStorage加载数据 - 使用项目ID作为键名以确保一致性
+                const localKey = `employees_${projectId}`;
+                const savedData = localStorage.getItem(localKey);
+
+                let employees = [];
+                if (savedData) {
+                    const parsedData = JSON.parse(savedData);
+                    employees = parsedData.employees || [];
+                }
+
+                // 按工号emp_code升序排序（数字排序）
+                employees.sort((a, b) => {
+                    const codeA = parseInt(a.emp_code) || 0;
+                    const codeB = parseInt(b.emp_code) || 0;
+                    return codeA - codeB;
+                });
+
+                return employees;
+            } catch (error) {
+                console.error('从localStorage获取员工数据失败:', error);
+                return [];
+            }
+        }
+
+        // 渲染员工列表
+        function renderEmployeeList(employees) {
+            const employeeList = document.getElementById('employeeList');
+
+            if (employees.length === 0) {
+                employeeList.innerHTML = '<div style="text-align: center; color: #6c757d; padding: 20px;">暂无员工数据</div>';
+                return;
+            }
+
+            let html = '';
+            employees.forEach(employee => {
+                const hasPhone = employee.phone && employee.phone.trim() !== '';
+                const status = employee.状态 || employee.status || '';
+                const showStatus = ['离职', '隐藏', '结清'].includes(status);
+                html += `
+                    <div class="employee-item" data-id="${employee.employee_id}" data-name="${employee.emp_name}" data-emp-code="${employee.emp_code}">
+                        <div class="employee-info">
+                            <div class="employee-id">${employee.emp_code}</div>
+                            <div class="employee-details">
+                                <div class="employee-name">${employee.emp_name}</div>
+                                ${hasPhone ? `<div class="employee-phone">${employee.phone}</div>` : ''}
+                            </div>
+                            ${showStatus ? `<div class="employee-status">${status}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+
+            employeeList.innerHTML = html;
+
+            // 恢复之前选中的员工状态
+            restoreSelectedEmployees();
+
+            // 添加员工选择事件
+            addEmployeeSelectionEvents();
+        }
+
+        // 添加员工选择事件 - 单选模式
+        function addEmployeeSelectionEvents() {
+            const employeeItems = document.querySelectorAll('.employee-item');
+            const employeeListModal = document.getElementById('employeeListModal');
+
+            employeeItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    // 单选模式：选中当前员工并关闭模态框
+                    const selectedEmployee = {
+                        id: this.dataset.id,
+                        name: this.dataset.name,
+                        empCode: this.dataset.empCode
+                    };
+
+                    // 处理选中的员工
+                    handleSelectedEmployees([selectedEmployee], false);
+
+                    // 关闭模态框
+                    employeeListModal.style.display = 'none';
+                });
+            });
+        }
+
+        // 恢复之前选中的员工状态
+        function restoreSelectedEmployees() {
+            try {
+                const savedSelected = localStorage.getItem('selectedEmployees');
+                if (savedSelected) {
+                    const selectedEmployees = JSON.parse(savedSelected);
+                    const employeeItems = document.querySelectorAll('.employee-item');
+
+                    employeeItems.forEach(item => {
+                        const empId = item.dataset.id;
+                        const isSelected = selectedEmployees.some(emp => emp.id === empId);
+                        if (isSelected) {
+                            item.classList.add('selected');
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('恢复选中员工状态失败:', error);
+            }
+        }
+
+        // 初始化员工筛选功能
+        function initEmployeeSearch() {
+            const searchInput = document.getElementById('employeeSearchInput');
+
+            // 添加输入事件监听器
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.trim().toLowerCase();
+
+                // 先根据搜索词筛选员工
+                let filteredEmployees;
+                if (!searchTerm) {
+                    filteredEmployees = originalEmployees;
+                } else {
+                    filteredEmployees = originalEmployees.filter(employee => {
+                        const empCode = employee.emp_code || '';
+                        const empName = employee.emp_name || '';
+                        return empCode.toLowerCase().includes(searchTerm) || empName.toLowerCase().includes(searchTerm);
+                    });
+                }
+
+                // 再根据showSettledEmployees变量筛选，排除结清的员工
+                if (!showSettledEmployees) {
+                    filteredEmployees = filteredEmployees.filter(employee => {
+                        const status = employee.状态 || employee.status || '';
+                        return status !== '结清';
+                    });
+                }
+
+                renderEmployeeList(filteredEmployees);
+            });
+        }
+
+        // 处理选中的员工
+        function handleSelectedEmployees(employees, isAllSelected = false) {
+            // 根据选中的员工更新按钮文本
+            const employeeListBtn = document.getElementById('employeeListBtn');
+            const employeeClearBtn = document.getElementById('employeeClearBtn');
+
+            // 保存选中的员工到localStorage
+            if (isAllSelected) {
+                // 如果是全部选中，清空localStorage中的员工选择
+                localStorage.removeItem('selectedEmployees');
+            } else {
+                // 否则保存选中的员工
+                const selectedEmployeesData = employees.map(emp => ({
+                    id: emp.id,
+                    name: emp.name,
+                    empCode: emp.empCode
+                }));
+                localStorage.setItem('selectedEmployees', JSON.stringify(selectedEmployeesData));
+            }
+
+            // 更新按钮文本
+            if (employees.length === 0 || isAllSelected) {
+                // 如果没有选中员工或者全部选中，显示"全部员工"和▼
+                employeeListBtn.textContent = '全部员工 ▼';
+                employeeClearBtn.style.display = 'none';
+            } else {
+                // 获取选中的员工姓名列表
+                const employeeNames = employees.map(emp => emp.name);
+
+                // 生成显示文本，只显示员工姓名
+                let displayText = employeeNames.join(' | ');
+
+                // 非默认状态，只显示文本，不显示▼
+                employeeListBtn.textContent = displayText;
+                employeeClearBtn.style.display = 'inline-block';
+            }
+
+            // 触发自定义事件，通知其他组件员工选择已变更
+            const event = new CustomEvent('employeeSelectionChanged', {
+                detail: { employees, isAllSelected }
+            });
+            document.dispatchEvent(event);
+        }
+
+        // ==================== 照片加载功能 ====================
+
+        // 当前选中的筛选条件
+        let currentFilters = {
+            projectId: '',
+            dateRange: null, // {start: '2025-01-01', end: '2025-01-31'} 或 null
+            employeeId: null // 员工ID或null表示全部员工
+        };
+
+        // 当前选中的照片分类
+        let currentPhotoCategory = 'work';
+
+        // 当前正在加载的AbortController（用于终止未完成的异步操作）
+        let currentAbortController = null;
+
+        // 终止所有未完成的异步操作
+        function abortPendingRequests() {
+            if (currentAbortController) {
+                currentAbortController.abort();
+            }
+            currentAbortController = new AbortController();
+            return currentAbortController;
+        }
+
+        // 加载考勤照片
+        async function loadAttendancePhotos() {
+            const photoListContainer = document.querySelector('.photo-list-container');
+            const photoDateGroup = document.querySelector('.photo-date-group');
+            const categoryCount = document.querySelector('.photo-category-item[data-category="work"] .count-num');
+            const abortController = abortPendingRequests();
+            const signal = abortController.signal;
+
+            try {
+                // 获取当前项目ID
+                const projectId = localStorage.getItem('currentProjectId') || '';
+                if (!projectId) {
+                    photoListContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 40px;">请先选择项目</div>';
+                    return;
+                }
+                currentFilters.projectId = projectId;
+
+                // 检查是否已被终止
+                if (signal.aborted) {
+                    return;
+                }
+
+                // 从localStorage获取考勤记录
+                const attendanceRecords = await getAttendanceRecordsFromStorage();
+
+                // 检查是否已被终止
+                if (signal.aborted) {
+                    return;
+                }
+
+                // 筛选考勤记录
+                const filteredRecords = filterAttendanceRecords(attendanceRecords);
+
+                // 按日期分组
+                const groupedByDate = groupRecordsByDate(filteredRecords);
+
+                // 渲染照片
+                await renderPhotos(groupedByDate, signal);
+
+                // 检查是否已被终止
+                if (signal.aborted) {
+                    console.log('loadAttendancePhotos: 渲染后请求已被终止');
+                    return;
+                }
+
+                // 更新统计数量
+                const totalPhotos = filteredRecords.reduce((sum, record) => {
+                    return sum + (record.image_ids ? record.image_ids.length : 0);
+                }, 0);
+                if (categoryCount) {
+                    categoryCount.textContent = totalPhotos;
+                }
+
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.log('loadAttendancePhotos: 请求被终止');
+                    return;
+                }
+                console.error('加载考勤照片失败:', error);
+                photoListContainer.innerHTML = '<div style="text-align: center; color: #dc3545; padding: 40px;">加载照片失败</div>';
+            }
+        }
+
+        // 加载借支照片（从settlement_records表）
+        async function loadSettlementPhotos() {
+            const photoListContainer = document.querySelector('.photo-list-container');
+            const categoryCount = document.querySelector('.photo-category-item[data-category="settlement"] .count-num');
+            const abortController = abortPendingRequests();
+            const signal = abortController.signal;
+
+            try {
+                // 获取当前项目ID
+                const projectId = localStorage.getItem('currentProjectId') || '';
+                if (!projectId) {
+                    photoListContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 40px;">请先选择项目</div>';
+                    return;
+                }
+                currentFilters.projectId = projectId;
+
+                // 检查是否已被终止
+                if (signal.aborted) {
+                    return;
+                }
+
+                // 从Supabase获取借支记录
+                const settlementRecords = await getSettlementRecordsFromStorage();
+
+                // 检查是否已被终止
+                if (signal.aborted) {
+                    return;
+                }
+
+                // 筛选记录
+                const filteredRecords = filterSettlementRecords(settlementRecords);
+
+                // 按日期分组
+                const groupedByDate = groupRecordsByDate(filteredRecords);
+
+                // 渲染照片
+                await renderSettlementPhotos(groupedByDate, signal);
+
+                // 检查是否已被终止
+                if (signal.aborted) {
+                    console.log('loadSettlementPhotos: 渲染后请求已被终止');
+                    return;
+                }
+
+                // 更新统计数量
+                const totalPhotos = filteredRecords.reduce((sum, record) => {
+                    return sum + (record.image_ids ? record.image_ids.length : 0);
+                }, 0);
+                if (categoryCount) {
+                    categoryCount.textContent = totalPhotos;
+                }
+
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.log('loadSettlementPhotos: 请求被终止');
+                    return;
+                }
+                console.error('加载借支照片失败:', error);
+                photoListContainer.innerHTML = '<div style="text-align: center; color: #dc3545; padding: 40px;">加载照片失败</div>';
+            }
+        }
+
+        // 从Supabase数据库获取借支记录
+        async function getSettlementRecordsFromStorage() {
+            try {
+                // 等待Supabase初始化完成
+                await window.waitForSupabase();
+
+                const projectId = localStorage.getItem('currentProjectId') || '';
+                if (!projectId) {
+                    return [];
+                }
+
+                // 检查是否在线
+                if (!navigator.onLine || !window.supabase || typeof window.supabase.from !== 'function') {
+                    // 离线状态从localStorage获取
+                    const storageKeys = ['settlementRecords', 'settlement_records_cache', `settlement_records_${projectId}`];
+                    for (const key of storageKeys) {
+                        const savedData = localStorage.getItem(key);
+                        if (savedData) {
+                            try {
+                                const parsedData = JSON.parse(savedData);
+                                const records = Array.isArray(parsedData) ? parsedData : (parsedData.records || parsedData.settlement_records || []);
+                                return records.filter(r => r.project_id === projectId);
+                            } catch (e) {
+                                continue;
+                            }
+                        }
+                    }
+                    return [];
+                }
+
+                // 在线状态，从Supabase获取
+                let query = window.supabase
+                    .from('settlement_records')
+                    .select('*')
+                    .eq('project_id', projectId);
+
+                // 如果有日期筛选条件
+                if (currentFilters.dateRange) {
+                    if (currentFilters.dateRange.start) {
+                        query = query.gte('record_date', currentFilters.dateRange.start);
+                    }
+                    if (currentFilters.dateRange.end) {
+                        query = query.lte('record_date', currentFilters.dateRange.end);
+                    }
+                }
+
+                // 员工筛选
+                if (currentFilters.employeeId) {
+                    query = query.eq('employee_id', currentFilters.employeeId);
+                }
+
+                const { data, error } = await query;
+
+                if (error) {
+                    console.error('从Supabase获取借支记录失败:', error);
+                    return [];
+                }
+
+                // 过滤出有图片的记录
+                const records = (data || [])
+                    .filter(record => record.image_ids && record.image_ids.length > 0);
+
+                return records;
+            } catch (error) {
+                console.error('获取借支记录失败:', error);
+                return [];
+            }
+        }
+
+        // 筛选借支记录
+        function filterSettlementRecords(records) {
+            return records.filter(record => {
+                // 项目筛选
+                if (record.project_id !== currentFilters.projectId) {
+                    return false;
+                }
+
+                // 日期筛选
+                if (currentFilters.dateRange) {
+                    const recordDate = record.record_date;
+                    if (currentFilters.dateRange.start && recordDate < currentFilters.dateRange.start) {
+                        return false;
+                    }
+                    if (currentFilters.dateRange.end && recordDate > currentFilters.dateRange.end) {
+                        return false;
+                    }
+                }
+
+                // 员工筛选
+                if (currentFilters.employeeId) {
+                    if (record.employee_id !== currentFilters.employeeId) {
+                        return false;
+                    }
+                }
+
+                // 只返回有照片的记录
+                return record.image_ids && record.image_ids.length > 0;
+            });
+        }
+
+        // 渲染借支照片
+        async function renderSettlementPhotos(groupedByDate, signal) {
+            const photoListContainer = document.querySelector('.photo-list-container');
+
+            // 立即检查当前分类是否匹配
+            if (currentPhotoCategory !== 'settlement') {
+                return;
+            }
+
+            // 立即检查是否已被终止
+            if (signal.aborted) {
+                console.log('renderSettlementPhotos: 请求已被终止，跳过渲染');
+                return;
+            }
+
+            const dates = Object.keys(groupedByDate);
+
+            if (dates.length === 0) {
+                photoListContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 40px;">暂无照片</div>';
+                return;
+            }
+
+            // 按日期分组渲染
+            let html = '';
+            let globalIndex = 0;
+
+            dates.forEach(date => {
+                const records = groupedByDate[date];
+                const datePhotoCount = records.reduce((sum, record) => {
+                    return sum + (record.image_ids ? record.image_ids.length : 0);
+                }, 0);
+
+                // 日期分组标题
+                html += `
+                    <div class="photo-date-group" style="margin-top: 20px;">
+                        <div class="photo-date-header" style="padding: 10px 0; border-bottom: 1px solid #e9ecef;">
+                            <span class="photo-date" style="font-size: 16px; font-weight: 600; color: #333;">${formatDateForDisplay(date)}</span>
+                            <span class="photo-count" style="font-size: 14px; color: #999; margin-left: 5px;">/${datePhotoCount}张照片</span>
+                        </div>
+                        <div class="photo-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+                `;
+
+                // 收集该日期的所有照片（使用Set去重，避免同一图片被多个记录引用）
+                const seenImageIds = new Set();
+                const datePhotos = [];
+                records.forEach(record => {
+                    if (record.image_ids) {
+                        record.image_ids.forEach(imageId => {
+                            // 在同一日期同一记录类型内去重
+                            const uniqueKey = `${imageId}`;
+                            if (!seenImageIds.has(uniqueKey)) {
+                                seenImageIds.add(uniqueKey);
+                                datePhotos.push({
+                                    imageId: imageId,
+                                    date: date,
+                                    recordId: record.settlement_id,
+                                    recordType: record.record_type,
+                                    amount: record.amount,
+                                    description: record.remark || ''
+                                });
+                            }
+                        });
+                    }
+                });
+
+                // 更新日期照片数量（去重后的数量）
+                const actualPhotoCount = datePhotos.length;
+
+                // 生成该日期的照片HTML
+                datePhotos.forEach((photo) => {
+                    html += `
+                        <div class="photo-item" data-image-id="${photo.imageId}" data-record-id="${photo.recordId}" data-index="${globalIndex}" data-date="${date}" style="aspect-ratio: 4/3; border-radius: 8px; overflow: hidden; background-color: #f0f0f0; cursor: pointer; transition: all 0.3s ease;">
+                            <img src="" alt="借支照片" class="photo-img" loading="lazy" style="display:none; width: 100%; height: 100%; object-fit: cover;"
+                                 onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%25%22 height=%22100%25%22><rect width=%22100%25%22 height=%22100%25%22 fill=%22%23f0f0f0%22/><text x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23999%22>加载失败</text></svg>'; this.style.display='block'; this.parentElement.querySelector('.photo-loading').style.display='none';">
+                            <div class="photo-loading" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f0f0f0;color:#999;font-size:12px;">加载中...</div>
+                        </div>
+                    `;
+                    globalIndex++;
+                });
+
+                html += '</div></div>';
+            });
+
+            // 在设置HTML之前检查是否已被终止
+            if (signal.aborted) {
+                console.log('renderSettlementPhotos: 设置HTML前请求已被终止');
+                return;
+            }
+
+            photoListContainer.innerHTML = html;
+
+            // 异步加载每张图片
+            globalIndex = 0;
+            dates.forEach(date => {
+                const records = groupedByDate[date];
+                records.forEach(record => {
+                    if (record.image_ids) {
+                        record.image_ids.forEach(async (imageId) => {
+                            // 检查是否已被终止
+                            if (signal.aborted) {
+                                return;
+                            }
+
+                            const imageUrl = await getImageUrl(imageId);
+
+                            // 检查是否已被终止
+                            if (signal.aborted) {
+                                return;
+                            }
+
+                            const photoItem = photoListContainer.querySelector(`[data-index="${globalIndex}"]`);
+                            if (photoItem && imageUrl) {
+                                const img = photoItem.querySelector('img');
+                                const loading = photoItem.querySelector('.photo-loading');
+                                img.src = imageUrl;
+                                img.style.display = 'block';
+                                img.style.cursor = 'pointer';
+                                if (loading) loading.style.display = 'none';
+
+                                // 添加点击预览事件
+                                img.addEventListener('click', function() {
+                                    const extraData = {
+                                        projectId: localStorage.getItem('currentProjectId'),
+                                        recordDate: date,
+                                        employeeId: record.employee_id,
+                                        recordType: record.record_type
+                                    };
+                                    openImagePreview(imageUrl, date, record.record_type, extraData);
+                                });
+                            }
+                            globalIndex++;
+                        });
+                    }
+                });
+            });
+        }
+
+        // 加载记账照片（从project_expenses和project_income表）
+        async function loadAccountPhotos() {
+            const photoListContainer = document.querySelector('.photo-list-container');
+            const categoryCount = document.querySelector('.photo-category-item[data-category="account"] .count-num');
+            const abortController = abortPendingRequests();
+            const signal = abortController.signal;
+
+            try {
+                // 获取当前项目ID
+                const projectId = localStorage.getItem('currentProjectId') || '';
+                if (!projectId) {
+                    photoListContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 40px;">请先选择项目</div>';
+                    return;
+                }
+                currentFilters.projectId = projectId;
+
+                // 检查是否已被终止
+                if (signal.aborted) {
+                    console.log('loadAccountPhotos: 请求已被终止');
+                    return;
+                }
+
+                // 从Supabase获取支出和收入记录
+                const expenseRecords = await getExpenseRecordsFromStorage();
+                const incomeRecords = await getIncomeRecordsFromStorage();
+
+                // 检查是否已被终止
+                if (signal.aborted) {
+                    return;
+                }
+
+                // 合并记录
+                const allRecords = [...expenseRecords, ...incomeRecords];
+
+                // 筛选记录
+                const filteredRecords = filterAccountRecords(allRecords);
+
+                // 按日期分组
+                const groupedByDate = groupRecordsByDate(filteredRecords);
+
+                // 渲染照片
+                await renderAccountPhotos(groupedByDate, signal);
+
+                // 检查是否已被终止
+                if (signal.aborted) {
+                    console.log('loadAccountPhotos: 渲染后请求已被终止');
+                    return;
+                }
+
+                // 更新统计数量
+                const totalPhotos = filteredRecords.reduce((sum, record) => {
+                    return sum + (record.image_ids ? record.image_ids.length : 0);
+                }, 0);
+                if (categoryCount) {
+                    categoryCount.textContent = totalPhotos;
+                }
+
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.log('loadAccountPhotos: 请求被终止');
+                    return;
+                }
+                console.error('加载记账照片失败:', error);
+                photoListContainer.innerHTML = '<div style="text-align: center; color: #dc3545; padding: 40px;">加载照片失败</div>';
+            }
+        }
+
+        // 加载点工单照片（从work_records表）
+        async function loadWorkOrderPhotos() {
+            const photoListContainer = document.querySelector('.photo-list-container');
+            const categoryCount = document.querySelector('.photo-category-item[data-category="workorder"] .count-num');
+            const abortController = abortPendingRequests();
+            const signal = abortController.signal;
+
+            try {
+                // 获取当前项目ID
+                const projectId = localStorage.getItem('currentProjectId') || '';
+                if (!projectId) {
+                    photoListContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 40px;">请先选择项目</div>';
+                    return;
+                }
+                currentFilters.projectId = projectId;
+
+                // 检查是否已被终止
+                if (signal.aborted) {
+                    console.log('loadWorkOrderPhotos: 请求已被终止');
+                    return;
+                }
+
+                // 从Supabase获取点工单记录
+                const workOrderRecords = await getWorkOrderRecordsFromStorage();
+
+                // 检查是否已被终止
+                if (signal.aborted) {
+                    return;
+                }
+
+                // 筛选记录
+                const filteredRecords = filterWorkOrderRecords(workOrderRecords);
+
+                // 按日期分组
+                const groupedByDate = groupRecordsByDate(filteredRecords);
+
+                // 渲染照片
+                await renderWorkOrderPhotos(groupedByDate, signal);
+
+                // 检查是否已被终止
+                if (signal.aborted) {
+                    console.log('loadWorkOrderPhotos: 渲染后请求已被终止');
+                    return;
+                }
+
+                // 更新统计数量
+                const totalPhotos = filteredRecords.reduce((sum, record) => {
+                    return sum + (record.image_ids ? record.image_ids.length : 0);
+                }, 0);
+                if (categoryCount) {
+                    categoryCount.textContent = totalPhotos;
+                }
+
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.log('loadWorkOrderPhotos: 请求被终止');
+                    return;
+                }
+                console.error('加载点工单照片失败:', error);
+                photoListContainer.innerHTML = '<div style="text-align: center; color: #dc3545; padding: 40px;">加载照片失败</div>';
+            }
+        }
+
+        // 从Supabase数据库获取点工单记录
+        async function getWorkOrderRecordsFromStorage() {
+            try {
+                // 等待Supabase初始化完成
+                await window.waitForSupabase();
+
+                const projectId = localStorage.getItem('currentProjectId') || '';
+                if (!projectId) {
+                    return [];
+                }
+
+                // 检查是否在线
+                if (!navigator.onLine || !window.supabase || typeof window.supabase.from !== 'function') {
+                    // 离线状态从localStorage获取
+                    const storageKeys = ['workRecords', 'work_records_cache', `work_records_${projectId}`];
+                    for (const key of storageKeys) {
+                        const savedData = localStorage.getItem(key);
+                        if (savedData) {
+                            try {
+                                const parsedData = JSON.parse(savedData);
+                                const records = Array.isArray(parsedData) ? parsedData : (parsedData.records || parsedData.work_records || []);
+                                return records.filter(r => r.project_id === projectId);
+                            } catch (e) {
+                                continue;
+                            }
+                        }
+                    }
+                    return [];
+                }
+
+                // 在线状态，从Supabase获取
+                let query = window.supabase
+                    .from('work_records')
+                    .select('*')
+                    .eq('project_id', projectId);
+
+                // 如果有日期筛选条件
+                if (currentFilters.dateRange) {
+                    if (currentFilters.dateRange.start) {
+                        query = query.gte('record_date', currentFilters.dateRange.start);
+                    }
+                    if (currentFilters.dateRange.end) {
+                        query = query.lte('record_date', currentFilters.dateRange.end);
+                    }
+                }
+
+                const { data, error } = await query;
+
+                if (error) {
+                    return [];
+                }
+
+                // 过滤出有图片的记录
+                const records = (data || [])
+                    .filter(record => record.image_ids && record.image_ids.length > 0)
+                    .map(record => ({
+                        ...record,
+                        record_type: 'workorder'
+                    }));
+
+                return records;
+            } catch (error) {
+                return [];
+            }
+        }
+
+        // 筛选点工单记录
+        function filterWorkOrderRecords(records) {
+            return records.filter(record => {
+                // 项目筛选
+                if (record.project_id !== currentFilters.projectId) {
+                    return false;
+                }
+
+                // 日期筛选
+                if (currentFilters.dateRange) {
+                    const recordDate = record.record_date;
+                    if (currentFilters.dateRange.start && recordDate < currentFilters.dateRange.start) {
+                        return false;
+                    }
+                    if (currentFilters.dateRange.end && recordDate > currentFilters.dateRange.end) {
+                        return false;
+                    }
+                }
+
+                // 只返回有照片的记录
+                return record.image_ids && record.image_ids.length > 0;
+            });
+        }
+
+        // 渲染点工单照片
+        async function renderWorkOrderPhotos(groupedByDate, signal) {
+            const photoListContainer = document.querySelector('.photo-list-container');
+
+            // 立即检查当前分类是否匹配
+            if (currentPhotoCategory !== 'workorder') {
+                return;
+            }
+
+            // 立即检查是否已被终止
+            if (signal.aborted) {
+                console.log('renderWorkOrderPhotos: 请求已被终止，跳过渲染');
+                return;
+            }
+
+            const dates = Object.keys(groupedByDate);
+
+            if (dates.length === 0) {
+                photoListContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 40px;">暂无照片</div>';
+                return;
+            }
+
+            // 按日期分组渲染
+            let html = '';
+            let globalIndex = 0;
+
+            dates.forEach(date => {
+                const records = groupedByDate[date];
+
+                // 收集该日期的所有照片（使用Set去重）
+                const seenImageIds = new Set();
+                const datePhotos = [];
+                records.forEach(record => {
+                    if (record.image_ids) {
+                        record.image_ids.forEach(imageId => {
+                            if (!seenImageIds.has(imageId)) {
+                                seenImageIds.add(imageId);
+                                datePhotos.push({
+                                    imageId: imageId,
+                                    date: date,
+                                    recordId: record.work_record_id,
+                                    recordType: record.record_type,
+                                    amount: record.amount,
+                                    description: record.description || ''
+                                });
+                            }
+                        });
+                    }
+                });
+
+                // 去重后的照片数量
+                const actualPhotoCount = datePhotos.length;
+
+                // 日期分组标题
+                html += `
+                    <div class="photo-date-group" style="margin-top: 20px;">
+                        <div class="photo-date-header" style="padding: 10px 0; border-bottom: 1px solid #e9ecef;">
+                            <span class="photo-date" style="font-size: 16px; font-weight: 600; color: #333;">${formatDateForDisplay(date)}</span>
+                            <span class="photo-count" style="font-size: 14px; color: #999; margin-left: 5px;">/${actualPhotoCount}张照片</span>
+                        </div>
+                        <div class="photo-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+                `;
+
+                // 生成该日期的照片HTML
+                datePhotos.forEach((photo) => {
+                    html += `
+                        <div class="photo-item" data-image-id="${photo.imageId}" data-record-id="${photo.recordId}" data-index="${globalIndex}" data-date="${date}" style="aspect-ratio: 4/3; border-radius: 8px; overflow: hidden; background-color: #f0f0f0; cursor: pointer; transition: all 0.3s ease;">
+                            <img src="" alt="点工单照片" class="photo-img" loading="lazy" style="display:none; width: 100%; height: 100%; object-fit: cover;"
+                                 onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%25%22 height=%22100%25%22><rect width=%22100%25%22 height=%22100%25%22 fill=%22%23f0f0f0%22/><text x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23999%22>加载失败</text></svg>'; this.style.display='block'; this.parentElement.querySelector('.photo-loading').style.display='none';">
+                            <div class="photo-loading" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f0f0f0;color:#999;font-size:12px;">加载中...</div>
+                        </div>
+                    `;
+                    globalIndex++;
+                });
+
+                html += '</div></div>';
+            });
+
+            // 在设置HTML之前检查是否已被终止
+            if (signal.aborted) {
+                return;
+            }
+
+            photoListContainer.innerHTML = html;
+
+            // 异步加载每张图片
+            globalIndex = 0;
+            dates.forEach(date => {
+                const records = groupedByDate[date];
+                records.forEach(record => {
+                    if (record.image_ids) {
+                        record.image_ids.forEach(async (imageId) => {
+                            // 检查是否已被终止
+                            if (signal.aborted) {
+                                return;
+                            }
+
+                            const imageUrl = await getImageUrl(imageId);
+
+                            // 检查是否已被终止
+                            if (signal.aborted) {
+                                return;
+                            }
+
+                            const photoItem = photoListContainer.querySelector(`[data-index="${globalIndex}"]`);
+                            if (photoItem && imageUrl) {
+                                const img = photoItem.querySelector('img');
+                                const loading = photoItem.querySelector('.photo-loading');
+                                img.src = imageUrl;
+                                img.style.display = 'block';
+                                img.style.cursor = 'pointer';
+                                if (loading) loading.style.display = 'none';
+
+                                // 添加点击预览事件
+                                img.addEventListener('click', function() {
+                                    const extraData = {
+                                        projectId: localStorage.getItem('currentProjectId'),
+                                        recordDate: date,
+                                        employeeId: record.employee_id,
+                                        workType: record.work_type
+                                    };
+                                    openImagePreview(imageUrl, date, record.record_type, extraData);
+                                });
+                            }
+                            globalIndex++;
+                        });
+                    }
+                });
+            });
+        }
+
+        // 从Supabase数据库获取支出记录
+        async function getExpenseRecordsFromStorage() {
+            try {
+                // 等待Supabase初始化完成
+                await window.waitForSupabase();
+
+                const projectId = localStorage.getItem('currentProjectId') || '';
+                if (!projectId) {
+                    return [];
+                }
+
+                // 检查是否在线
+                if (!navigator.onLine || !window.supabase || typeof window.supabase.from !== 'function') {
+                    return [];
+                }
+
+                // 在线状态，从Supabase获取
+                let query = window.supabase
+                    .from('project_expenses')
+                    .select('*')
+                    .eq('project_id', projectId);
+
+                // 如果有日期筛选条件
+                if (currentFilters.dateRange) {
+                    if (currentFilters.dateRange.start) {
+                        query = query.gte('record_date', currentFilters.dateRange.start);
+                    }
+                    if (currentFilters.dateRange.end) {
+                        query = query.lte('record_date', currentFilters.dateRange.end);
+                    }
+                }
+
+                const { data, error } = await query;
+
+                if (error) {
+                    return [];
+                }
+
+                // 过滤出有图片的记录（image_ids不为空数组）
+                const records = (data || [])
+                    .filter(record => record.image_ids && record.image_ids.length > 0)
+                    .map(record => ({
+                        ...record,
+                        record_type: 'expense'
+                    }));
+
+                return records;
+            } catch (error) {
+                return [];
+            }
+        }
+
+        // 从Supabase数据库获取收入记录
+        async function getIncomeRecordsFromStorage() {
+            try {
+                // 等待Supabase初始化完成
+                await window.waitForSupabase();
+
+                const projectId = localStorage.getItem('currentProjectId') || '';
+                if (!projectId) {
+                    return [];
+                }
+
+                // 检查是否在线
+                if (!navigator.onLine || !window.supabase || typeof window.supabase.from !== 'function') {
+                    return [];
+                }
+
+                // 在线状态，从Supabase获取
+                let query = window.supabase
+                    .from('project_income')
+                    .select('*')
+                    .eq('project_id', projectId);
+
+                // 如果有日期筛选条件
+                if (currentFilters.dateRange) {
+                    if (currentFilters.dateRange.start) {
+                        query = query.gte('record_date', currentFilters.dateRange.start);
+                    }
+                    if (currentFilters.dateRange.end) {
+                        query = query.lte('record_date', currentFilters.dateRange.end);
+                    }
+                }
+
+                const { data, error } = await query;
+
+                if (error) {
+                    return [];
+                }
+
+                // 过滤出有图片的记录（image_ids不为空数组）
+                const records = (data || [])
+                    .filter(record => record.image_ids && record.image_ids.length > 0)
+                    .map(record => ({
+                        ...record,
+                        record_type: 'income'
+                    }));
+
+                return records;
+            } catch (error) {
+                return [];
+            }
+        }
+
+        // 筛选记账记录
+        function filterAccountRecords(records) {
+            return records.filter(record => {
+                // 项目筛选
+                if (record.project_id !== currentFilters.projectId) {
+                    return false;
+                }
+
+                // 日期筛选
+                if (currentFilters.dateRange) {
+                    const recordDate = record.record_date;
+                    if (currentFilters.dateRange.start && recordDate < currentFilters.dateRange.start) {
+                        return false;
+                    }
+                    if (currentFilters.dateRange.end && recordDate > currentFilters.dateRange.end) {
+                        return false;
+                    }
+                }
+
+                // 只返回有照片的记录
+                return record.image_ids && record.image_ids.length > 0;
+            });
+        }
+
+        // 渲染记账照片
+        async function renderAccountPhotos(groupedByDate, signal) {
+            const photoListContainer = document.querySelector('.photo-list-container');
+
+            // 立即检查当前分类是否匹配
+            if (currentPhotoCategory !== 'account') {
+                return;
+            }
+
+            // 立即检查是否已被终止
+            if (signal.aborted) {
+                console.log('renderAccountPhotos: 请求已被终止，跳过渲染');
+                return;
+            }
+
+            // 按日期升序排列
+            const dates = Object.keys(groupedByDate).sort();
+
+            if (dates.length === 0) {
+                photoListContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 40px;">暂无照片</div>';
+                return;
+            }
+
+            // 按日期分组渲染
+            let html = '';
+            let globalIndex = 0;
+
+            dates.forEach(date => {
+                const records = groupedByDate[date];
+
+                // 收集该日期的所有照片（使用Set去重）
+                const seenImageIds = new Set();
+                const datePhotos = [];
+                records.forEach(record => {
+                    if (record.image_ids) {
+                        record.image_ids.forEach(imageId => {
+                            if (!seenImageIds.has(imageId)) {
+                                seenImageIds.add(imageId);
+                                datePhotos.push({
+                                    imageId: imageId,
+                                    date: date,
+                                    recordId: record.expense_id || record.income_id,
+                                    recordType: record.record_type,
+                                    amount: record.amount,
+                                    description: record.detail_description || record.remark || ''
+                                });
+                            }
+                        });
+                    }
+                });
+
+                // 去重后的照片数量
+                const actualPhotoCount = datePhotos.length;
+
+                // 日期分组标题
+                html += `
+                    <div class="photo-date-group" style="margin-top: 20px;">
+                        <div class="photo-date-header" style="padding: 10px 0; border-bottom: 1px solid #e9ecef;">
+                            <span class="photo-date" style="font-size: 16px; font-weight: 600; color: #333;">${formatDateForDisplay(date)}</span>
+                            <span class="photo-count" style="font-size: 14px; color: #999; margin-left: 5px;">/${actualPhotoCount}张照片</span>
+                        </div>
+                        <div class="photo-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+                `;
+
+                // 生成该日期的照片HTML
+                datePhotos.forEach((photo) => {
+                    html += `
+                        <div class="photo-item" data-image-id="${photo.imageId}" data-record-id="${photo.recordId}" data-index="${globalIndex}" data-date="${date}" style="aspect-ratio: 4/3; border-radius: 8px; overflow: hidden; background-color: #f0f0f0; cursor: pointer; transition: all 0.3s ease;">
+                            <img src="" alt="记账照片" class="photo-img" loading="lazy" style="display:none; width: 100%; height: 100%; object-fit: cover;"
+                                 onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%25%22 height=%22100%25%22><rect width=%22100%25%22 height=%22100%25%22 fill=%22%23f0f0f0%22/><text x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23999%22>加载失败</text></svg>'; this.style.display='block'; this.parentElement.querySelector('.photo-loading').style.display='none';">
+                            <div class="photo-loading" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f0f0f0;color:#999;font-size:12px;">加载中...</div>
+                        </div>
+                    `;
+                    globalIndex++;
+                });
+
+                html += '</div></div>';
+            });
+
+            // 在设置HTML之前检查是否已被终止
+            if (signal.aborted) {
+                return;
+            }
+
+            photoListContainer.innerHTML = html;
+
+            // 异步加载每张图片
+            globalIndex = 0;
+            dates.forEach(date => {
+                const records = groupedByDate[date];
+                records.forEach(record => {
+                    if (record.image_ids) {
+                        record.image_ids.forEach(async (imageId) => {
+                            // 检查是否已被终止
+                            if (signal.aborted) {
+                                return;
+                            }
+
+                            const imageUrl = await getImageUrl(imageId);
+
+                            // 检查是否已被终止
+                            if (signal.aborted) {
+                                return;
+                            }
+
+                            const photoItem = photoListContainer.querySelector(`[data-index="${globalIndex}"]`);
+                            if (photoItem && imageUrl) {
+                                const img = photoItem.querySelector('img');
+                                const loading = photoItem.querySelector('.photo-loading');
+                                img.src = imageUrl;
+                                img.style.display = 'block';
+                                img.style.cursor = 'pointer';
+                                if (loading) loading.style.display = 'none';
+
+                                // 添加点击预览事件
+                                img.addEventListener('click', function() {
+                                    openImagePreview(imageUrl, date, record.record_type);
+                                });
+                            }
+                            globalIndex++;
+                        });
+                    }
+                });
+            });
+        }
+
+        // 从Supabase数据库获取考勤记录
+        async function getAttendanceRecordsFromStorage() {
+            try {
+                // 等待Supabase初始化完成
+                await window.waitForSupabase();
+
+                const projectId = localStorage.getItem('currentProjectId') || '';
+                if (!projectId) {
+                    return [];
+                }
+
+                // 检查是否在线
+                if (!navigator.onLine || !window.supabase || typeof window.supabase.from !== 'function') {
+                    // 离线状态，从localStorage获取
+                    const localKey = `attendance_records_${projectId}`;
+                    const savedData = localStorage.getItem(localKey);
+                    if (savedData) {
+                        const parsedData = JSON.parse(savedData);
+                        return parsedData.records || [];
+                    }
+                    return [];
+                }
+
+                // 在线状态，从Supabase获取
+                let query = window.supabase
+                    .from('attendance_records')
+                    .select('*')
+                    .eq('project_id', projectId);
+
+                // 如果有日期筛选条件
+                if (currentFilters.dateRange) {
+                    if (currentFilters.dateRange.start) {
+                        query = query.gte('record_date', currentFilters.dateRange.start);
+                    }
+                    if (currentFilters.dateRange.end) {
+                        query = query.lte('record_date', currentFilters.dateRange.end);
+                    }
+                }
+
+                // 如果有员工筛选条件
+                if (currentFilters.employeeId) {
+                    query = query.eq('employee_id', currentFilters.employeeId);
+                }
+
+                // 只获取有照片的记录
+                query = query.not('image_ids', 'is', null);
+
+                const { data, error } = await query;
+
+                if (error) {
+                    console.error('从Supabase获取考勤记录失败:', error);
+                    // 出错时尝试从localStorage获取
+                    const localKey = `attendance_records_${projectId}`;
+                    const savedData = localStorage.getItem(localKey);
+                    if (savedData) {
+                        const parsedData = JSON.parse(savedData);
+                        return parsedData.records || [];
+                    }
+                    return [];
+                }
+
+                return data || [];
+            } catch (error) {
+                console.error('获取考勤记录失败:', error);
+                // 出错时尝试从localStorage获取
+                try {
+                    const projectId = localStorage.getItem('currentProjectId') || '';
+                    const localKey = `attendance_records_${projectId}`;
+                    const savedData = localStorage.getItem(localKey);
+                    if (savedData) {
+                        const parsedData = JSON.parse(savedData);
+                        return parsedData.records || [];
+                    }
+                } catch (e) {
+                    console.error('从localStorage获取考勤记录也失败:', e);
+                }
+                return [];
+            }
+        }
+
+        // 筛选考勤记录
+        function filterAttendanceRecords(records) {
+            return records.filter(record => {
+                // 项目筛选（已经通过localStorage键名筛选了）
+                if (record.project_id !== currentFilters.projectId) {
+                    return false;
+                }
+
+                // 日期筛选
+                if (currentFilters.dateRange) {
+                    const recordDate = record.record_date;
+                    if (currentFilters.dateRange.start && recordDate < currentFilters.dateRange.start) {
+                        return false;
+                    }
+                    if (currentFilters.dateRange.end && recordDate > currentFilters.dateRange.end) {
+                        return false;
+                    }
+                }
+
+                // 员工筛选
+                if (currentFilters.employeeId) {
+                    if (record.employee_id !== currentFilters.employeeId) {
+                        return false;
+                    }
+                }
+
+                // 只返回有照片的考勤记录
+                return record.image_ids && record.image_ids.length > 0;
+            });
+        }
+
+        // 按日期分组记录
+        function groupRecordsByDate(records) {
+            const grouped = {};
+            records.forEach(record => {
+                const date = record.record_date;
+                if (!grouped[date]) {
+                    grouped[date] = [];
+                }
+                grouped[date].push(record);
+            });
+            return grouped;
+        }
+
+        // 渲染照片
+        async function renderPhotos(groupedByDate, signal) {
+            const photoListContainer = document.querySelector('.photo-list-container');
+
+            // 立即检查当前分类是否匹配
+            if (currentPhotoCategory !== 'work') {
+                return;
+            }
+
+            // 立即检查是否已被终止
+            if (signal.aborted) {
+                console.log('renderPhotos: 请求已被终止，跳过渲染');
+                return;
+            }
+
+            // 按日期升序排列
+            const dates = Object.keys(groupedByDate).sort();
+
+            if (dates.length === 0) {
+                photoListContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 40px;">暂无照片</div>';
+                return;
+            }
+
+            // 按日期分组渲染
+            let html = '';
+            let globalIndex = 0;
+
+            dates.forEach(date => {
+                const records = groupedByDate[date];
+
+                // 收集该日期的所有照片（使用Set去重）
+                const seenImageIds = new Set();
+                const datePhotos = [];
+                records.forEach(record => {
+                    if (record.image_ids) {
+                        record.image_ids.forEach(imageId => {
+                            if (!seenImageIds.has(imageId)) {
+                                seenImageIds.add(imageId);
+                                datePhotos.push({
+                                    imageId: imageId,
+                                    date: date,
+                                    employeeId: record.employee_id,
+                                    employeeName: record.employee_name || '',
+                                    recordId: record.record_id
+                                });
+                            }
+                        });
+                    }
+                });
+
+                // 去重后的照片数量
+                const actualPhotoCount = datePhotos.length;
+
+                // 日期分组标题
+                html += `
+                    <div class="photo-date-group" style="margin-top: 20px;">
+                        <div class="photo-date-header" style="padding: 10px 0; border-bottom: 1px solid #e9ecef;">
+                            <span class="photo-date" style="font-size: 16px; font-weight: 600; color: #333;">${formatDateForDisplay(date)}</span>
+                            <span class="photo-count" style="font-size: 14px; color: #999; margin-left: 5px;">/${actualPhotoCount}张照片</span>
+                        </div>
+                        <div class="photo-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+                `;
+
+                // 生成该日期的照片HTML
+                datePhotos.forEach((photo) => {
+                    html += `
+                        <div class="photo-item" data-image-id="${photo.imageId}" data-record-id="${photo.recordId}" data-index="${globalIndex}" data-date="${date}" style="aspect-ratio: 4/3; border-radius: 8px; overflow: hidden; background-color: #f0f0f0; cursor: pointer; transition: all 0.3s ease;">
+                            <img src="" alt="考勤照片" class="photo-img" loading="lazy" style="display:none; width: 100%; height: 100%; object-fit: cover;"
+                                 onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%25%22 height=%22100%25%22><rect width=%22100%25%22 height=%22100%25%22 fill=%22%23f0f0f0%22/><text x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23999%22>加载失败</text></svg>'; this.style.display='block'; this.parentElement.querySelector('.photo-loading').style.display='none';">
+                            <div class="photo-loading" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f0f0f0;color:#999;font-size:12px;">加载中...</div>
+                        </div>
+                    `;
+                    globalIndex++;
+                });
+
+                html += '</div></div>';
+            });
+
+            // 在设置HTML之前检查是否已被终止
+            if (signal.aborted) {
+                console.log('renderPhotos: 设置HTML前请求已被终止');
+                return;
+            }
+
+            photoListContainer.innerHTML = html;
+
+            // 异步加载每张图片
+            globalIndex = 0;
+            dates.forEach(date => {
+                const records = groupedByDate[date];
+                records.forEach(record => {
+                    if (record.image_ids) {
+                        record.image_ids.forEach(async (imageId) => {
+                            // 检查是否已被终止
+                            if (signal.aborted) {
+                                return;
+                            }
+
+                            const imageUrl = await getImageUrl(imageId);
+
+                            // 检查是否已被终止
+                            if (signal.aborted) {
+                                return;
+                            }
+
+                            const photoItem = photoListContainer.querySelector(`[data-index="${globalIndex}"]`);
+                            if (photoItem && imageUrl) {
+                                const img = photoItem.querySelector('img');
+                                const loading = photoItem.querySelector('.photo-loading');
+                                img.src = imageUrl;
+                                img.style.display = 'block';
+                                img.style.cursor = 'pointer';
+                                if (loading) loading.style.display = 'none';
+
+                                // 添加点击预览事件
+                                img.addEventListener('click', function() {
+                                    const extraData = {
+                                        projectId: localStorage.getItem('currentProjectId'),
+                                        recordDate: date,
+                                        employeeId: record.employee_id,
+                                        workType: record.work_type
+                                    };
+                                    openImagePreview(imageUrl, date, record.record_type, extraData);
+                                });
+                            }
+                            globalIndex++;
+                        });
+                    }
+                });
+            });
+        }
+
+        // 获取图片URL（优先从在线获取，失败则从localStorage获取）
+        async function getImageUrl(imageId) {
+            // 如果imageId本身就是URL（http开头），直接返回
+            if (typeof imageId === 'string' && (imageId.startsWith('http://') || imageId.startsWith('https://'))) {
+                return imageId;
+            }
+
+            // 首先尝试从localStorage获取
+            const localUrl = getImageUrlFromStorage(imageId);
+            if (localUrl) {
+                return localUrl;
+            }
+
+            // 如果localStorage没有，且是在线状态，尝试从Supabase存储获取
+            if (navigator.onLine && window.supabase && typeof window.supabase.storage === 'object') {
+                try {
+                    // 尝试从Supabase存储桶获取图片URL
+                    // 存储桶名称为 FYKQ，路径格式为 attendance/日期attendance_序号.jpg
+                    const { data, error } = await window.supabase
+                        .storage
+                        .from('FYKQ')
+                        .getPublicUrl(imageId);
+
+                    if (!error && data && data.publicUrl) {
+                        return data.publicUrl;
+                    }
+                } catch (e) {
+                    console.warn('从Supabase存储获取图片URL失败:', e);
+                }
+            }
+
+            return '';
+        }
+
+        // 从localStorage获取图片URL
+        function getImageUrlFromStorage(imageId) {
+            try {
+                // 尝试从图片存储中获取
+                const imageData = localStorage.getItem(`image_${imageId}`);
+                if (imageData) {
+                    return imageData; // 直接返回base64或URL
+                }
+
+                // 或者从图片映射表中获取
+                const imageMap = localStorage.getItem('imageUrlMap');
+                if (imageMap) {
+                    const map = JSON.parse(imageMap);
+                    return map[imageId] || '';
+                }
+            } catch (error) {
+                console.error('获取图片URL失败:', error);
+            }
+            return '';
+        }
+
+        // 更新筛选条件
+        function updateFilters() {
+            const workDateInput = document.getElementById('workDate');
+
+            // 获取日期范围
+            if (workDateInput.dataset.selectAll === 'true') {
+                // 全部日期
+                currentFilters.dateRange = null;
+            } else if (workDateInput.dataset.displayValue && workDateInput.dataset.displayValue.includes('~')) {
+                // 日期范围
+                const dates = workDateInput.dataset.displayValue.split(' ~ ');
+                currentFilters.dateRange = {
+                    start: dates[0],
+                    end: dates[1]
+                };
+            } else if (workDateInput.value) {
+                // 单个日期
+                currentFilters.dateRange = {
+                    start: workDateInput.value,
+                    end: workDateInput.value
+                };
+            } else {
+                currentFilters.dateRange = null;
+            }
+
+            // 更新所有分类的图片数量
+            updateAllCategoryCounts();
+
+            // 重新加载当前分类的照片
+            if (currentPhotoCategory === 'work') {
+                loadAttendancePhotos();
+            } else if (currentPhotoCategory === 'settlement') {
+                loadSettlementPhotos();
+            } else if (currentPhotoCategory === 'workorder') {
+                loadWorkOrderPhotos();
+            } else if (currentPhotoCategory === 'account') {
+                loadAccountPhotos();
+            } else if (currentPhotoCategory === 'construction') {
+                loadConstructionPhotos();
+            }
+        }
+
+        // 加载施工日志照片（从construction_logs表）
+        async function loadConstructionPhotos() {
+            const photoListContainer = document.querySelector('.photo-list-container');
+            const categoryCount = document.querySelector('.photo-category-item[data-category="construction"] .count-num');
+            const abortController = abortPendingRequests();
+            const signal = abortController.signal;
+
+            try {
+                // 获取当前项目ID
+                const projectId = localStorage.getItem('currentProjectId') || '';
+                if (!projectId) {
+                    photoListContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 40px;">请先选择项目</div>';
+                    return;
+                }
+                currentFilters.projectId = projectId;
+
+                // 检查是否已被终止
+                if (signal.aborted) {
+                    console.log('loadConstructionPhotos: 请求已被终止');
+                    return;
+                }
+
+                // 从Supabase获取施工日志记录
+                const constructionLogs = await getConstructionLogsFromStorage();
+
+                // 检查是否已被终止
+                if (signal.aborted) {
+                    return;
+                }
+
+                // 筛选记录
+                const filteredRecords = filterConstructionLogs(constructionLogs);
+
+                // 按日期分组
+                const groupedByDate = groupRecordsByDate(filteredRecords);
+
+                // 渲染照片
+                await renderConstructionPhotos(groupedByDate, signal);
+
+                // 检查是否已被终止
+                if (signal.aborted) {
+                    console.log('loadConstructionPhotos: 渲染后请求已被终止');
+                    return;
+                }
+
+                // 更新统计数量
+                const totalPhotos = filteredRecords.reduce((sum, record) => {
+                    return sum + (record.image_ids ? record.image_ids.length : 0);
+                }, 0);
+                if (categoryCount) {
+                    categoryCount.textContent = totalPhotos;
+                }
+
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.log('loadConstructionPhotos: 请求被终止');
+                    return;
+                }
+                console.error('加载施工日志照片失败:', error);
+                photoListContainer.innerHTML = '<div style="text-align: center; color: #dc3545; padding: 40px;">加载照片失败</div>';
+            }
+        }
+
+        // 从Supabase数据库获取施工日志记录
+        async function getConstructionLogsFromStorage() {
+            try {
+                // 等待Supabase初始化完成
+                await window.waitForSupabase();
+
+                const projectId = localStorage.getItem('currentProjectId') || '';
+                if (!projectId) {
+                    return [];
+                }
+
+                // 检查是否在线
+                if (!navigator.onLine || !window.supabase || typeof window.supabase.from !== 'function') {
+                    // 离线状态从localStorage获取
+                    const storageKeys = ['constructionLogs', 'construction_logs_cache', `construction_logs_${projectId}`];
+                    for (const key of storageKeys) {
+                        const savedData = localStorage.getItem(key);
+                        if (savedData) {
+                            try {
+                                const parsedData = JSON.parse(savedData);
+                                const records = Array.isArray(parsedData) ? parsedData : (parsedData.records || parsedData.construction_logs || []);
+                                return records.filter(r => r.project_id === projectId);
+                            } catch (e) {
+                                continue;
+                            }
+                        }
+                    }
+                    return [];
+                }
+
+                // 在线状态，从Supabase获取
+                let query = window.supabase
+                    .from('construction_logs')
+                    .select('*')
+                    .eq('project_id', projectId);
+
+                // 如果有日期筛选条件
+                if (currentFilters.dateRange) {
+                    if (currentFilters.dateRange.start) {
+                        query = query.gte('record_date', currentFilters.dateRange.start);
+                    }
+                    if (currentFilters.dateRange.end) {
+                        query = query.lte('record_date', currentFilters.dateRange.end);
+                    }
+                }
+
+                const { data, error } = await query;
+
+                if (error) {
+                    return [];
+                }
+
+                // 过滤出有图片的记录
+                const records = (data || [])
+                    .filter(record => record.image_ids && record.image_ids.length > 0)
+                    .map(record => ({
+                        ...record,
+                        record_type: 'construction'
+                    }));
+
+                return records;
+            } catch (error) {
+                return [];
+            }
+        }
+
+        // 筛选施工日志记录
+        function filterConstructionLogs(records) {
+            return records.filter(record => {
+                // 项目筛选
+                if (record.project_id !== currentFilters.projectId) {
+                    return false;
+                }
+
+                // 日期筛选
+                if (currentFilters.dateRange) {
+                    const recordDate = record.record_date;
+                    if (currentFilters.dateRange.start && recordDate < currentFilters.dateRange.start) {
+                        return false;
+                    }
+                    if (currentFilters.dateRange.end && recordDate > currentFilters.dateRange.end) {
+                        return false;
+                    }
+                }
+
+                // 只返回有照片的记录
+                return record.image_ids && record.image_ids.length > 0;
+            });
+        }
+
+        // 渲染施工日志照片
+        async function renderConstructionPhotos(groupedByDate, signal) {
+            const photoListContainer = document.querySelector('.photo-list-container');
+
+            // 立即检查当前分类是否匹配
+            if (currentPhotoCategory !== 'construction') {
+                return;
+            }
+
+            // 立即检查是否已被终止
+            if (signal.aborted) {
+                console.log('renderConstructionPhotos: 请求已被终止，跳过渲染');
+                return;
+            }
+
+            const dates = Object.keys(groupedByDate);
+
+            if (dates.length === 0) {
+                photoListContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 40px;">暂无照片</div>';
+                return;
+            }
+
+            // 按日期分组渲染
+            let html = '';
+            let globalIndex = 0;
+
+            dates.forEach(date => {
+                const records = groupedByDate[date];
+
+                // 收集该日期的所有照片（使用Set去重）
+                const seenImageIds = new Set();
+                const datePhotos = [];
+                records.forEach(record => {
+                    if (record.image_ids) {
+                        record.image_ids.forEach(imageId => {
+                            if (!seenImageIds.has(imageId)) {
+                                seenImageIds.add(imageId);
+                                datePhotos.push({
+                                    imageId: imageId,
+                                    date: date,
+                                    recordId: record.log_id,
+                                    recordType: record.record_type,
+                                    description: record.log_content || ''
+                                });
+                            }
+                        });
+                    }
+                });
+
+                // 去重后的照片数量
+                const actualPhotoCount = datePhotos.length;
+
+                // 日期分组标题
+                html += `
+                    <div class="photo-date-group" style="margin-top: 20px;">
+                        <div class="photo-date-header" style="padding: 10px 0; border-bottom: 1px solid #e9ecef;">
+                            <span class="photo-date" style="font-size: 16px; font-weight: 600; color: #333;">${formatDateForDisplay(date)}</span>
+                            <span class="photo-count" style="font-size: 14px; color: #999; margin-left: 5px;">/${actualPhotoCount}张照片</span>
+                        </div>
+                        <div class="photo-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+                `;
+
+                // 生成该日期的照片HTML
+                datePhotos.forEach((photo) => {
+                    html += `
+                        <div class="photo-item" data-image-id="${photo.imageId}" data-record-id="${photo.recordId}" data-index="${globalIndex}" data-date="${date}" style="aspect-ratio: 4/3; border-radius: 8px; overflow: hidden; background-color: #f0f0f0; cursor: pointer; transition: all 0.3s ease;">
+                            <img src="" alt="施工日志照片" class="photo-img" loading="lazy" style="display:none; width: 100%; height: 100%; object-fit: cover;"
+                                 onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%25%22 height=%22100%25%22><rect width=%22100%25%22 height=%22100%25%22 fill=%22%23f0f0f0%22/><text x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23999%22>加载失败</text></svg>'; this.style.display='block'; this.parentElement.querySelector('.photo-loading').style.display='none';">
+                            <div class="photo-loading" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f0f0f0;color:#999;font-size:12px;">加载中...</div>
+                        </div>
+                    `;
+                    globalIndex++;
+                });
+
+                html += '</div></div>';
+            });
+
+            // 在设置HTML之前检查是否已被终止
+            if (signal.aborted) {
+                return;
+            }
+
+            photoListContainer.innerHTML = html;
+
+            // 异步加载每张图片
+            globalIndex = 0;
+            dates.forEach(date => {
+                const records = groupedByDate[date];
+                records.forEach(record => {
+                    if (record.image_ids) {
+                        record.image_ids.forEach(async (imageId) => {
+                            // 检查是否已被终止
+                            if (signal.aborted) {
+                                return;
+                            }
+
+                            const imageUrl = await getImageUrl(imageId);
+
+                            // 检查是否已被终止
+                            if (signal.aborted) {
+                                return;
+                            }
+
+                            const photoItem = photoListContainer.querySelector(`[data-index="${globalIndex}"]`);
+                            if (photoItem && imageUrl) {
+                                const img = photoItem.querySelector('img');
+                                const loading = photoItem.querySelector('.photo-loading');
+                                img.src = imageUrl;
+                                img.style.display = 'block';
+                                img.style.cursor = 'pointer';
+                                if (loading) loading.style.display = 'none';
+
+                                // 添加点击预览事件
+                                img.addEventListener('click', function() {
+                                    const extraData = {
+                                        projectId: localStorage.getItem('currentProjectId'),
+                                        recordDate: date,
+                                        userId: record.user_id
+                                    };
+                                    openImagePreview(imageUrl, date, record.record_type, extraData);
+                                });
+                            }
+                            globalIndex++;
+                        });
+                    }
+                });
+            });
+        }
+
+        // 获取施工日志照片数量
+        async function getConstructionPhotoCount() {
+            try {
+                await window.waitForSupabase();
+
+                const projectId = localStorage.getItem('currentProjectId') || '';
+                if (!projectId) return 0;
+
+                // 离线状态从localStorage获取
+                if (!navigator.onLine || !window.supabase || typeof window.supabase.from !== 'function') {
+                    const storageKeys = ['constructionLogs', 'construction_logs_cache', `construction_logs_${projectId}`];
+                    for (const key of storageKeys) {
+                        const savedData = localStorage.getItem(key);
+                        if (savedData) {
+                            try {
+                                const parsedData = JSON.parse(savedData);
+                                const records = Array.isArray(parsedData) ? parsedData : (parsedData.records || parsedData.construction_logs || []);
+                                const projectRecords = records.filter(r => r.project_id === projectId);
+                                const filteredRecords = filterConstructionLogs(projectRecords);
+                                return filteredRecords.reduce((sum, record) => {
+                                    return sum + (record.image_ids ? record.image_ids.length : 0);
+                                }, 0);
+                            } catch (e) {
+                                continue;
+                            }
+                        }
+                    }
+                    return 0;
+                }
+
+                // 在线状态从Supabase获取
+                let query = window.supabase
+                    .from('construction_logs')
+                    .select('*')
+                    .eq('project_id', projectId);
+
+                // 日期筛选
+                if (currentFilters.dateRange) {
+                    if (currentFilters.dateRange.start) {
+                        query = query.gte('record_date', currentFilters.dateRange.start);
+                    }
+                    if (currentFilters.dateRange.end) {
+                        query = query.lte('record_date', currentFilters.dateRange.end);
+                    }
+                }
+
+                const { data, error } = await query;
+
+                if (error) {
+                    console.error('获取施工日志照片数量失败:', error);
+                    return 0;
+                }
+
+                const records = (data || [])
+                    .filter(record => record.image_ids && record.image_ids.length > 0);
+                const filteredRecords = filterConstructionLogs(records);
+
+                return filteredRecords.reduce((sum, record) => {
+                    return sum + (record.image_ids ? record.image_ids.length : 0);
+                }, 0);
+            } catch (error) {
+                console.error('获取施工日志照片数量失败:', error);
+                return 0;
+            }
+        }
+
+        // 更新所有分类的图片数量
+        async function updateAllCategoryCounts() {
+            const projectId = localStorage.getItem('currentProjectId') || '';
+            if (!projectId) return;
+
+            currentFilters.projectId = projectId;
+
+            // 更新记工照片数量
+            const workCount = await getWorkPhotoCount();
+            const workCountEl = document.querySelector('.photo-category-item[data-category="work"] .count-num');
+            if (workCountEl) workCountEl.textContent = workCount;
+
+            // 更新借支照片数量
+            const settlementCount = await getSettlementPhotoCount();
+            const settlementCountEl = document.querySelector('.photo-category-item[data-category="settlement"] .count-num');
+            if (settlementCountEl) settlementCountEl.textContent = settlementCount;
+
+            // 更新点工单照片数量
+            const workOrderCount = await getWorkOrderPhotoCount();
+            const workOrderCountEl = document.querySelector('.photo-category-item[data-category="workorder"] .count-num');
+            if (workOrderCountEl) workOrderCountEl.textContent = workOrderCount;
+
+            // 更新记账照片数量
+            const accountCount = await getAccountPhotoCount();
+            const accountCountEl = document.querySelector('.photo-category-item[data-category="account"] .count-num');
+            if (accountCountEl) accountCountEl.textContent = accountCount;
+
+            // 更新施工日志照片数量
+            const constructionCount = await getConstructionPhotoCount();
+            const constructionCountEl = document.querySelector('.photo-category-item[data-category="construction"] .count-num');
+            if (constructionCountEl) constructionCountEl.textContent = constructionCount;
+        }
+
+        // 获取记工照片数量
+        async function getWorkPhotoCount() {
+            try {
+                await window.waitForSupabase();
+
+                if (!navigator.onLine || !window.supabase || typeof window.supabase.from !== 'function') {
+                    // 离线状态从localStorage获取
+                    const localKey = `attendance_records_${currentFilters.projectId}`;
+                    const savedData = localStorage.getItem(localKey);
+                    if (savedData) {
+                        const parsedData = JSON.parse(savedData);
+                        const records = parsedData.records || [];
+                        const filteredRecords = filterAttendanceRecords(records);
+                        return filteredRecords.reduce((sum, record) => {
+                            return sum + (record.image_ids ? record.image_ids.length : 0);
+                        }, 0);
+                    }
+                    return 0;
+                }
+
+                // 在线状态从Supabase获取
+                let query = window.supabase
+                    .from('attendance_records')
+                    .select('*')
+                    .eq('project_id', currentFilters.projectId);
+
+                // 日期筛选
+                if (currentFilters.dateRange) {
+                    if (currentFilters.dateRange.start) {
+                        query = query.gte('record_date', currentFilters.dateRange.start);
+                    }
+                    if (currentFilters.dateRange.end) {
+                        query = query.lte('record_date', currentFilters.dateRange.end);
+                    }
+                }
+
+                const { data, error } = await query;
+
+                if (error) {
+                    console.error('获取记工照片数量失败:', error);
+                    return 0;
+                }
+
+                const records = data || [];
+                const filteredRecords = filterAttendanceRecords(records);
+                return filteredRecords.reduce((sum, record) => {
+                    return sum + (record.image_ids ? record.image_ids.length : 0);
+                }, 0);
+            } catch (error) {
+                console.error('获取记工照片数量失败:', error);
+                return 0;
+            }
+        }
+
+        // 获取记账照片数量
+        async function getAccountPhotoCount() {
+            try {
+                await window.waitForSupabase();
+
+                if (!navigator.onLine || !window.supabase || typeof window.supabase.from !== 'function') {
+                    return 0;
+                }
+
+                // 获取支出记录
+                let expenseQuery = window.supabase
+                    .from('project_expenses')
+                    .select('*')
+                    .eq('project_id', currentFilters.projectId);
+
+                // 获取收入记录
+                let incomeQuery = window.supabase
+                    .from('project_income')
+                    .select('*')
+                    .eq('project_id', currentFilters.projectId);
+
+                // 日期筛选
+                if (currentFilters.dateRange) {
+                    if (currentFilters.dateRange.start) {
+                        expenseQuery = expenseQuery.gte('record_date', currentFilters.dateRange.start);
+                        incomeQuery = incomeQuery.gte('record_date', currentFilters.dateRange.start);
+                    }
+                    if (currentFilters.dateRange.end) {
+                        expenseQuery = expenseQuery.lte('record_date', currentFilters.dateRange.end);
+                        incomeQuery = incomeQuery.lte('record_date', currentFilters.dateRange.end);
+                    }
+                }
+
+                const [expenseResult, incomeResult] = await Promise.all([
+                    expenseQuery,
+                    incomeQuery
+                ]);
+
+                if (expenseResult.error) {
+                    console.error('获取支出记录失败:', expenseResult.error);
+                }
+                if (incomeResult.error) {
+                    console.error('获取收入记录失败:', incomeResult.error);
+                }
+
+                const expenseRecords = (expenseResult.data || [])
+                    .filter(record => record.image_ids && record.image_ids.length > 0);
+                const incomeRecords = (incomeResult.data || [])
+                    .filter(record => record.image_ids && record.image_ids.length > 0);
+
+                const allRecords = [...expenseRecords, ...incomeRecords];
+                const filteredRecords = filterAccountRecords(allRecords);
+
+                return filteredRecords.reduce((sum, record) => {
+                    return sum + (record.image_ids ? record.image_ids.length : 0);
+                }, 0);
+            } catch (error) {
+                console.error('获取记账照片数量失败:', error);
+                return 0;
+            }
+        }
+
+        // 获取借支照片数量
+        async function getSettlementPhotoCount() {
+            try {
+                await window.waitForSupabase();
+
+                const projectId = localStorage.getItem('currentProjectId') || '';
+                if (!projectId) return 0;
+
+                // 离线状态从localStorage获取
+                if (!navigator.onLine || !window.supabase || typeof window.supabase.from !== 'function') {
+                    const storageKeys = ['settlementRecords', 'settlement_records_cache', `settlement_records_${projectId}`];
+                    for (const key of storageKeys) {
+                        const savedData = localStorage.getItem(key);
+                        if (savedData) {
+                            try {
+                                const parsedData = JSON.parse(savedData);
+                                const records = Array.isArray(parsedData) ? parsedData : (parsedData.records || parsedData.settlement_records || []);
+                                const projectRecords = records.filter(r => r.project_id === projectId);
+                                const filteredRecords = filterSettlementRecords(projectRecords);
+                                return filteredRecords.reduce((sum, record) => {
+                                    return sum + (record.image_ids ? record.image_ids.length : 0);
+                                }, 0);
+                            } catch (e) {
+                                continue;
+                            }
+                        }
+                    }
+                    return 0;
+                }
+
+                // 在线状态从Supabase获取
+                let query = window.supabase
+                    .from('settlement_records')
+                    .select('*')
+                    .eq('project_id', projectId);
+
+                // 日期筛选
+                if (currentFilters.dateRange) {
+                    if (currentFilters.dateRange.start) {
+                        query = query.gte('record_date', currentFilters.dateRange.start);
+                    }
+                    if (currentFilters.dateRange.end) {
+                        query = query.lte('record_date', currentFilters.dateRange.end);
+                    }
+                }
+
+                // 员工筛选
+                if (currentFilters.employeeId) {
+                    query = query.eq('employee_id', currentFilters.employeeId);
+                }
+
+                const { data, error } = await query;
+
+                if (error) {
+                    console.error('获取借支照片数量失败:', error);
+                    return 0;
+                }
+
+                const records = (data || [])
+                    .filter(record => record.image_ids && record.image_ids.length > 0);
+                const filteredRecords = filterSettlementRecords(records);
+
+                return filteredRecords.reduce((sum, record) => {
+                    return sum + (record.image_ids ? record.image_ids.length : 0);
+                }, 0);
+            } catch (error) {
+                console.error('获取借支照片数量失败:', error);
+                return 0;
+            }
+        }
+
+        // 获取点工单照片数量
+        async function getWorkOrderPhotoCount() {
+            try {
+                await window.waitForSupabase();
+
+                const projectId = localStorage.getItem('currentProjectId') || '';
+                if (!projectId) return 0;
+
+                // 离线状态从localStorage获取
+                if (!navigator.onLine || !window.supabase || typeof window.supabase.from !== 'function') {
+                    const storageKeys = ['workRecords', 'work_records_cache', `work_records_${projectId}`];
+                    for (const key of storageKeys) {
+                        const savedData = localStorage.getItem(key);
+                        if (savedData) {
+                            try {
+                                const parsedData = JSON.parse(savedData);
+                                const records = Array.isArray(parsedData) ? parsedData : (parsedData.records || parsedData.work_records || []);
+                                const projectRecords = records.filter(r => r.project_id === projectId);
+                                const filteredRecords = filterWorkOrderRecords(projectRecords);
+                                return filteredRecords.reduce((sum, record) => {
+                                    return sum + (record.image_ids ? record.image_ids.length : 0);
+                                }, 0);
+                            } catch (e) {
+                                continue;
+                            }
+                        }
+                    }
+                    return 0;
+                }
+
+                // 在线状态从Supabase获取
+                let query = window.supabase
+                    .from('work_records')
+                    .select('*')
+                    .eq('project_id', projectId);
+
+                // 日期筛选
+                if (currentFilters.dateRange) {
+                    if (currentFilters.dateRange.start) {
+                        query = query.gte('record_date', currentFilters.dateRange.start);
+                    }
+                    if (currentFilters.dateRange.end) {
+                        query = query.lte('record_date', currentFilters.dateRange.end);
+                    }
+                }
+
+                const { data, error } = await query;
+
+                if (error) {
+                    return 0;
+                }
+
+                const records = (data || [])
+                    .filter(record => record.image_ids && record.image_ids.length > 0);
+                const filteredRecords = filterWorkOrderRecords(records);
+
+                return filteredRecords.reduce((sum, record) => {
+                    return sum + (record.image_ids ? record.image_ids.length : 0);
+                }, 0);
+            } catch (error) {
+                return 0;
+            }
+        }
+
+        // 监听日期选择变化
+        function setupDateChangeListener() {
+            const workDateInput = document.getElementById('workDate');
+            workDateInput.addEventListener('change', function() {
+                updateFilters();
+            });
+        }
+
+        // 监听员工选择变化
+        function setupEmployeeChangeListener() {
+            document.addEventListener('employeeSelectionChanged', function(e) {
+                const { employees, isAllSelected } = e.detail;
+
+                if (isAllSelected || employees.length === 0) {
+                    // 全部员工
+                    currentFilters.employeeId = null;
+                } else if (employees.length === 1) {
+                    // 单个员工
+                    currentFilters.employeeId = employees[0].id;
+                }
+
+                // 更新所有分类的图片数量
+                updateAllCategoryCounts();
+
+                // 重新加载当前分类的照片
+                if (currentPhotoCategory === 'work') {
+                    loadAttendancePhotos();
+                } else if (currentPhotoCategory === 'settlement') {
+                    loadSettlementPhotos();
+                } else if (currentPhotoCategory === 'workorder') {
+                    loadWorkOrderPhotos();
+                } else if (currentPhotoCategory === 'account') {
+                    loadAccountPhotos();
+                } else if (currentPhotoCategory === 'construction') {
+                    loadConstructionPhotos();
+                }
+            });
+        }
+
+        // ==================== 图片预览功能 ====================
+
+        // 初始化图片预览功能
+        function initImagePreview() {
+            const modal = document.getElementById('imagePreviewModal');
+            const closeBtn = document.getElementById('closePreviewBtn');
+            const img = document.getElementById('previewImage');
+
+            // 关闭按钮事件
+            closeBtn.addEventListener('click', closeImagePreview);
+
+            // 点击背景关闭
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    closeImagePreview();
+                }
+            });
+
+            // 图片拖动功能
+            let isDragging = false;
+            let startX, startY;
+            let translateX = 0, translateY = 0;
+            let scale = 1;
+
+            img.addEventListener('mousedown', function(e) {
+                isDragging = true;
+                startX = e.clientX - translateX;
+                startY = e.clientY - translateY;
+                img.style.cursor = 'grabbing';
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+                translateX = e.clientX - startX;
+                translateY = e.clientY - startY;
+                updateImageTransform(img, translateX, translateY, scale);
+            });
+
+            document.addEventListener('mouseup', function() {
+                isDragging = false;
+                img.style.cursor = 'move';
+            });
+
+            // 鼠标滚轮缩放功能
+            img.addEventListener('wheel', function(e) {
+                e.preventDefault();
+
+                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                scale *= delta;
+
+                // 限制缩放范围
+                scale = Math.min(Math.max(0.5, scale), 3);
+
+                updateImageTransform(img, translateX, translateY, scale);
+            });
+
+            // 查看记工按钮事件
+            const viewAttendanceBtn = document.getElementById('viewAttendanceBtn');
+            if (viewAttendanceBtn) {
+                viewAttendanceBtn.addEventListener('click', function() {
+                    goToAttendancePage();
+                });
+            }
+
+            // 查看借支按钮事件
+            const viewSettlementBtn = document.getElementById('viewSettlementBtn');
+            if (viewSettlementBtn) {
+                viewSettlementBtn.addEventListener('click', function() {
+                    goToSettlementPage();
+                });
+            }
+
+            // 查看点工单按钮事件
+            const viewWorkOrderBtn = document.getElementById('viewWorkOrderBtn');
+            if (viewSettlementBtn) {
+                if (currentPhotoCategory === 'settlement') {
+                    viewSettlementBtn.style.display = 'inline-block';
+                } else {
+                    viewSettlementBtn.style.display = 'none';
+                }
+            }
+
+            if (viewWorkOrderBtn) {
+                viewWorkOrderBtn.addEventListener('click', function() {
+                    goToWorkOrderPage();
+                });
+            }
+
+            // 查看记账按钮事件
+            const viewAccountBtn = document.getElementById('viewAccountBtn');
+            if (viewAccountBtn) {
+                viewAccountBtn.addEventListener('click', function() {
+                    goToAccountPage();
+                });
+            }
+
+            // ESC键关闭预览
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    closeImagePreview();
+                }
+            });
+        }
+
+        // 跳转到记工页面(统计.html)
+        function goToAttendancePage() {
+            const modal = document.getElementById('imagePreviewModal');
+            // 获取 extraData
+            let extraData = null;
+            if (modal.dataset.extraData) {
+                try {
+                    extraData = JSON.parse(modal.dataset.extraData);
+                } catch (e) {
+                    console.error('解析extraData失败', e);
+                }
+            }
+
+            if (!extraData) {
+                console.warn('没有记工数据，无法跳转');
+                return;
+            }
+
+            // 构建统计.html的URL参数
+            const params = new URLSearchParams();
+            params.set('project_id', extraData.projectId || '');
+            params.set('date', extraData.recordDate || '');
+            params.set('employee_id', extraData.employeeId || '');
+            params.set('work_type', extraData.workType || '');
+            params.set('view', 'detail'); // 选中明细界面
+
+            // 关闭预览并跳转
+            closeImagePreview();
+            window.location.href = `统计.html?${params.toString()}`;
+        }
+
+        // 跳转到借支页面(统计.html)
+        function goToSettlementPage() {
+            const modal = document.getElementById('imagePreviewModal');
+            // 获取 extraData
+            let extraData = null;
+            if (modal.dataset.extraData) {
+                try {
+                    extraData = JSON.parse(modal.dataset.extraData);
+                } catch (e) {
+                    console.error('解析extraData失败', e);
+                }
+            }
+
+            if (!extraData) {
+                console.warn('没有借支数据，无法跳转');
+                return;
+            }
+
+            // 构建统计.html的URL参数
+            const params = new URLSearchParams();
+            params.set('project_id', extraData.projectId || '');
+            params.set('date', extraData.recordDate || '');
+            params.set('employee_id', extraData.employeeId || '');
+            params.set('record_type', extraData.recordType || ''); // 使用实际的记录类型（借支、扣款、公司转账、结算）
+            params.set('view', 'detail'); // 选中明细界面
+
+            // 关闭预览并跳转
+            closeImagePreview();
+            window.location.href = `统计.html?${params.toString()}`;
+        }
+
+        // 跳转到点工单页面
+        function goToWorkOrderPage() {
+            const modal = document.getElementById('imagePreviewModal');
+            const imageDate = modal.dataset.currentImageDate;
+
+            if (!imageDate) {
+                console.warn('没有当前图片日期，无法跳转');
+                return;
+            }
+
+            const projectId = localStorage.getItem('currentProjectId');
+            const projectName = localStorage.getItem('currentProjectName');
+
+            // 构建URL参数
+            const params = new URLSearchParams();
+            if (projectName) {
+                // 不需要手动编码，URLSearchParams会自动处理
+                params.set('project_name', projectName);
+            }
+            if (projectId) {
+                params.set('project_id', projectId);
+            }
+            params.set('work_date', imageDate);
+            params.set('show_detail', 'true');
+
+            // 构建完整URL
+            const url = `点工单.html?${params.toString()}`;
+
+            // 关闭预览并跳转
+            closeImagePreview();
+            window.open(url, '_self');
+        }
+
+        // 跳转到项目记账页面
+        function goToAccountPage() {
+            const modal = document.getElementById('imagePreviewModal');
+            const imageDate = modal.dataset.currentImageDate;
+            const recordType = modal.dataset.currentRecordType;
+
+            if (!imageDate) {
+                console.warn('没有当前图片日期，无法跳转');
+                return;
+            }
+
+            const projectId = localStorage.getItem('currentProjectId');
+            const projectName = localStorage.getItem('currentProjectName');
+
+            // 构建URL参数
+            const params = new URLSearchParams();
+            if (projectName) {
+                // 不需要手动编码，URLSearchParams会自动处理
+                params.set('project_name', projectName);
+            }
+            if (projectId) {
+                params.set('project_id', projectId);
+            }
+            params.set('work_date', imageDate);
+            params.set('show_detail', 'true');
+            
+            // 根据记录类型设置标签参数
+            // 如果是支出记录(expense)，设置 type=expense
+            // 如果是收入记录(income)，设置 type=income
+            if (recordType === 'expense') {
+                params.set('type', 'expense');
+            } else if (recordType === 'income') {
+                params.set('type', 'income');
+            }
+
+            // 构建完整URL
+            const url = `项目记账.html?${params.toString()}`;
+
+            // 关闭预览并跳转
+            closeImagePreview();
+            window.open(url, '_self');
+        }
+
+        // 更新图片变换
+        function updateImageTransform(img, x, y, scale) {
+            img.style.left = '50%';
+            img.style.top = '50%';
+            img.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) scale(${scale})`;
+        }
+
+        // 打开图片预览
+        function openImagePreview(imageSrc, imageDate, recordType, extraData) {
+            const modal = document.getElementById('imagePreviewModal');
+            const img = document.getElementById('previewImage');
+            const viewAttendanceBtn = document.getElementById('viewAttendanceBtn');
+            const viewSettlementBtn = document.getElementById('viewSettlementBtn');
+            const viewWorkOrderBtn = document.getElementById('viewWorkOrderBtn');
+            const viewAccountBtn = document.getElementById('viewAccountBtn');
+            const viewConstructionBtn = document.getElementById('viewConstructionBtn') || createViewConstructionBtn();
+
+            img.src = imageSrc;
+            img.style.left = '50%';
+            img.style.top = '50%';
+            img.style.transform = 'translate(-50%, -50%) scale(1)';
+            img.style.cursor = 'move';
+
+            modal.style.display = 'block';
+
+            // 保存当前图片的日期（用于跳转点工单）
+            if (imageDate) {
+                modal.dataset.currentImageDate = imageDate;
+            }
+            
+            // 保存记录类型
+            if (recordType) {
+                modal.dataset.currentRecordType = recordType;
+            }
+
+            // 保存额外数据
+            if (extraData) {
+                modal.dataset.extraData = JSON.stringify(extraData);
+            }
+
+            // 根据当前分类显示或隐藏按钮
+            if (viewAttendanceBtn) {
+                if (currentPhotoCategory === 'work') {
+                    viewAttendanceBtn.style.display = 'inline-block';
+                } else {
+                    viewAttendanceBtn.style.display = 'none';
+                }
+            }
+
+            if (viewSettlementBtn) {
+                if (currentPhotoCategory === 'settlement') {
+                    viewSettlementBtn.style.display = 'inline-block';
+                } else {
+                    viewSettlementBtn.style.display = 'none';
+                }
+            }
+
+            if (viewWorkOrderBtn) {
+                if (currentPhotoCategory === 'workorder') {
+                    viewWorkOrderBtn.style.display = 'inline-block';
+                } else {
+                    viewWorkOrderBtn.style.display = 'none';
+                }
+            }
+            
+            if (viewAccountBtn) {
+                if (currentPhotoCategory === 'account') {
+                    viewAccountBtn.style.display = 'inline-block';
+                } else {
+                    viewAccountBtn.style.display = 'none';
+                }
+            }
+
+            if (viewConstructionBtn) {
+                if (currentPhotoCategory === 'construction') {
+                    viewConstructionBtn.style.display = 'inline-block';
+                } else {
+                    viewConstructionBtn.style.display = 'none';
+                }
+            }
+        }
+
+        // 关闭图片预览
+        function closeImagePreview() {
+            const modal = document.getElementById('imagePreviewModal');
+            const img = document.getElementById('previewImage');
+            const viewAttendanceBtn = document.getElementById('viewAttendanceBtn');
+            const viewSettlementBtn = document.getElementById('viewSettlementBtn');
+            const viewConstructionBtn = document.getElementById('viewConstructionBtn');
+
+            modal.style.display = 'none';
+            img.src = '';
+
+            // 清除保存的日期
+            if (modal.dataset.currentImageDate) {
+                delete modal.dataset.currentImageDate;
+            }
+            
+            // 清除保存的记录类型
+            if (modal.dataset.currentRecordType) {
+                delete modal.dataset.currentRecordType;
+            }
+
+            // 清除保存的额外数据
+            if (modal.dataset.extraData) {
+                delete modal.dataset.extraData;
+            }
+
+            // 隐藏查看记工按钮
+            if (viewAttendanceBtn) {
+                viewAttendanceBtn.style.display = 'none';
+            }
+
+            // 隐藏查看借支按钮
+            if (viewSettlementBtn) {
+                viewSettlementBtn.style.display = 'none';
+            }
+
+            // 隐藏查看施工日志按钮
+            if (viewConstructionBtn) {
+                viewConstructionBtn.style.display = 'none';
+            }
+        }
+
+        // 创建查看施工日志按钮
+        function createViewConstructionBtn() {
+            const previewBottomBar = document.getElementById('previewBottomBar');
+            const existingBtn = document.getElementById('viewConstructionBtn');
+            if (existingBtn) {
+                return existingBtn;
+            }
+
+            const btn = document.createElement('button');
+            btn.id = 'viewConstructionBtn';
+            btn.textContent = '查看施工日志';
+            btn.style.display = 'none';
+            btn.style.background = '#722ed1';
+            btn.style.color = 'white';
+            btn.style.border = 'none';
+            btn.style.padding = '6px 16px';
+            btn.style.borderRadius = '4px';
+            btn.style.fontSize = '14px';
+            btn.style.cursor = 'pointer';
+            btn.style.transition = 'background 0.3s';
+
+            btn.addEventListener('click', function() {
+                goToConstructionPage();
+            });
+
+            previewBottomBar.appendChild(btn);
+            return btn;
+        }
+
+        // 跳转到施工日志页面
+        function goToConstructionPage() {
+            const modal = document.getElementById('imagePreviewModal');
+            const imageDate = modal.dataset.currentImageDate;
+
+            if (!imageDate) {
+                console.warn('没有当前图片日期，无法跳转');
+                return;
+            }
+
+            const projectId = localStorage.getItem('currentProjectId');
+            const projectName = localStorage.getItem('currentProjectName');
+
+            // 构建URL参数
+            const params = new URLSearchParams();
+            if (projectName) {
+                params.set('project_name', projectName);
+            }
+            if (projectId) {
+                params.set('project_id', projectId);
+            }
+            params.set('work_date', imageDate);
+            params.set('show_detail', 'true');
+
+            // 构建完整URL
+            const url = `施工日志.html?${params.toString()}`;
+
+            // 关闭预览并跳转
+            closeImagePreview();
+            window.open(url, '_self');
+        }
+
+        // 从URL参数同步项目信息到localStorage
+        function syncProjectFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const projectName = urlParams.get('project_name');
+            const projectId = urlParams.get('project_id');
+
+            if (projectName) {
+                localStorage.setItem('currentProjectName', decodeURIComponent(projectName));
+            }
+
+            if (projectId) {
+                localStorage.setItem('currentProjectId', decodeURIComponent(projectId));
+            }
+        }
+
+        // 页面初始化
+        document.addEventListener('DOMContentLoaded', async function() {
+            // 从URL参数同步项目信息
+            syncProjectFromUrl();
+
+            // 通知父页面更新标题为"云相册"
+            if (window.parent && window.parent !== window) {
+                const targetOrigin = window.location.origin || '*';
+                window.parent.postMessage({
+                    type: 'updateTitle',
+                    page: '云相册.html'
+                }, targetOrigin);
+            }
+
+            setTodayDate();
+            setupDateInteraction();
+            setupEmployeeListEvents();
+            setupDateChangeListener();
+            setupEmployeeChangeListener();
+
+            // 初始化图片预览功能
+            initImagePreview();
+
+            // 初始化照片分类点击事件
+            initPhotoCategoryEvents();
+
+            // 初始化员工选择框为全部员工
+            handleSelectedEmployees([], true);
+
+            // 初始化筛选条件（根据日期框和员工选择的默认值）
+            initializeFilters();
+
+            // 更新所有分类的图片数量
+            await updateAllCategoryCounts();
+
+            // 初始加载照片
+            loadAttendancePhotos();
+        });
+
+        // 初始化照片分类点击事件
+        function initPhotoCategoryEvents() {
+            const categoryItems = document.querySelectorAll('.photo-category-item[data-category]');
+            categoryItems.forEach(item => {
+                item.addEventListener('click', async function() {
+                    // 移除所有active状态
+                    categoryItems.forEach(i => i.classList.remove('active'));
+                    // 添加当前active状态
+                    this.classList.add('active');
+
+                    // 获取分类类型
+                    const category = this.dataset.category;
+                    currentPhotoCategory = category;
+
+                    // 终止之前的加载请求
+                    abortPendingRequests();
+
+                    // 先清除旧的照片显示，显示加载状态
+                    const photoListContainer = document.querySelector('.photo-list-container');
+                    photoListContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 40px;">加载中...</div>';
+
+                    // 根据分类加载对应照片
+                    switch (category) {
+                        case 'work':
+                            await loadAttendancePhotos();
+                            break;
+                        case 'settlement':
+                            await loadSettlementPhotos();
+                            break;
+                        case 'account':
+                            await loadAccountPhotos();
+                            break;
+                        case 'workorder':
+                            await loadWorkOrderPhotos();
+                            break;
+                        case 'construction':
+                            await loadConstructionPhotos();
+                            break;
+                    }
+                });
+            });
+        }
+
+        // 初始化筛选条件
+        function initializeFilters() {
+            const workDateInput = document.getElementById('workDate');
+
+            // 获取当前项目ID
+            currentFilters.projectId = localStorage.getItem('currentProjectId') || '';
+
+            // 根据日期框的值设置日期筛选条件
+            if (workDateInput.dataset.selectAll === 'true') {
+                // 全部日期
+                currentFilters.dateRange = null;
+            } else if (workDateInput.dataset.displayValue && workDateInput.dataset.displayValue.includes('~')) {
+                // 日期范围
+                const dates = workDateInput.dataset.displayValue.split(' ~ ');
+                currentFilters.dateRange = {
+                    start: dates[0],
+                    end: dates[1]
+                };
+            } else if (workDateInput.value) {
+                // 单个日期（默认今天）
+                currentFilters.dateRange = {
+                    start: workDateInput.value,
+                    end: workDateInput.value
+                };
+            } else {
+                currentFilters.dateRange = null;
+            }
+
+            // 员工筛选默认为null（全部员工）
+            currentFilters.employeeId = null;
+        }
+    </script>
+</body>
+</html>
