@@ -529,23 +529,21 @@
                 padding: 8px 5px !important;
                 font-size: 14px !important;
                 white-space: nowrap !important;
-                overflow: hidden !important;
                 text-overflow: ellipsis !important;
             }
+            #dayWorkOptions > div:first-child #dayWork1 {
+                flex: 0.9 !important;
+            }
+            #dayWorkOptions > div:first-child #dayWork05 {
+                flex: 0.8 !important;
+            }
             #dayWorkOptions > div:first-child .hours-select-container {
-                flex: 0 0 auto !important;
-                min-width: 90px !important;
-                width: 90px !important;
+                flex: 1.2 !important;
+                min-width: 0 !important;
+                width: auto !important;
             }
             #dayWorkOptions > div:first-child .hours-input {
                 font-size: 14px !important;
-            }
-            /* 移动端下拉框z-index提高，确保显示在最上层 */
-            .hours-dropdown {
-                z-index: 9999 !important;
-            }
-            .hours-dropdown[style*="block"] {
-                z-index: 9999 !important;
             }
             /* 移动端工量界面不换行，自动调整输入框宽度 */
             #workAmountInputContainer > div {
@@ -8617,27 +8615,10 @@
             });
             
             // 选小时按钮
-            const dayWorkHoursBtn = document.getElementById('dayWorkHours');
-            if (dayWorkHoursBtn) {
-                // 添加点击事件
-                dayWorkHoursBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleDayWorkHoursClick(this);
-                });
-                
-                // 添加触摸事件支持（移动端）
-                dayWorkHoursBtn.addEventListener('touchstart', function(e) {
-                    e.preventDefault();
-                    handleDayWorkHoursClick(this);
-                }, { passive: false });
-            }
-            
-            // 处理选小时按钮点击的函数
-            function handleDayWorkHoursClick(btn) {
+            document.getElementById('dayWorkHours').addEventListener('click', function() {
                 // 检查当前按钮是否已激活
-                const isCurrentlyActive = btn.classList.contains('active');
-                const value = btn.getAttribute('data-value');
+                const isCurrentlyActive = this.classList.contains('active');
+                const value = this.getAttribute('data-value');
                 
                 // 重置1个工按钮为默认状态
                 resetDayWork1Button();
@@ -8653,10 +8634,10 @@
                     });
                     
                     // 为当前按钮添加active状态
-                    btn.classList.add('active');
-                    btn.style.backgroundColor = '#1890ff';
-                    btn.style.color = 'white';
-                    btn.style.border = 'none';
+                    this.classList.add('active');
+                    this.style.backgroundColor = '#1890ff';
+                    this.style.color = 'white';
+                    this.style.border = 'none';
                     
                     // 同步更新隐藏的单选按钮
                     document.querySelectorAll('input[name="dayWork"]').forEach(radio => {
@@ -8664,22 +8645,15 @@
                     });
                     
                     // 显示下拉框
-                    const dropdown = btn.querySelector('.hours-dropdown');
+                    const dropdown = this.querySelector('.hours-dropdown');
                     if (dropdown) {
                         dropdown.style.display = 'block';
-                        // 确保下拉框在移动端也能正确显示
-                        setTimeout(() => {
-                            dropdown.style.zIndex = '9999';
-                        }, 10);
                     }
                     
                     // 隐藏工作小时数输入框（点击选小时按钮时不显示）
                     // 已删除hoursInput元素，无需处理
                     
-                    const morningAfternoonBtn = document.getElementById('morningAfternoonBtn');
-                    if (morningAfternoonBtn) {
-                        morningAfternoonBtn.textContent = '上下午';
-                    }
+                    document.getElementById('morningAfternoonBtn').textContent = '上下午';
                     return;
                 }
                 
@@ -8694,10 +8668,10 @@
                     });
                     
                     // 为当前按钮添加active状态
-                    btn.classList.add('active');
-                    btn.style.backgroundColor = '#1890ff';
-                    btn.style.color = 'white';
-                    btn.style.border = 'none';
+                    this.classList.add('active');
+                    this.style.backgroundColor = '#1890ff';
+                    this.style.color = 'white';
+                    this.style.border = 'none';
                     
                     // 同步更新隐藏的单选按钮
                     document.querySelectorAll('input[name="dayWork"]').forEach(radio => {
@@ -8705,19 +8679,16 @@
                     });
                     
                     // 显示下拉框
-                    const hoursDropdown = btn.querySelector('.hours-dropdown');
+                    const hoursDropdown = this.querySelector('.hours-dropdown');
                     if (hoursDropdown) {
                         hoursDropdown.style.display = 'block';
-                        setTimeout(() => {
-                            hoursDropdown.style.zIndex = '9999';
-                        }, 10);
                     }
                 } else {
                     // 如果已经是活动状态，则取消选中
-                    btn.classList.remove('active');
-                    btn.style.backgroundColor = '#f5f5f5';
-                    btn.style.color = '#333';
-                    btn.style.border = '1px solid #ddd';
+                    this.classList.remove('active');
+                    this.style.backgroundColor = '#f5f5f5';
+                    this.style.color = '#333';
+                    this.style.border = '1px solid #ddd';
                     
                     // 同步更新隐藏的单选按钮
                     document.querySelectorAll('input[name="dayWork"]').forEach(radio => {
@@ -8725,17 +8696,14 @@
                     });
                     
                     // 隐藏下拉框
-                    const hoursDropdown = btn.querySelector('.hours-dropdown');
+                    const hoursDropdown = this.querySelector('.hours-dropdown');
                     if (hoursDropdown) {
                         hoursDropdown.style.display = 'none';
                     }
                 }
                 
-                const morningAfternoonBtn = document.getElementById('morningAfternoonBtn');
-                if (morningAfternoonBtn) {
-                    morningAfternoonBtn.textContent = '上下午';
-                }
-            }
+                document.getElementById('morningAfternoonBtn').textContent = '上下午';
+            });
             }
             
             // 休息按钮
