@@ -1,0 +1,164 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.attendance_records (
+  record_id uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+  phone character varying NOT NULL,
+  project_id character varying NOT NULL,
+  employee_id uuid NOT NULL,
+  record_date date NOT NULL,
+  work_type character varying NOT NULL,
+  regular_hours numeric DEFAULT 0,
+  overtime_hours numeric DEFAULT 0,
+  work_time character varying,
+  contract_amount numeric DEFAULT 0,
+  work_quantity numeric DEFAULT 0,
+  unit_price numeric DEFAULT 0,
+  image_ids ARRAY,
+  remark text,
+  created_at timestamp with time zone NOT NULL DEFAULT (CURRENT_TIMESTAMP + '08:00:00'::interval),
+  updated_at timestamp with time zone NOT NULL DEFAULT (CURRENT_TIMESTAMP + '08:00:00'::interval),
+  audit_status character varying DEFAULT '未审核'::character varying,
+  CONSTRAINT attendance_records_pkey PRIMARY KEY (record_id),
+  CONSTRAINT attendance_records_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(project_id),
+  CONSTRAINT attendance_records_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.employees(employee_id)
+);
+CREATE TABLE public.construction_logs (
+  log_id uuid NOT NULL DEFAULT gen_random_uuid(),
+  project_id character varying NOT NULL,
+  user_id uuid NOT NULL,
+  record_date date NOT NULL,
+  weather_info character varying,
+  log_content text NOT NULL,
+  image_ids ARRAY,
+  created_at timestamp with time zone NOT NULL DEFAULT (CURRENT_TIMESTAMP + '08:00:00'::interval),
+  updated_at timestamp with time zone NOT NULL DEFAULT (CURRENT_TIMESTAMP + '08:00:00'::interval),
+  CONSTRAINT construction_logs_pkey PRIMARY KEY (log_id),
+  CONSTRAINT construction_logs_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(project_id),
+  CONSTRAINT construction_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
+);
+CREATE TABLE public.employees (
+  employee_id uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+  project_id character varying,
+  emp_code character varying NOT NULL,
+  emp_name character varying NOT NULL,
+  status character varying NOT NULL DEFAULT '在职'::character varying,
+  labor_cost numeric,
+  phone character varying,
+  id_card character varying UNIQUE,
+  hire_date date,
+  leave_date date,
+  remarks text,
+  bank_name character varying,
+  bank_card_number character varying,
+  bank_address character varying,
+  created_at timestamp with time zone NOT NULL DEFAULT (CURRENT_TIMESTAMP + '08:00:00'::interval),
+  updated_at timestamp with time zone NOT NULL DEFAULT (CURRENT_TIMESTAMP + '08:00:00'::interval),
+  CONSTRAINT employees_pkey PRIMARY KEY (employee_id),
+  CONSTRAINT employees_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(project_id)
+);
+CREATE TABLE public.project_expenses (
+  expense_id uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+  project_id character varying NOT NULL,
+  record_date date NOT NULL,
+  payer character varying,
+  amount numeric NOT NULL,
+  detail_description text,
+  remark text,
+  image_ids ARRAY,
+  created_at timestamp with time zone NOT NULL DEFAULT (CURRENT_TIMESTAMP + '08:00:00'::interval),
+  updated_at timestamp with time zone NOT NULL DEFAULT (CURRENT_TIMESTAMP + '08:00:00'::interval),
+  CONSTRAINT project_expenses_pkey PRIMARY KEY (expense_id),
+  CONSTRAINT project_expenses_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(project_id)
+);
+CREATE TABLE public.project_income (
+  income_id uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+  project_id character varying NOT NULL,
+  record_date date NOT NULL,
+  amount numeric NOT NULL,
+  detail_description text,
+  remark text,
+  image_ids ARRAY,
+  created_at timestamp with time zone NOT NULL DEFAULT (CURRENT_TIMESTAMP + '08:00:00'::interval),
+  updated_at timestamp with time zone NOT NULL DEFAULT (CURRENT_TIMESTAMP + '08:00:00'::interval),
+  CONSTRAINT project_income_pkey PRIMARY KEY (income_id),
+  CONSTRAINT project_income_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(project_id)
+);
+CREATE TABLE public.projects (
+  project_id character varying NOT NULL UNIQUE,
+  user_id uuid,
+  project_name character varying NOT NULL UNIQUE,
+  address text,
+  regular_hours numeric DEFAULT 0,
+  overtime_hours numeric DEFAULT 0,
+  status character varying DEFAULT '在建'::character varying,
+  created_at timestamp with time zone NOT NULL DEFAULT (CURRENT_TIMESTAMP + '08:00:00'::interval),
+  updated_at timestamp with time zone NOT NULL DEFAULT (CURRENT_TIMESTAMP + '08:00:00'::interval),
+  CONSTRAINT projects_pkey PRIMARY KEY (project_id),
+  CONSTRAINT projects_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
+);
+CREATE TABLE public.settlement_records (
+  settlement_id uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+  record_type character varying NOT NULL,
+  project_id character varying NOT NULL,
+  record_date date NOT NULL,
+  employee_id uuid NOT NULL,
+  amount numeric NOT NULL,
+  payer character varying,
+  remark text,
+  image_ids ARRAY,
+  audit_status character varying DEFAULT '未审核'::character varying,
+  created_at timestamp with time zone NOT NULL DEFAULT (CURRENT_TIMESTAMP + '08:00:00'::interval),
+  updated_at timestamp with time zone NOT NULL DEFAULT (CURRENT_TIMESTAMP + '08:00:00'::interval),
+  CONSTRAINT settlement_records_pkey PRIMARY KEY (settlement_id),
+  CONSTRAINT settlement_records_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(project_id),
+  CONSTRAINT settlement_records_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.employees(employee_id)
+);
+CREATE TABLE public.user_projects (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  project_id character varying NOT NULL,
+  perm_add_work_record boolean DEFAULT true,
+  perm_edit_work_record boolean DEFAULT true,
+  perm_delete_work_record boolean DEFAULT true,
+  perm_add_settlement boolean DEFAULT true,
+  perm_edit_settlement boolean DEFAULT true,
+  perm_delete_settlement boolean DEFAULT true,
+  perm_add_expense boolean DEFAULT true,
+  perm_edit_expense boolean DEFAULT true,
+  perm_delete_expense boolean DEFAULT true,
+  perm_add_income boolean DEFAULT true,
+  perm_edit_income boolean DEFAULT true,
+  perm_delete_income boolean DEFAULT true,
+  created_at timestamp with time zone NOT NULL DEFAULT (CURRENT_TIMESTAMP + '08:00:00'::interval),
+  CONSTRAINT user_projects_pkey PRIMARY KEY (id),
+  CONSTRAINT user_projects_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
+  CONSTRAINT user_projects_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(project_id)
+);
+CREATE TABLE public.users (
+  user_id uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+  phone character varying NOT NULL UNIQUE,
+  login_name character varying NOT NULL UNIQUE,
+  password character varying NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT (CURRENT_TIMESTAMP + '08:00:00'::interval),
+  updated_at timestamp with time zone NOT NULL DEFAULT (CURRENT_TIMESTAMP + '08:00:00'::interval),
+  status character varying DEFAULT 'active'::character varying,
+  CONSTRAINT users_pkey PRIMARY KEY (user_id)
+);
+CREATE TABLE public.work_records (
+  work_record_id uuid NOT NULL DEFAULT gen_random_uuid(),
+  project_id character varying NOT NULL,
+  record_date date NOT NULL,
+  team_name character varying,
+  team_leader character varying,
+  work_days numeric DEFAULT 0,
+  worker_type character varying DEFAULT '普工'::character varying,
+  unit_price numeric DEFAULT 0,
+  amount numeric DEFAULT 0,
+  description text,
+  image_ids ARRAY,
+  created_at timestamp with time zone NOT NULL DEFAULT (CURRENT_TIMESTAMP + '08:00:00'::interval),
+  updated_at timestamp with time zone NOT NULL DEFAULT (CURRENT_TIMESTAMP + '08:00:00'::interval),
+  CONSTRAINT work_records_pkey PRIMARY KEY (work_record_id),
+  CONSTRAINT work_records_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(project_id)
+);
