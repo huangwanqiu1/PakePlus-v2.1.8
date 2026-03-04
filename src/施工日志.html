@@ -1,0 +1,3455 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>施工日志</title>
+    <!-- 本地加载完整的Supabase库 -->
+    <script src="./JavaScript/supabase/supabase.min.js"></script>
+    <!-- 加载浏览器环境的Supabase配置 -->
+    <script src="./JavaScript/supabase/supabase-client.js"></script>
+    <!-- 离线同步服务 -->
+    <script src="./JavaScript/离线同步/offline-sync-service.js"></script>
+    <!-- 同步状态指示器 -->
+    <script src="./JavaScript/离线同步/sync-status-indicator.js"></script>
+    <!-- tus-js-client用于大文件上传 -->
+    <script src="./JavaScript/supabase/tus.min.js"></script>
+    <!-- Compressor.js用于图片压缩 -->
+    <script src="./JavaScript/supabase/compressor.min.js"></script>
+    <!-- 中文转拼音库 -->
+    <script src="./JavaScript/supabase/pinyin-pro.js"></script>
+    <!-- PDF生成相关库 -->
+    <script src="./JavaScript/pdf/html2canvas.min.js"></script>
+    <script src="./JavaScript/pdf/jspdf.umd.min.js"></script>
+    <script src="./JavaScript/pdf/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        /* 基础重置 */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        /* 顶部操作栏容器 */
+        .header-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+
+        /* 按钮通用样式 */
+        .btn {
+            padding: 8px 20px;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.3s;
+            outline: none;
+            min-width: 80px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .btn-outline-primary {
+            color: #409EFF;
+            background-color: #ecf5ff;
+            border-color: #b3d8ff;
+        }
+
+        .btn-outline-primary:hover {
+            background-color: #409EFF;
+            color: #fff;
+            border-color: #409EFF;
+        }
+
+        .btn-primary {
+            color: #fff;
+            background-color: #409EFF;
+            border-color: #409EFF;
+            box-shadow: 0 2px 4px rgba(64, 158, 255, 0.2);
+        }
+
+        .btn-primary:hover {
+            background-color: #66b1ff;
+            border-color: #66b1ff;
+        }
+
+        /* --- 日志列表样式 --- */
+        .log-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .log-card {
+            background-color: #fff;
+            border-radius: 4px; /* 卡片圆角，参考图片比较直 */
+            border: 1px solid #ebeef5; /* 浅淡的边框 */
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02); /* 非常淡的阴影 */
+        }
+
+        .log-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        /* 头像样式 */
+        .avatar {
+            width: 48px;
+            height: 48px;
+            background-color: #409EFF; /* 蓝色背景 */
+            color: #fff;
+            border-radius: 50%; /* 圆形 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 14px;
+            font-weight: 500;
+            margin-right: 12px;
+        }
+
+        .user-info {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .user-name {
+            font-size: 16px;
+            font-weight: 600; /* 加粗 */
+            color: #303133;
+            margin-bottom: 4px;
+        }
+
+        .log-date {
+            font-size: 12px;
+            color: #909399; /* 灰色日期 */
+        }
+
+        .log-content {
+            font-size: 14px;
+            color: #606266;
+            margin-bottom: 15px;
+            line-height: 1.5;
+            padding-left: 2px; /* 稍微对其一点视觉 */
+        }
+
+        .log-footer {
+            font-size: 12px;
+            color: #909399;
+        }
+
+        /* 底部提示文字 */
+        .no-more-data {
+            text-align: center;
+            color: #909399;
+            font-size: 13px;
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+
+        /* --- 侧边栏及遮罩层样式 --- */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 2000; /* 提高层级 */
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .overlay.active {
+            display: block;
+            opacity: 1;
+        }
+
+        .sidebar {
+            position: fixed;
+            top: 0;
+            right: -320px; /* 默认隐藏在右侧外 */
+            width: 320px;
+            height: 100%;
+            background-color: white;
+            z-index: 2001; /* 提高层级 */
+            box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
+            transition: right 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar.active {
+            right: 0;
+            transform: none; /* 移除之前的 transform */
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid #e8e8e8;
+            font-size: 16px;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .sidebar-content {
+            padding: 24px;
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .form-label {
+            width: 80px;
+            text-align: right;
+            margin-right: 16px;
+            color: #333;
+            font-size: 15px; /* 增大字体，从 14px 改为 15px */
+            margin-bottom: 0;
+            min-width: unset;
+            flex-shrink: unset;
+        }
+
+        .form-label .required {
+            color: #ff4d4f;
+            margin-right: 4px;
+        }
+
+        /* 必填星号通用样式 */
+        .required-star {
+            color: #F56C6C;
+            margin-right: 4px;
+        }
+
+        .form-input-wrapper {
+            flex: 1;
+            position: relative;
+        }
+
+        .form-input {
+            width: 100%;
+            height: 36px;
+            padding: 0 12px;
+            background: linear-gradient(135deg, rgba(230, 247, 255, 0.8), rgba(240, 250, 255, 0.6));
+            border: 1px solid #91d5ff;
+            border-radius: 4px;
+            font-size: 14px; /* 增大字体，从 13px 改为 14px */
+            color: #333;
+            outline: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 1px 2px rgba(24, 144, 255, 0.1);
+            cursor: pointer;
+        }
+        
+        .form-input:hover {
+            background: linear-gradient(135deg, rgba(24, 144, 255, 0.9), rgba(64, 169, 255, 0.8));
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
+            border-color: #1890ff;
+        }
+        
+        .form-input:focus {
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        .form-input:hover ~ .input-icon {
+            color: white;
+        }
+
+        .input-icon {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #bfbfbf;
+            pointer-events: none;
+            width: 16px;
+            height: 16px;
+            transition: color 0.3s;
+        }
+
+        .sidebar-actions {
+            margin-top: 10px;
+            padding-left: 20px; /* 向左移动，减小左内边距 */
+            display: flex;
+            gap: 12px;
+        }
+
+        .sidebar-actions .btn {
+            height: 36px;
+            padding: 0 20px;
+            border-radius: 6px; /* 增大圆角，从 4px 改为 6px */
+            font-size: 14px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.3s;
+            min-width: unset;
+        }
+
+        .sidebar-actions .btn-primary {
+            background-color: #1890ff;
+            color: white;
+            border-color: #1890ff;
+        }
+
+        .sidebar-actions .btn-primary:hover {
+            background-color: #40a9ff;
+            border-color: #40a9ff;
+        }
+
+        .sidebar-actions .btn-default {
+            background-color: white;
+            color: #666;
+            border-color: #d9d9d9;
+        }
+
+        .sidebar-actions .btn-default:hover {
+            color: #40a9ff;
+            border-color: #40a9ff;
+            background-color: white;
+        }
+
+        /* Date Picker Styles */
+        .date-picker-dropdown {
+            position: fixed;
+            z-index: 2002;
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            width: 250px;
+            font-size: 13px;
+            display: none;
+            border: 1px solid #e8e8e8;
+        }
+
+        .date-picker-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .date-picker-header span {
+            cursor: pointer;
+            user-select: none;
+            padding: 0 4px;
+            color: #999;
+        }
+        
+        .date-picker-header span:hover {
+            color: #1890ff;
+        }
+
+        .current-year-month {
+            font-weight: bold;
+            color: #333 !important;
+            font-size: 14px;
+        }
+
+        .date-picker-body {
+            padding: 8px;
+        }
+
+        .weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            text-align: center;
+            margin-bottom: 6px;
+            color: #666;
+            font-size: 12px;
+        }
+
+        .days-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+        }
+
+        .day-cell {
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+            border: 1px solid #f0f0f0;
+        }
+
+        .day-cell:hover {
+            background-color: #f5f5f5;
+            border-color: #d9d9d9;
+        }
+
+        .day-cell.current-month {
+            color: #333;
+        }
+
+        .day-cell.prev-month, .day-cell.next-month {
+            color: #ccc;
+        }
+
+        .day-cell.selected {
+            background-color: #1890ff;
+            color: white;
+            border-color: #1890ff;
+            border-radius: 8px;
+        }
+        
+        .day-cell.today {
+            border: 1px solid #1890ff;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+
+        .day-cell.disabled {
+            color: #d9d9d9;
+            background-color: #f5f5f5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        .date-picker-footer {
+            padding: 8px;
+            border-top: 1px solid #f0f0f0;
+            text-align: center;
+        }
+
+        .today-btn {
+            color: #1890ff;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        
+        .today-btn:hover {
+            color: #40a9ff;
+        }
+
+        /* 项目名称输入框特殊样式 */
+        #projectName {
+            background-color: #f8f9fa !important;
+            cursor: not-allowed !important;
+            color: #6c757d !important;
+            border: 1px solid #dee2e6 !important;
+            font-weight: 500;
+            font-size: 16px !important;
+        }
+        
+        #projectName:focus {
+            outline: none !important;
+            box-shadow: none !important;
+            border-color: #dee2e6 !important;
+        }
+
+    /* --- 写日志界面样式 --- */
+        .write-log-container {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 30px;
+            min-height: 500px;
+            display: none; /* 默认隐藏 */
+        }
+
+        .write-form-group {
+            margin-bottom: 24px;
+            display: flex;
+            align-items: flex-start; /* 顶部对齐，适应多行文本框 */
+        }
+
+        .write-form-label {
+            width: 80px;
+            text-align: right;
+            margin-right: 20px;
+            color: #606266;
+            font-size: 15px;
+            line-height: 36px; /* 与输入框高度一致 */
+            flex-shrink: 0;
+        }
+
+        .write-form-content {
+            flex: 1;
+            max-width: 600px; /* 限制最大宽度 */
+            position: relative;
+        }
+
+        /* 天气卡片样式 */
+        .weather-cards {
+            display: flex;
+            gap: 20px;
+        }
+
+        .weather-card {
+            width: 200px;
+            padding: 40px 15px 15px 15px; /* 顶部留出空间给标签 */
+            border-radius: 8px;
+            position: relative;
+        }
+
+        .weather-card.am {
+            background-color: #fcf6ec; /* 浅橙色背景 */
+        }
+
+        .weather-card.pm {
+            background-color: #f0f8ff; /* 浅蓝色背景 */
+        }
+
+        .weather-tag {
+            position: absolute;
+            top: 0;
+            left: 0;
+            padding: 4px 16px;
+            border-radius: 8px 0 10px 0; /* 左上角圆角处理 */
+            font-size: 13px;
+            color: #fff;
+            line-height: 1.5;
+        }
+
+        .weather-tag.am {
+            background-color: #ff9800; /* 橙色 */
+        }
+
+        .weather-tag.pm {
+            background-color: #409EFF; /* 蓝色 */
+        }
+
+        .weather-info {
+            font-size: 14px;
+            color: #606266;
+            line-height: 1.8;
+        }
+
+        .weather-edit-btn {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            color: #409EFF; /* 这里的修改按钮颜色可能需要根据卡片类型调整，但统一蓝色也行 */
+            color: #5d8aff; /* 统一用偏蓝紫色，或者跟随主题 */
+            color: #409EFF;
+            font-size: 14px;
+            cursor: pointer;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        /* 针对AM卡片的修改按钮颜色微调，如果需要的话。暂时保持一致 */
+        .weather-card.am .weather-edit-btn {
+            color: #6a71e2; /* 图片中可能是蓝紫色 */
+        }
+        
+        .weather-card.pm .weather-edit-btn {
+            color: #6a71e2;
+        }
+
+        /* 天气卡片响应式设计 */
+        @media (max-width: 768px) {
+            body {
+                padding: 15px 10px;
+            }
+
+            .weather-cards {
+                flex-direction: row;
+                gap: 12px;
+            }
+
+            .weather-card {
+                width: calc(50% - 6px);
+                padding: 35px 12px 12px 12px;
+            }
+
+            .weather-info {
+                font-size: 13px;
+                line-height: 1.6;
+            }
+
+            .weather-edit-btn {
+                font-size: 13px;
+                right: 12px;
+            }
+
+            /* 表单标签靠左 */
+            .form-label {
+                text-align: left;
+                width: auto;
+                margin-right: 8px;
+            }
+
+            .write-form-label {
+                text-align: left;
+                width: auto;
+                margin-right: 8px;
+                line-height: 1.5;
+            }
+
+            .write-form-group {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            /* 项目名称、记录日期和图片保持水平显示 */
+            .write-form-group:first-of-type,
+            .write-form-group:nth-of-type(2),
+            .write-form-group:nth-of-type(5) {
+                flex-direction: row;
+                align-items: center;
+            }
+
+            .write-form-group:first-of-type .write-form-label,
+            .write-form-group:nth-of-type(2) .write-form-label,
+            .write-form-group:nth-of-type(5) .write-form-label {
+                width: 80px;
+                margin-right: 12px;
+                line-height: 36px;
+            }
+
+            .write-form-group:first-of-type .write-form-content,
+            .write-form-group:nth-of-type(2) .write-form-content,
+            .write-form-group:nth-of-type(5) .write-form-content {
+                max-width: calc(100% - 92px);
+            }
+
+            .write-form-content {
+                max-width: 100%;
+                width: 100%;
+            }
+
+            .form-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .form-input-wrapper {
+                width: 100%;
+            }
+
+            /* 侧边栏内容靠左 */
+            .sidebar-content {
+                padding: 20px 12px;
+            }
+
+            .sidebar-actions {
+                padding-left: 12px;
+                padding-right: 12px;
+            }
+
+            /* 顶部操作栏靠左 */
+            .header-actions {
+                flex-wrap: wrap;
+                justify-content: flex-start;
+            }
+
+            /* 写日志容器优化 */
+            .write-log-container {
+                padding: 20px 12px;
+            }
+
+            /* 详情页移动端适配 */
+            #logDetailContainer {
+                padding: 15px 10px;
+            }
+
+            #logDetailContainer > div[style*="display: flex"] {
+                flex-direction: column;
+                align-items: flex-start;
+                margin-bottom: 15px;
+            }
+
+            #logDetailContainer > div[style*="display: flex"] > div[style*="display: flex; align-items: center"] {
+                flex-direction: row;
+                margin-right: 0;
+                margin-bottom: 10px;
+                width: 100%;
+            }
+
+            #logDetailContainer .avatar {
+                width: 40px;
+                height: 40px;
+                font-size: 14px;
+            }
+
+            #logDetailContainer .user-name {
+                font-size: 15px;
+            }
+
+            #logDetailContainer .log-date {
+                font-size: 12px;
+            }
+
+            #logDetailContainer > div[style*="display: flex"] > div[style*="display: flex; gap"] {
+                margin-left: 0;
+                width: 100%;
+                justify-content: flex-start;
+            }
+
+            #logDetailContainer h3 {
+                font-size: 15px;
+                margin-bottom: 12px;
+            }
+
+            #logDetailContainer #detailContent {
+                font-size: 13px;
+                line-height: 1.5;
+                margin-bottom: 15px;
+            }
+
+            #logDetailContainer #detailImageList {
+                gap: 8px;
+            }
+
+            #logDetailContainer #detailImageList img {
+                max-width: 80px;
+                max-height: 80px;
+            }
+
+            #logDetailContainer > div:last-child {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            #logDetailContainer > div:last-child button {
+                padding: 8px 16px;
+                font-size: 13px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 10px 8px;
+            }
+
+            .weather-cards {
+                flex-direction: row;
+                gap: 8px;
+            }
+
+            .weather-card {
+                width: calc(50% - 4px);
+                padding: 30px 10px 10px 10px;
+                border-radius: 6px;
+            }
+
+            .weather-tag {
+                padding: 3px 12px;
+                font-size: 12px;
+            }
+
+            .weather-info {
+                font-size: 12px;
+                line-height: 1.5;
+            }
+
+            .weather-edit-btn {
+                font-size: 12px;
+                top: 8px;
+                right: 10px;
+            }
+
+            /* 表单标签靠左 */
+            .form-label {
+                text-align: left;
+                width: auto;
+                margin-right: 6px;
+                font-size: 14px;
+            }
+
+            .write-form-label {
+                text-align: left;
+                width: auto;
+                margin-right: 6px;
+                line-height: 1.5;
+                font-size: 14px;
+            }
+
+            .write-form-group {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            /* 项目名称、记录日期和图片保持水平显示 */
+            .write-form-group:first-of-type,
+            .write-form-group:nth-of-type(2),
+            .write-form-group:nth-of-type(5) {
+                flex-direction: row;
+                align-items: center;
+            }
+
+            .write-form-group:first-of-type .write-form-label,
+            .write-form-group:nth-of-type(2) .write-form-label,
+            .write-form-group:nth-of-type(5) .write-form-label {
+                width: 70px;
+                margin-right: 10px;
+                line-height: 36px;
+                font-size: 14px;
+            }
+
+            .write-form-group:first-of-type .write-form-content,
+            .write-form-group:nth-of-type(2) .write-form-content,
+            .write-form-group:nth-of-type(5) .write-form-content {
+                max-width: calc(100% - 80px);
+            }
+
+            .write-form-content {
+                max-width: 100%;
+                width: 100%;
+            }
+
+            .form-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .form-input-wrapper {
+                width: 100%;
+            }
+
+            /* 侧边栏内容靠左 */
+            .sidebar-content {
+                padding: 16px 10px;
+            }
+
+            .sidebar-actions {
+                padding-left: 10px;
+                padding-right: 10px;
+            }
+
+            /* 顶部操作栏靠左 */
+            .header-actions {
+                flex-wrap: wrap;
+                justify-content: flex-start;
+                padding: 10px 8px;
+            }
+
+            /* 写日志容器优化 */
+            .write-log-container {
+                padding: 15px 10px;
+            }
+
+            /* 详情页移动端适配 */
+            #logDetailContainer {
+                padding: 12px 8px;
+            }
+
+            #logDetailContainer > div[style*="display: flex"] {
+                flex-direction: column;
+                align-items: flex-start;
+                margin-bottom: 12px;
+            }
+
+            #logDetailContainer > div[style*="display: flex"] > div[style*="display: flex; align-items: center"] {
+                flex-direction: row;
+                margin-right: 0;
+                margin-bottom: 8px;
+                width: 100%;
+            }
+
+            #logDetailContainer .avatar {
+                width: 36px;
+                height: 36px;
+                font-size: 13px;
+            }
+
+            #logDetailContainer .user-name {
+                font-size: 14px;
+            }
+
+            #logDetailContainer .log-date {
+                font-size: 11px;
+            }
+
+            #logDetailContainer > div[style*="display: flex"] > div[style*="display: flex; gap"] {
+                margin-left: 0;
+                width: 100%;
+                justify-content: flex-start;
+                gap: 8px;
+            }
+
+            #logDetailContainer h3 {
+                font-size: 14px;
+                margin-bottom: 10px;
+            }
+
+            #logDetailContainer #detailContent {
+                font-size: 12px;
+                line-height: 1.4;
+                margin-bottom: 12px;
+            }
+
+            #logDetailContainer #detailImageList {
+                gap: 6px;
+            }
+
+            #logDetailContainer #detailImageList img {
+                max-width: 70px;
+                max-height: 70px;
+            }
+
+            #logDetailContainer > div:last-child {
+                flex-wrap: wrap;
+                gap: 6px;
+            }
+
+            #logDetailContainer > div:last-child button {
+                padding: 6px 14px;
+                font-size: 12px;
+            }
+        }
+
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .weather-cards {
+                gap: 15px;
+            }
+
+            .weather-card {
+                width: calc(50% - 7.5px);
+                padding: 38px 14px 14px 14px;
+            }
+        }
+
+        /* 文本域样式 */
+        .log-textarea {
+            width: 100%;
+            height: 150px;
+            padding: 12px;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            resize: none;
+            outline: none;
+            font-family: inherit;
+            font-size: 14px;
+            color: #606266;
+            transition: border-color 0.2s;
+        }
+
+        .log-textarea:focus {
+            border-color: #409EFF;
+        }
+
+        .log-textarea.error {
+            border-color: #F56C6C;
+        }
+
+        .rich-editor-editable.error {
+            background-color: #fef0f0;
+        }
+
+        .textarea-footer {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 4px;
+        }
+
+        .char-count {
+            font-size: 12px;
+            color: #909399;
+        }
+
+        .error-message {
+            font-size: 12px;
+            color: #F56C6C;
+            visibility: hidden;
+        }
+
+        /* 图片上传样式 */
+        .upload-box {
+            width: 100px;
+            height: 100px;
+            border: 1px dashed #d9d9d9;
+            border-radius: 6px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: border-color 0.3s;
+            background-color: #fafafa;
+        }
+
+        .upload-box:hover {
+            border-color: #409EFF;
+        }
+
+        .upload-icon {
+            font-size: 24px;
+            color: #8c939d;
+        }
+
+        /* 底部操作栏 */
+        .footer-actions {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #ebeef5;
+            display: flex;
+            gap: 15px;
+        }
+
+        /* 天气选择侧边栏样式 */
+        .weather-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            margin-bottom: 30px;
+        }
+
+        .weather-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            padding: 10px 5px;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .weather-item:hover {
+            background-color: #f5f7fa;
+        }
+
+        .weather-item.selected {
+            background-color: #ecf5ff;
+            border-color: #409EFF;
+        }
+
+        .weather-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+            line-height: 1;
+        }
+
+        .weather-name {
+            font-size: 12px;
+            color: #606266;
+        }
+
+        .weather-section-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #303133;
+            margin-bottom: 15px;
+        }
+
+        .temp-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .temp-input {
+            width: 100%;
+            height: 40px;
+            padding: 0 30px 0 12px;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            outline: none;
+            font-size: 14px;
+            color: #606266;
+        }
+
+        .temp-input:focus {
+            border-color: #409EFF;
+        }
+
+        .temp-suffix {
+            position: absolute;
+            right: 12px;
+            color: #909399;
+            font-size: 14px;
+        }
+
+        /* 加载动画 */
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        @keyframes dash {
+            0% { stroke-dasharray: 1, 150; stroke-dashoffset: 0; }
+            50% { stroke-dasharray: 90, 150; stroke-dashoffset: -35; }
+            100% { stroke-dasharray: 90, 150; stroke-dashoffset: -124; }
+        }
+
+        /* 隐藏不同模式的侧边栏内容 */
+        .sidebar-content-section {
+            display: none;
+        }
+        
+        .sidebar-content-section.active {
+            display: block;
+        }
+
+        /* 模态框通用样式 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 2005; /* 比侧边栏高 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        .modal-container {
+            background-color: white;
+            border-radius: 8px;
+            width: 400px;
+            max-width: 90%;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            display: flex;
+            flex-direction: column;
+            animation: slideUp 0.2s ease-out;
+        }
+
+        .modal-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #ebeef5;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #303133;
+            margin: 0;
+        }
+
+        .modal-close {
+            cursor: pointer;
+            font-size: 24px;
+            color: #909399;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+        
+        .modal-close:hover {
+            color: #F56C6C;
+            background-color: rgba(245, 108, 108, 0.1);
+            transform: rotate(90deg) scale(1.1);
+        }
+
+        .modal-body {
+            padding: 20px;
+            font-size: 14px;
+            color: #606266;
+            line-height: 1.5;
+        }
+
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #ebeef5;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        /* 模态框按钮特殊动画 */
+        .modal-footer .btn {
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .modal-footer .btn:hover {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .modal-footer .btn:active {
+            transform: translateY(0) scale(0.98);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 3000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+            padding: 20px 20px 10px 20px;
+            border-radius: 25px;
+            width: 380px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2), 0 10px 20px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .form-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- 遮罩层 -->
+    <div class="overlay" id="overlay"></div>
+
+    <!-- 侧边栏 -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            选择时间范围
+        </div>
+        <div class="sidebar-content">
+            <!-- 日期范围选择内容 -->
+            <div id="dateRangeContent" class="sidebar-content-section active">
+                <div class="form-item">
+                    <label class="form-label"><span class="required">*</span>开始日期</label>
+                    <div class="form-input-wrapper">
+                        <input type="text" class="form-input" id="startDate" placeholder="请选择日期" readonly>
+                        <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                        </svg>
+                    </div>
+                </div>
+                <div class="form-item">
+                    <label class="form-label"><span class="required">*</span>结束日期</label>
+                    <div class="form-input-wrapper">
+                        <input type="text" class="form-input" id="endDate" placeholder="请选择日期" readonly>
+                        <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 天气设置内容 -->
+            <div id="weatherSettingsContent" class="sidebar-content-section">
+                <div class="weather-grid" id="weatherGrid">
+                    <!-- JS Generated -->
+                </div>
+                
+                <div class="weather-section-title" id="tempTitle">设置上午温度</div>
+                <div class="temp-input-wrapper">
+                    <input type="number" class="temp-input" id="weatherTemp" value="19">
+                    <span class="temp-suffix">℃</span>
+                </div>
+            </div>
+            
+            <!-- 按钮移动到这里 -->
+            <div class="sidebar-actions">
+                <button class="btn btn-primary" id="confirmBtn">确定</button>
+                <button class="btn btn-default" id="cancelBtn">取消</button>
+            </div>
+        </div>
+        <!-- 移除原来的 footer -->
+    </div>
+
+    <!-- Date Picker Dropdown -->
+    <div class="date-picker-dropdown" id="datePicker">
+        <div class="date-picker-header">
+            <span class="year-prev-btn" id="pickerPrevYear" title="上一年">&lt;&lt;</span>
+            <span class="month-prev-btn" id="pickerPrevMonth" title="上个月">&lt;</span>
+            <span class="current-year-month" id="pickerCurrentMonth">2026年 1月</span>
+            <span class="month-next-btn" id="pickerNextMonth" title="下个月">&gt;</span>
+            <span class="year-next-btn" id="pickerNextYear" title="下一年">&gt;&gt;</span>
+        </div>
+        <div class="date-picker-body">
+            <div class="weekdays">
+                <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+            </div>
+            <div class="days-grid" id="daysGrid">
+                <!-- JS generated -->
+            </div>
+        </div>
+        <div class="date-picker-footer">
+            <span class="today-btn" id="pickerTodayBtn">今天</span>
+        </div>
+    </div>
+
+    <!-- 列表页容器 -->
+    <div id="listPageContainer">
+        <!-- 顶部操作栏 -->
+        <div class="header-actions">
+            <button class="btn btn-outline-primary" id="filterBtn">筛选</button>
+            <button class="btn btn-outline-primary" id="exportBtn">批量导出</button>
+            <button class="btn btn-primary" id="writeLogBtn">写日志</button>
+        </div>
+
+        <!-- 日志列表区域 -->
+        <div class="log-list">
+            <div class="loading-state" style="text-align: center; padding: 40px; color: #909399;">
+                <div style="margin-bottom: 10px;">
+                    <svg viewBox="0 0 24 24" width="32" height="32" style="animation: rotate 1s linear infinite;">
+                        <circle cx="12" cy="12" r="10" stroke="#409EFF" stroke-width="3" fill="none" stroke-dasharray="31.4 31.4" stroke-linecap="round" style="animation: dash 1.5s ease-in-out infinite;"/>
+                    </svg>
+                </div>
+                <div>数据正在加载中...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 写日志界面容器 -->
+    <div id="writeLogContainer" class="write-log-container">
+        <!-- 项目名称 -->
+        <div class="write-form-group">
+            <label class="write-form-label">项目名称</label>
+            <div class="write-form-content">
+                <input type="text" class="form-input" id="projectName" value="123" readonly disabled style="background-color: #f8f9fa; cursor: not-allowed; color: #6c757d;">
+            </div>
+        </div>
+
+        <!-- 记录日期 -->
+        <div class="write-form-group">
+            <label class="write-form-label"><span class="required-star">*</span>记录日期</label>
+            <div class="write-form-content">
+                <div class="form-input-wrapper">
+                    <input type="text" class="form-input" id="logDate" value="2026年02月02日 (今天)" readonly>
+                    <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- 天气 -->
+        <div class="write-form-group">
+            <label class="write-form-label">天气</label>
+            <div class="write-form-content">
+                <div class="weather-cards">
+                    <!-- 上午卡片 -->
+                    <div class="weather-card am">
+                        <div class="weather-tag am">上午</div>
+                        <div class="weather-edit-btn">修改</div>
+                        <div class="weather-info">
+                            <div class="weather-empty-text" style="color: #909399; margin-top: 10px; text-align: center;">未设置</div>
+                        </div>
+                    </div>
+                    <!-- 下午卡片 -->
+                    <div class="weather-card pm">
+                        <div class="weather-tag pm">下午</div>
+                        <div class="weather-edit-btn">修改</div>
+                        <div class="weather-info">
+                            <div class="weather-empty-text" style="color: #909399; margin-top: 10px; text-align: center;">未设置</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 日志内容 -->
+        <div class="write-form-group">
+            <label class="write-form-label"><span class="required-star">*</span>日志内容</label>
+            <div class="write-form-content">
+                <textarea class="log-textarea"></textarea>
+                <div class="textarea-footer">
+                    <span class="error-message">请输入日志内容</span>
+                    <span class="char-count">0 / 2000</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 图片 -->
+        <div class="write-form-group">
+            <label class="write-form-label">图片</label>
+            <div class="write-form-content" id="imageUploadSection">
+                <div id="imageUploadContainer" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <div class="image-upload-item" id="addImgBtn" style="cursor: pointer;">
+                        <div class="upload-box">
+                            <span class="upload-icon">+</span>
+                        </div>
+                    </div>
+                </div>
+                <input type="file" id="imageUpload" accept="image/*" style="display: none;" multiple>
+            </div>
+        </div>
+
+        <!-- 底部操作按钮 -->
+        <div class="footer-actions">
+            <button class="btn btn-default" id="cancelWriteBtn" style="border: 1px solid #dcdfe6;">取消</button>
+            <button class="btn btn-primary" id="saveLogBtn">保存日志</button>
+        </div>
+    </div>
+
+    <!-- 日志详情容器 -->
+    <div id="logDetailContainer" class="write-log-container" style="display: none; padding: 20px;">
+        <!-- 头部：头像 + 信息 + 操作按钮 -->
+        <div style="display: flex; align-items: flex-start; margin-bottom: 20px; border-bottom: 1px solid #ebeef5; padding-bottom: 20px;">
+            <div style="display: flex; align-items: center; margin-right: 20px;">
+                <div class="avatar" id="detailAvatar" style="width: 50px; height: 50px; background-color: #409EFF; font-size: 16px;">用户</div>
+                <div class="user-info">
+                    <span class="user-name" id="detailUserName" style="font-size: 16px; margin-bottom: 5px;">用户</span>
+                    <span class="log-date" id="detailDate" style="font-size: 13px;">-</span>
+                </div>
+            </div>
+            <!-- 操作按钮：去掉 justify-content: space-between 后，自然左移。
+                 margin-top 稍微调整以对齐（如果需要），这里默认 flex-start 对齐。
+                 为了让按钮不紧贴用户信息，可以给上面的 user-info 容器加 margin-right，或者给按钮容器加 margin-left。
+                 这里给按钮容器加 margin-left: auto; 可以推到右边，但用户要求左移。
+                 如果想紧跟在用户信息后面，就不用加 margin-left: auto。
+            -->
+            <div style="display: flex; gap: 10px; margin-left: 20px; align-self: center;">
+                <button id="detailDeleteBtn" class="btn" style="color: #F56C6C; background: #fff; border: 1px solid #fde2e2;" onmouseover="this.style.backgroundColor='#fef0f0'; this.style.borderColor='#fde2e2';" onmouseout="this.style.backgroundColor='#fff'; this.style.borderColor='#fde2e2';">删除</button>
+                <button class="btn" style="color: #409EFF; background: #fff; border: 1px solid #b3d8ff;" onmouseover="this.style.backgroundColor='#ecf5ff'; this.style.borderColor='#b3d8ff';" onmouseout="this.style.backgroundColor='#fff'; this.style.borderColor='#b3d8ff';" id="detailModifyBtn">修改</button>
+            </div>
+        </div>
+
+        <!-- 天气板块 -->
+        <div style="margin-bottom: 30px;">
+            <h3 style="font-size: 16px; font-weight: bold; color: #303133; margin-bottom: 15px;">天气</h3>
+            <div class="weather-cards">
+                <!-- 上午卡片 (只读) -->
+                <div class="weather-card am" style="padding-top: 40px; width: 220px;">
+                    <div class="weather-tag am">上午</div>
+                    <div class="weather-info">
+                        <div style="margin-bottom: 8px;">天气：<svg viewBox="0 0 64 64" width="20" height="20" style="vertical-align: middle;"><circle cx="32" cy="32" r="14" fill="#FFD700" stroke="#FFA500" stroke-width="2"/><g stroke="#FFD700" stroke-width="3" stroke-linecap="round"><line x1="32" y1="10" x2="32" y2="4"/><line x1="32" y1="54" x2="32" y2="60"/><line x1="54" y1="32" x2="60" y2="32"/><line x1="4" y1="32" x2="10" y2="32"/><line x1="48" y1="16" x2="52" y2="12"/><line x1="16" y1="48" x2="12" y2="52"/><line x1="48" y1="48" x2="52" y2="52"/><line x1="16" y1="16" x2="12" y2="12"/></g></svg> <span style="vertical-align: middle;">晴</span></div>
+                        <div>温度：19.00℃</div>
+                    </div>
+                </div>
+                <!-- 下午卡片 (只读) -->
+                <div class="weather-card pm" style="padding-top: 40px; width: 220px;">
+                    <div class="weather-tag pm">下午</div>
+                    <div class="weather-info">
+                        <div style="margin-bottom: 8px;">天气：<svg viewBox="0 0 64 64" width="20" height="20" style="vertical-align: middle;"><circle cx="32" cy="32" r="14" fill="#FFD700" stroke="#FFA500" stroke-width="2"/><g stroke="#FFD700" stroke-width="3" stroke-linecap="round"><line x1="32" y1="10" x2="32" y2="4"/><line x1="32" y1="54" x2="32" y2="60"/><line x1="54" y1="32" x2="60" y2="32"/><line x1="4" y1="32" x2="10" y2="32"/><line x1="48" y1="16" x2="52" y2="12"/><line x1="16" y1="48" x2="12" y2="52"/><line x1="48" y1="48" x2="52" y2="52"/><line x1="16" y1="16" x2="12" y2="12"/></g></svg> <span style="vertical-align: middle;">晴</span></div>
+                        <div>温度：19.00℃</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 日志内容板块 -->
+        <div>
+            <h3 style="font-size: 16px; font-weight: bold; color: #303133; margin-bottom: 15px;">日志内容</h3>
+            <div id="detailContent" style="font-size: 14px; color: #606266; line-height: 1.6; margin-bottom: 20px; white-space: pre-wrap;">
+                -
+            </div>
+            <!-- 图片列表 -->
+            <div id="detailImageList" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <!-- 图片将由JavaScript动态生成 -->
+            </div>
+
+            <!-- 底部取消按钮 -->
+            <div style="margin-top: 30px; display: flex; justify-content: flex-start; gap: 12px;">
+                <button id="detailCancelBtn" class="btn" style="color: #606266; background: #fff; border: 1px solid #dcdfe6; padding: 10px 25px;" onmouseover="this.style.color='#409EFF'; this.style.borderColor='#c6e2ff'; this.style.backgroundColor='#ecf5ff';" onmouseout="this.style.color='#606266'; this.style.borderColor='#dcdfe6'; this.style.backgroundColor='#fff';">取消</button>
+                <button id="detailPrintBtn" class="btn" style="color: #fff; background: #409EFF; border: 1px solid #409EFF; padding: 10px 25px;" onmouseover="this.style.backgroundColor='#66b1ff'; this.style.borderColor='#66b1ff';" onmouseout="this.style.backgroundColor='#409EFF'; this.style.borderColor='#409EFF';">打印施工日志</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图片预览模态框 -->
+    <div id="imageModal" style="display: none;"></div>
+
+    <!-- 确认删除模态框 -->
+    <div id="confirmModal" class="modal-overlay" style="display: none;">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3>确认删除</h3>
+                <span class="modal-close" id="confirmModalClose">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div style="display: flex; align-items: flex-start; gap: 12px;">
+                    <svg viewBox="0 0 1024 1024" width="24" height="24" style="flex-shrink: 0; color: #E6A23C;">
+                        <path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm0 820c-205.4 0-372-166.6-372-372s166.6-372 372-372 372 166.6 372 372-166.6 372-372 372z" fill="currentColor"></path>
+                        <path d="M464 688a48 48 0 1 0 96 0 48 48 0 1 0-96 0zm24-112h48c4.4 0 8-3.6 8-8V296c0-4.4-3.6-8-8-8h-48c-4.4 0-8 3.6-8 8v272c0 4.4 3.6 8 8 8z" fill="currentColor"></path>
+                    </svg>
+                    <p style="margin: 0; padding-top: 2px;">确定要删除这条施工日志吗？<br><span style="color: #909399; font-size: 13px;">此操作不可恢复，请谨慎操作。</span></p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" id="confirmModalCancel">取消</button>
+                <button class="btn btn-primary" id="confirmModalOk" style="background-color: #F56C6C; border-color: #F56C6C;">确定删除</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="construction-log-export-choice-modal" style="display: none;">
+        <div class="modal-content" style="text-align: center; width: 320px; padding: 15px;">
+            <h3 style="color: #409EFF; margin-bottom: 15px; font-size: 18px;">选择导出类型</h3>
+            <div style="display: flex; gap: 15px; justify-content: center; margin-bottom: 15px;">
+                <div style="flex: 1; padding: 15px 10px; border: 2px solid #e2e8f0; border-radius: 8px; cursor: pointer; transition: all 0.3s; background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);" id="construction-log-pdf-option" onmouseover="this.style.borderColor='#667eea'; this.style.boxShadow='0 8px 20px rgba(102, 126, 234, 0.2)';" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none';">
+                    <div style="font-size: 36px; margin-bottom: 8px; color: #667eea;">📄</div>
+                    <div style="font-size: 14px; font-weight: bold; color: #374151; margin-bottom: 4px;">导出PDF</div>
+                    <div style="font-size: 11px; color: #64748b;">生成PDF格式</div>
+                </div>
+                <div style="flex: 1; padding: 15px 10px; border: 2px solid #e2e8f0; border-radius: 8px; cursor: pointer; transition: all 0.3s; background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);" id="construction-log-word-option" onmouseover="this.style.borderColor='#10b981'; this.style.boxShadow='0 8px 20px rgba(16, 185, 129, 0.2)';" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none';">
+                    <div style="font-size: 36px; margin-bottom: 8px; color: #10b981;">📝</div>
+                    <div style="font-size: 14px; font-weight: bold; color: #374151; margin-bottom: 4px;">导出Word</div>
+                    <div style="font-size: 11px; color: #64748b;">生成Word格式</div>
+                </div>
+            </div>
+            <div class="form-buttons">
+                <button id="construction-log-cancel-export-btn" style="background-color: #64748b; color: #fff; border: none; padding: 10px 24px; border-radius: 10px; cursor: pointer;" onmouseover="this.style.backgroundColor='#475569'" onmouseout="this.style.backgroundColor='#64748b'">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 富文本编辑器 -->
+    <script src="./JavaScript/施工日志/richTextEditor.js"></script>
+    <!-- 施工日志API -->
+    <script src="./JavaScript/施工日志/construction-log-api.js"></script>
+    <!-- 施工日志导出PDF -->
+    <script src="./JavaScript/施工日志/export-log-pdf.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const filterBtn = document.getElementById('filterBtn');
+            const exportBtn = document.getElementById('exportBtn'); // 获取导出按钮
+            const overlay = document.getElementById('overlay');
+            const sidebar = document.getElementById('sidebar');
+            const cancelBtn = document.getElementById('cancelBtn');
+            const confirmBtn = document.getElementById('confirmBtn');
+            const sidebarHeader = document.querySelector('.sidebar-header'); // 获取侧边栏标题
+
+            // 新增元素获取
+            const listPageContainer = document.getElementById('listPageContainer');
+            const writeLogContainer = document.getElementById('writeLogContainer');
+            const logDetailContainer = document.getElementById('logDetailContainer'); // 新增详情页容器
+            const writeLogBtn = document.getElementById('writeLogBtn');
+            const cancelWriteBtn = document.getElementById('cancelWriteBtn');
+            const saveLogBtn = document.getElementById('saveLogBtn');
+            const detailModifyBtn = document.getElementById('detailModifyBtn'); // 详情页的修改按钮
+            const detailCancelBtn = document.getElementById('detailCancelBtn'); // 详情页的取消按钮
+            const detailDeleteBtn = document.getElementById('detailDeleteBtn'); // 详情页的删除按钮
+            const detailPrintBtn = document.getElementById('detailPrintBtn');
+            const exportChoiceModal = document.getElementById('construction-log-export-choice-modal');
+            const exportPdfOption = document.getElementById('construction-log-pdf-option');
+            const exportWordOption = document.getElementById('construction-log-word-option');
+            const exportCancelBtn = document.getElementById('construction-log-cancel-export-btn');
+
+            // 模态框相关元素
+            const confirmModal = document.getElementById('confirmModal');
+            const confirmModalClose = document.getElementById('confirmModalClose');
+            const confirmModalCancel = document.getElementById('confirmModalCancel');
+            const confirmModalOk = document.getElementById('confirmModalOk');
+
+            // 模态框关闭函数
+            function closeConfirmModal() {
+                confirmModal.style.display = 'none';
+            }
+
+            // 绑定模态框关闭事件
+            if (confirmModalClose) confirmModalClose.addEventListener('click', closeConfirmModal);
+            if (confirmModalCancel) confirmModalCancel.addEventListener('click', closeConfirmModal);
+            
+            // 点击遮罩层关闭
+            if (confirmModal) {
+                confirmModal.addEventListener('click', function(e) {
+                    if (e.target === confirmModal) {
+                        closeConfirmModal();
+                    }
+                });
+            }
+
+            // 当前编辑的日志ID（用于区分新增和编辑模式）
+            let currentEditingLogId = null;
+            // 当前查看日志的图片ID列表（用于删除）
+            let currentLogImageIds = [];
+            // 存储原始云端图片URL（用于删除云端旧图片）
+            let originalCloudImageUrls = [];
+            let allConstructionLogs = [];
+            let currentViewingLog = null;
+            let pendingExportContext = null;
+
+            // 重置写日志表单
+            function resetWriteLogForm() {
+                // 1. 重置日期为今天
+                const logDateInput = document.getElementById('logDate');
+                if (logDateInput) {
+                    const now = new Date();
+                    const year = now.getFullYear();
+                    const month = String(now.getMonth() + 1).padStart(2, '0');
+                    const day = String(now.getDate()).padStart(2, '0');
+                    logDateInput.value = `${year}年${month}月${day}日 (今天)`;
+                }
+
+                // 2. 重置天气
+                document.querySelectorAll('.weather-card').forEach(card => {
+                    const infoDiv = card.querySelector('.weather-info');
+                    if (infoDiv) {
+                        infoDiv.innerHTML = '<div class="weather-empty-text" style="color: #909399; margin-top: 10px; text-align: center;">未设置</div>';
+                    }
+                });
+
+                // 3. 清空编辑器
+                if (editor) {
+                    editor.setContent('');
+                }
+
+                // 4. 清空图片
+                window.selectedImages = [];
+                originalCloudImageUrls = [];
+                const imageContainer = document.getElementById('imageUploadContainer');
+                if (imageContainer) {
+                    // 保留添加按钮，删除预览项
+                    const previews = imageContainer.querySelectorAll('.image-preview-item');
+                    previews.forEach(p => p.remove());
+                }
+
+                // 5. 重置全局状态
+                currentEditingLogId = null;
+                
+                // 6. 重置标题
+                document.title = '新增施工日志';
+                if (window.parent) {
+                    window.parent.postMessage({ type: 'updateTitle', title: '新增施工日志' }, '*');
+                }
+            }
+
+            // 切换显示写日志界面
+            writeLogBtn.addEventListener('click', function() {
+                listPageContainer.style.display = 'none';
+                logDetailContainer.style.display = 'none'; // 确保详情页隐藏
+                writeLogContainer.style.display = 'block';
+                
+                // 重置表单
+                resetWriteLogForm();
+            });
+
+            // 返回列表界面
+            function backToList() {
+                writeLogContainer.style.display = 'none';
+                logDetailContainer.style.display = 'none'; // 详情页隐藏
+                listPageContainer.style.display = 'block';
+                document.title = '施工日志'; // 恢复原标题（假设原标题是施工日志）
+                // 通知父页面（首页）恢复标题
+                window.parent.postMessage({ type: 'updateTitle', title: '施工日志' }, '*');
+            }
+
+            cancelWriteBtn.addEventListener('click', backToList);
+            
+            // 保存日志按钮 - 从富文本编辑器获取内容
+            saveLogBtn.addEventListener('click', async function() {
+                const content = editor.getContent();
+                
+                // 验证内容是否为空
+                if (!content || content.trim().length === 0) {
+                    const errorMsg = document.querySelector('.error-message');
+                    const editableDiv = document.querySelector('.rich-editor-editable');
+                    if (editableDiv) editableDiv.classList.add('error');
+                    if (errorMsg) errorMsg.style.visibility = 'visible';
+                    return; // 阻止保存
+                }
+                
+                // 检查API是否已初始化
+                if (!window.constructionLogAPI) {
+                    showNotification('API正在初始化，请稍候重试', true);
+                    return;
+                }
+                
+                // 获取项目ID
+                const projectId = localStorage.getItem('currentProjectId');
+                if (!projectId) {
+                    showNotification('未找到项目ID，请先选择项目', true);
+                    return;
+                }
+                
+                // 获取用户ID（从localStorage获取当前登录用户）
+                const currentUserStr = localStorage.getItem('currentUser');
+                let userId = null;
+                if (currentUserStr) {
+                    try {
+                        const currentUser = JSON.parse(currentUserStr);
+                        userId = currentUser.user_id;
+                    } catch (e) {
+                        console.error('解析用户信息失败:', e);
+                    }
+                }
+                if (!userId) {
+                    showNotification('未找到用户信息，请重新登录', true);
+                    return;
+                }
+                
+                // 获取记录日期
+                const logDateInput = document.getElementById('logDate');
+                const recordDate = logDateInput ? logDateInput.value.match(/(\d{4})年(\d{2})月(\d{2})日/) : null;
+                const formattedDate = recordDate ? `${recordDate[1]}-${recordDate[2]}-${recordDate[3]}` : new Date().toISOString().split('T')[0];
+                
+                // 获取天气信息
+                const weatherInfo = getCurrentWeatherInfo();
+                
+                // 准备保存数据
+                const logData = {
+                    project_id: projectId,
+                    user_id: userId,
+                    record_date: formattedDate,
+                    weather_info: weatherInfo,
+                    log_content: content,
+                    images: window.selectedImages || []
+                };
+
+                // 如果是编辑模式，添加日志ID和原始云端图片URL
+                let oldImages = [];
+                if (currentEditingLogId) {
+                    logData.log_id = currentEditingLogId;
+                    // 添加原始云端图片URL，用于删除被移除的云端图片
+                    // 注意：这里不再传递 original_cloud_image_urls 给 logData，而是作为单独参数传递 oldImages
+                    
+                    if (originalCloudImageUrls && originalCloudImageUrls.length > 0) {
+                        // 复制一份原始图片列表
+                        oldImages = [...originalCloudImageUrls];
+                        
+                        // 找出当前仍存在的原始图片URL
+                        const keepUrls = new Set();
+                        if (window.selectedImages && window.selectedImages.length > 0) {
+                            window.selectedImages.forEach(img => {
+                                // 检查是否有 originalUrl 属性（这是在从详情页加载图片时添加的）
+                                if (img.originalUrl) {
+                                    keepUrls.add(img.originalUrl);
+                                }
+                            });
+                        }
+                        
+                        // 过滤 oldImages，只保留真正被用户删除的图片
+                        oldImages = oldImages.filter(url => !keepUrls.has(url));
+                    }
+                }
+                
+                try {
+                    showNotification(currentEditingLogId ? '更新中...' : '保存中...', false);
+                    
+                    let result;
+                    if (currentEditingLogId) {
+                        // 编辑模式：调用更新API，传入logId, logData 和 oldImages
+                        result = await window.constructionLogAPI.updateConstructionLog(currentEditingLogId, logData, oldImages);
+                    } else {
+                        // 新增模式：调用保存API
+                        result = await window.constructionLogAPI.saveConstructionLog(logData);
+                    }
+                    
+                    if (result.success) {
+                        if (result.data && result.data.is_local) {
+                            showNotification(currentEditingLogId ? '已更新到本地存储，将在网络恢复后同步' : '已保存到本地存储，将在网络恢复后同步', false);
+                        } else {
+                            showNotification(currentEditingLogId ? '更新成功' : '保存成功', false);
+                        }
+                        
+                        // 重置表单（包括清空内容、图片、天气、重置日期）
+                        resetWriteLogForm();
+                        
+                        // 返回列表
+                        backToList();
+                        // 刷新日志列表
+                        await loadConstructionLogs();
+                    } else {
+                        showNotification((currentEditingLogId ? '更新' : '保存') + '失败: ' + (result.error || '未知错误'), true);
+                    }
+                } catch (error) {
+                    console.error(currentEditingLogId ? '更新日志失败:' : '保存日志失败:', error);
+                    showNotification((currentEditingLogId ? '更新' : '保存') + '失败，请重试', true);
+                }
+            });
+            
+            // 获取当前天气信息的辅助函数
+            function getCurrentWeatherInfo() {
+                const amCard = document.querySelector('.weather-card.am');
+                const pmCard = document.querySelector('.weather-card.pm');
+                
+                const weatherInfo = { am: null, pm: null };
+                
+                // 辅助解析函数
+                const parseCard = (card) => {
+                    if (!card) return null;
+                    const infoDiv = card.querySelector('.weather-info');
+                    if (!infoDiv) return null;
+                    
+                    // 检查是否是未设置状态（包含 weather-empty-text 类或文本内容包含“未设置”）
+                    if (infoDiv.querySelector('.weather-empty-text') || infoDiv.textContent.includes('未设置')) {
+                        return null; 
+                    }
+                    
+                    // 尝试解析标准格式：
+                    // <div>天气：[SVG] 晴天</div>
+                    // <div>温度：19℃</div>
+                    try {
+                        const weatherDiv = infoDiv.children[0];
+                        const tempDiv = infoDiv.children[1];
+                        
+                        if (!weatherDiv || !tempDiv) return null;
+                        
+                        // 提取天气名称（假设格式为 "天气：[图标] 名称" 或 "天气：名称"）
+                        // 使用 textContent 提取纯文本，然后分割
+                        const weatherFullText = weatherDiv.textContent || '';
+                        const weatherText = weatherFullText.split('：')[1]?.trim();
+                        
+                        // 提取温度
+                        const tempFullText = tempDiv.textContent || '';
+                        const tempText = tempFullText.match(/(\d+)/)?.[0];
+                        
+                        if (weatherText && tempText) {
+                            return {
+                                weather: weatherText,
+                                temp: tempText
+                            };
+                        }
+                    } catch (e) {
+                        console.warn('解析天气卡片失败:', e);
+                    }
+                    return null;
+                };
+
+                weatherInfo.am = parseCard(amCard);
+                weatherInfo.pm = parseCard(pmCard);
+                
+                return weatherInfo;
+            }
+            
+            // 显示通知的辅助函数
+            function showNotification(message, isError = false) {
+                // 移除所有已存在的通知
+                const existingNotifications = document.querySelectorAll('div[style*="position: fixed"][style*="top: 50%"][style*="left: 50%"]');
+                existingNotifications.forEach(notification => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                });
+
+                // 创建通知容器
+                const notification = document.createElement('div');
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    padding: 15px 20px;
+                    border-radius: 8px;
+                    color: white;
+                    font-size: 14px;
+                    font-weight: 500;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                    z-index: 9999;
+                    max-width: 300px;
+                    word-wrap: break-word;
+                    animation: fadeIn 0.3s ease-out;
+                    background-color: ${isError ? '#ff4d4f' : '#52c41a'};
+                `;
+
+                notification.textContent = message;
+
+                // 添加动画样式
+                const style = document.createElement('style');
+                style.textContent = `
+                    @keyframes fadeIn {
+                        from { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+                        to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+                    }
+                `;
+                document.head.appendChild(style);
+
+                // 添加到页面
+                document.body.appendChild(notification);
+
+                // 3秒后自动移除
+                setTimeout(() => {
+                    notification.style.animation = 'fadeIn 0.3s ease-in reverse';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 300);
+                }, 3000);
+            }
+
+            function openConstructionLogExportChoiceModal(context) {
+                pendingExportContext = context;
+                if (exportChoiceModal) {
+                    exportChoiceModal.style.display = 'flex';
+                }
+            }
+
+            function closeConstructionLogExportChoiceModal() {
+                if (exportChoiceModal) {
+                    exportChoiceModal.style.display = 'none';
+                }
+                pendingExportContext = null;
+            }
+
+            async function handleConstructionLogExportChoice(format) {
+                if (!pendingExportContext) {
+                    showNotification('未找到导出内容', true);
+                    closeConstructionLogExportChoiceModal();
+                    return;
+                }
+
+                const ctx = pendingExportContext;
+                closeConstructionLogExportChoiceModal();
+
+                try {
+                    if (format === 'pdf') {
+                        if (ctx.mode === 'single') {
+                            if (window.exportConstructionLog) {
+                                await window.exportConstructionLog(ctx.log);
+                            } else {
+                                showNotification('导出功能未加载，请刷新页面重试', true);
+                            }
+                        } else if (ctx.mode === 'range') {
+                            if (window.exportConstructionLogs) {
+                                await window.exportConstructionLogs(ctx.startDate, ctx.endDate);
+                            } else {
+                                showNotification('导出功能未加载，请刷新页面重试', true);
+                            }
+                        }
+                        return;
+                    }
+
+                    if (format === 'word') {
+                        if (ctx.mode === 'single') {
+                            if (window.exportConstructionLogWord) {
+                                await window.exportConstructionLogWord(ctx.log);
+                            } else {
+                                showNotification('导出功能未加载，请刷新页面重试', true);
+                            }
+                        } else if (ctx.mode === 'range') {
+                            if (window.exportConstructionLogsWord) {
+                                await window.exportConstructionLogsWord(ctx.startDate, ctx.endDate);
+                            } else {
+                                showNotification('导出功能未加载，请刷新页面重试', true);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    showNotification('导出失败，请重试', true);
+                }
+            }
+
+            if (exportCancelBtn) {
+                exportCancelBtn.addEventListener('click', closeConstructionLogExportChoiceModal);
+            }
+            if (exportChoiceModal) {
+                exportChoiceModal.addEventListener('click', function(e) {
+                    if (e.target === exportChoiceModal) {
+                        closeConstructionLogExportChoiceModal();
+                    }
+                });
+            }
+            if (exportPdfOption) {
+                exportPdfOption.addEventListener('click', () => handleConstructionLogExportChoice('pdf'));
+            }
+            if (exportWordOption) {
+                exportWordOption.addEventListener('click', () => handleConstructionLogExportChoice('word'));
+            }
+            
+            // 详情页取消按钮也返回列表
+            if (detailCancelBtn) {
+                detailCancelBtn.addEventListener('click', backToList);
+            }
+
+            if (detailPrintBtn) {
+                detailPrintBtn.addEventListener('click', function() {
+                    if (!currentViewingLog) {
+                        showNotification('未找到当前日志', true);
+                        return;
+                    }
+                    openConstructionLogExportChoiceModal({ mode: 'single', log: currentViewingLog });
+                });
+            }
+
+            // 详情页删除按钮逻辑
+            if (detailDeleteBtn) {
+                // 点击删除按钮，显示模态框
+                detailDeleteBtn.addEventListener('click', function() {
+                    if (!currentEditingLogId) {
+                        showNotification('未找到要删除的日志', true);
+                        return;
+                    }
+
+                    // 显示模态框
+                    confirmModal.style.display = 'flex';
+                });
+
+                // 模态框确定按钮逻辑
+                if (confirmModalOk) {
+                    confirmModalOk.addEventListener('click', async function() {
+                        // 关闭模态框
+                        closeConfirmModal();
+
+                        try {
+                            showNotification('正在删除...', false);
+                            
+                            const result = await window.constructionLogAPI.deleteConstructionLog(currentEditingLogId, currentLogImageIds);
+                            
+                            if (result.success) {
+                                showNotification('删除成功', false);
+                                // 重置编辑ID
+                                currentEditingLogId = null;
+                                currentLogImageIds = [];
+                                originalCloudImageUrls = []; // 重置原始云端图片URL
+                                // 返回列表
+                                backToList();
+                                // 刷新日志列表
+                                await loadConstructionLogs();
+                            } else {
+                                showNotification('删除失败: ' + (result.error || '未知错误'), true);
+                            }
+                        } catch (error) {
+                            console.error('删除日志失败:', error);
+                            showNotification('删除失败，请重试', true);
+                        }
+                    });
+                }
+            }
+
+            // 详情页修改按钮逻辑
+            detailModifyBtn.addEventListener('click', function() {
+                logDetailContainer.style.display = 'none';
+                writeLogContainer.style.display = 'block';
+                document.title = '编辑施工日志';
+                // 通知父页面（首页）更新标题
+                window.parent.postMessage({ type: 'updateTitle', title: '编辑施工日志' }, '*');
+                
+                // 获取当前正在编辑的日志ID
+                const activeLogCard = document.querySelector('.log-card.active');
+                if (activeLogCard) {
+                    currentEditingLogId = activeLogCard.dataset.logId;
+                }
+                
+                // 1. 填充日期
+                try {
+                    const detailDateText = document.querySelector('#logDetailContainer .log-date').textContent.trim();
+                    const logDateInput = document.getElementById('logDate');
+                    if (logDateInput) {
+                        // 提取日期部分，可能格式为 "2026/02/04" 或 "2026-02-04"
+                        const rawDate = detailDateText.split(' ')[0];
+
+                        // 支持横杠和斜杠两种分隔符
+                        let parts;
+                        if (rawDate.includes('/')) {
+                            parts = rawDate.split('/');
+                        } else if (rawDate.includes('-')) {
+                            parts = rawDate.split('-');
+                        } else {
+                            parts = rawDate.split(/[/-]/); // 使用正则同时匹配横杠和斜杠
+                        }
+
+                        if (parts.length === 3) {
+                            let dateValue = `${parts[0]}年${parts[1]}月${parts[2]}日`;
+
+                            // 检查是否是今天，如果是则添加"（今天）"
+                            const now = new Date();
+                            const currentYear = now.getFullYear();
+                            const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+                            const currentDay = String(now.getDate()).padStart(2, '0');
+
+                            // 使用相同的分隔符进行比较
+                            const currentDateStr = `${currentYear}/${currentMonth}/${currentDay}`;
+
+                            if (rawDate === currentDateStr) {
+                                dateValue += '（今天）';
+                            }
+
+                            logDateInput.value = dateValue;
+                        } else {
+                            logDateInput.value = rawDate;
+                        }
+                    }
+                } catch (e) {
+                    console.error('填充日期失败', e);
+                }
+
+                // 2. 填充天气和温度
+                try {
+                    // 辅助函数：从详情页卡片提取数据并填充到编辑页卡片
+                    function syncWeatherCard(type) {
+                        const detailCard = document.querySelector(`#logDetailContainer .weather-card.${type}`);
+                        const writeCard = document.querySelector(`#writeLogContainer .weather-card.${type}`);
+                        
+                        if (detailCard && writeCard) {
+                            const detailInfoDiv = detailCard.querySelector('.weather-info');
+                            const writeInfoDiv = writeCard.querySelector('.weather-info');
+                            
+                            // 直接复制 HTML 内容以保持图标和文本一致
+                            writeInfoDiv.innerHTML = detailInfoDiv.innerHTML;
+                        }
+                    }
+
+                    syncWeatherCard('am');
+                    syncWeatherCard('pm');
+                } catch (e) {
+                    console.error('填充天气失败', e);
+                }
+
+                // 3. 填充日志内容
+                try {
+                    const detailContent = document.querySelector('#logDetailContainer div[style*="font-size: 14px"]').innerHTML.trim();
+                    // 使用富文本编辑器设置内容
+                    if (editor) {
+                        editor.setContent(detailContent);
+                    }
+                } catch (e) {
+                    console.error('填充日志内容失败', e);
+                }
+
+                // 4. 填充图片
+                try {
+                    // 清空现有的图片预览（除了添加按钮）
+                    const previews = imageUploadContainer.querySelectorAll('.image-preview-item');
+                    previews.forEach(p => p.remove());
+                    window.selectedImages = []; // 重置已选图片数组
+                    originalCloudImageUrls = []; // 重置原始云端图片URL数组
+
+                    // 获取详情页的所有图片
+                    const detailImages = document.querySelectorAll('#logDetailContainer .detail-image');
+
+                    // 将详情页图片转换为文件对象并添加到预览区域
+                    detailImages.forEach(async (img, index) => {
+                        try {
+                            // 记录原始云端图片URL
+                            originalCloudImageUrls.push(img.src);
+
+                            const response = await fetch(img.src);
+                            const blob = await response.blob();
+
+                            // 从URL中提取原始文件名
+                            const url = new URL(img.src);
+                            const pathname = decodeURIComponent(url.pathname);
+                            const originalFileName = pathname.substring(pathname.lastIndexOf('/') + 1) || `image_${index}.png`;
+
+                            const file = new File([blob], originalFileName, { type: blob.type });
+
+                            // 为云端下载的图片添加原始URL属性，用于区分云端图片和新图片
+                            file.originalUrl = img.src;
+
+                            window.selectedImages.push(file);
+                            renderImagePreview(file, window.selectedImages.length - 1);
+                        } catch (e) {
+                            console.error('单个图片加载失败', e);
+                        }
+                    });
+                } catch (e) {
+                    console.error('填充图片列表失败', e);
+                }
+            });
+
+            // 点击日志卡片进入详情页
+            document.querySelector('.log-list').addEventListener('click', function(e) {
+                const card = e.target.closest('.log-card');
+                if (card) {
+                    listPageContainer.style.display = 'none';
+                    writeLogContainer.style.display = 'none';
+                    logDetailContainer.style.display = 'block';
+                    
+                    // 这里可以获取卡片数据并填充到详情页
+                    // 目前演示静态切换，后续可增加数据绑定
+                }
+            });
+
+            // 打开侧边栏通用函数
+            function openSidebar(title, confirmText, mode = 'date') {
+                // 隐藏所有内容区域
+                document.querySelectorAll('.sidebar-content-section').forEach(el => el.classList.remove('active'));
+                
+                // 设置标题和按钮文字
+                sidebarHeader.textContent = title;
+                confirmBtn.textContent = confirmText;
+
+                // 根据模式显示对应内容
+                if (mode === 'date') {
+                    document.getElementById('dateRangeContent').classList.add('active');
+                    // 从localStorage读取上次选择的日期
+                    const savedStartDate = localStorage.getItem('filterStartDate');
+                    const savedEndDate = localStorage.getItem('filterEndDate');
+                    if (savedStartDate) {
+                        document.getElementById('startDate').value = savedStartDate;
+                    }
+                    if (savedEndDate) {
+                        document.getElementById('endDate').value = savedEndDate;
+                    }
+                } else if (mode === 'weather') {
+                    document.getElementById('weatherSettingsContent').classList.add('active');
+                }
+
+                overlay.classList.add('active');
+                sidebar.classList.add('active');
+            }
+
+            // 打开筛选侧边栏
+            filterBtn.addEventListener('click', function() {
+                openSidebar('选择时间范围', '确定', 'date');
+            });
+
+            // 打开批量导出侧边栏
+            exportBtn.addEventListener('click', function() {
+                openSidebar('选择导出时间', '导出施工日志', 'date');
+            });
+            
+            // --- 天气设置逻辑 ---
+            const weatherOptions = [
+                { 
+                    name: '晴天', 
+                    icon: '<svg viewBox="0 0 64 64" width="32" height="32"><circle cx="32" cy="32" r="14" fill="#FFD700" stroke="#FFA500" stroke-width="2"/><g stroke="#FFD700" stroke-width="3" stroke-linecap="round"><line x1="32" y1="10" x2="32" y2="4"/><line x1="32" y1="54" x2="32" y2="60"/><line x1="54" y1="32" x2="60" y2="32"/><line x1="4" y1="32" x2="10" y2="32"/><line x1="48" y1="16" x2="52" y2="12"/><line x1="16" y1="48" x2="12" y2="52"/><line x1="48" y1="48" x2="52" y2="52"/><line x1="16" y1="16" x2="12" y2="12"/></g></svg>' 
+                },
+                { 
+                    name: '多云', 
+                    icon: '<svg viewBox="0 0 64 64" width="32" height="32"><circle cx="24" cy="24" r="12" fill="#FFD700"/><path d="M46,28a10,10,0,0,1,10,10c0,5.5-4.5,10-10,10H26c-5.5,0-10-4.5-10-10a10,10,0,0,1,8-9.8,12,12,0,0,1,22-8.2Z" fill="#F0F8FF" stroke="#B0C4DE" stroke-width="2"/></svg>' 
+                },
+                { 
+                    name: '阴', 
+                    icon: '<svg viewBox="0 0 64 64" width="32" height="32"><path d="M46,26a12,12,0,0,1,12,12c0,6.6-5.4,12-12,12H22c-6.6,0-12-5.4-12-12a12,12,0,0,1,9.6-11.8,14,14,0,0,1,26.4-9.8Z" fill="#D3D3D3" stroke="#A9A9A9" stroke-width="2"/></svg>' 
+                },
+                { 
+                    name: '雷雨天', 
+                    icon: '<svg viewBox="0 0 64 64" width="32" height="32"><path d="M46,24a12,12,0,0,1,12,12c0,6.6-5.4,12-12,12H22c-6.6,0-12-5.4-12-12a12,12,0,0,1,9.6-11.8,14,14,0,0,1,26.4-9.8Z" fill="#708090" stroke="#696969" stroke-width="2"/><polygon points="34,48 26,62 36,58 32,68 44,52 34,54" fill="#FFD700" stroke="#DAA520" stroke-width="1"/><circle cx="24" cy="56" r="1.5" fill="#4682B4"/><circle cx="48" cy="56" r="1.5" fill="#4682B4"/></svg>' 
+                },
+                { 
+                    name: '雨', 
+                    icon: '<svg viewBox="0 0 64 64" width="32" height="32"><path d="M46,24a12,12,0,0,1,12,12c0,6.6-5.4,12-12,12H22c-6.6,0-12-5.4-12-12a12,12,0,0,1,9.6-11.8,14,14,0,0,1,26.4-9.8Z" fill="#D3D3D3" stroke="#A9A9A9" stroke-width="2"/><g fill="#4682B4"><path d="M26,52l-2,8" stroke="#4682B4" stroke-width="2" stroke-linecap="round"/><path d="M34,54l-2,8" stroke="#4682B4" stroke-width="2" stroke-linecap="round"/><path d="M42,52l-2,8" stroke="#4682B4" stroke-width="2" stroke-linecap="round"/></g></svg>' 
+                },
+                { 
+                    name: '风', 
+                    icon: '<svg viewBox="0 0 64 64" width="32" height="32"><path d="M12,24h30a6,6,0,0,1,0,12h-4" fill="none" stroke="#87CEEB" stroke-width="3" stroke-linecap="round"/><path d="M8,36h24a6,6,0,0,0,0-12h-4" fill="none" stroke="#B0C4DE" stroke-width="3" stroke-linecap="round"/><path d="M16,48h20a6,6,0,0,1,0,12" fill="none" stroke="#87CEEB" stroke-width="3" stroke-linecap="round"/></svg>' 
+                },
+                { 
+                    name: '雾', 
+                    icon: '<svg viewBox="0 0 64 64" width="32" height="32"><line x1="12" y1="20" x2="52" y2="20" stroke="#D3D3D3" stroke-width="3" stroke-linecap="round"/><line x1="8" y1="32" x2="56" y2="32" stroke="#D3D3D3" stroke-width="3" stroke-linecap="round"/><line x1="16" y1="44" x2="48" y2="44" stroke="#D3D3D3" stroke-width="3" stroke-linecap="round"/></svg>' 
+                },
+                { 
+                    name: '霾', 
+                    icon: '<svg viewBox="0 0 64 64" width="32" height="32"><circle cx="32" cy="32" r="20" fill="#FFE4B5" opacity="0.6"/><path d="M20,32h24" stroke="#808080" stroke-width="2" stroke-dasharray="4,4"/><path d="M24,24h16" stroke="#808080" stroke-width="2" stroke-dasharray="4,4"/><path d="M24,40h16" stroke="#808080" stroke-width="2" stroke-dasharray="4,4"/></svg>' 
+                },
+                { 
+                    name: '雪', 
+                    icon: '❄️' 
+                },
+                { 
+                    name: '停电', 
+                    icon: '<svg viewBox="0 0 64 64" width="32" height="32"><circle cx="32" cy="32" r="24" fill="#333"/><polygon points="36,16 24,36 34,36 28,52 44,28 32,28" fill="#FFD700" stroke="#FFA500" stroke-width="1"/></svg>' 
+                }
+            ];
+
+            let currentWeatherType = 'am'; // 'am' or 'pm'
+            let selectedWeather = '晴天';
+
+            // 生成天气图标网格
+            const weatherGrid = document.getElementById('weatherGrid');
+            weatherOptions.forEach(weather => {
+                const item = document.createElement('div');
+                item.className = 'weather-item';
+                item.innerHTML = `
+                    <div class="weather-icon">${weather.icon}</div>
+                    <div class="weather-name">${weather.name}</div>
+                `;
+                item.addEventListener('click', function() {
+                    // 移除其他选中状态
+                    document.querySelectorAll('.weather-item').forEach(el => el.classList.remove('selected'));
+                    // 添加选中状态
+                    item.classList.add('selected');
+                    selectedWeather = weather.name;
+                });
+                weatherGrid.appendChild(item);
+            });
+
+            // 监听天气卡片修改按钮
+            document.querySelectorAll('.weather-edit-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const card = this.closest('.weather-card');
+                    currentWeatherType = card.classList.contains('am') ? 'am' : 'pm';
+                    const titleText = currentWeatherType === 'am' ? '设置上午天气' : '设置下午天气';
+                    const tempTitleText = currentWeatherType === 'am' ? '设置上午温度' : '设置下午温度';
+                    
+                    document.getElementById('tempTitle').textContent = tempTitleText;
+
+                    // 获取当前卡片的天气和温度数据（这里简化为从DOM读取，实际可能从数据对象读取）
+                    const infoDiv = card.querySelector('.weather-info');
+                    
+                    let weatherText = '晴天';
+                    let tempText = '19';
+
+                    // 检查是否已设置，如果不是“未设置”状态，则尝试解析当前值
+                    if (!infoDiv.querySelector('.weather-empty-text') && !infoDiv.textContent.includes('未设置')) {
+                        try {
+                            // 假设格式为 "天气：[图标] 名称" 或 "天气：名称" (如果图标是SVG且不占文本)
+                            if (infoDiv.children[0] && infoDiv.children[0].textContent) {
+                                const fullText = infoDiv.children[0].textContent.split('：')[1].trim();
+                                const parts = fullText.split(' ');
+                                if (parts.length > 1 && parts[0] !== '') {
+                                    weatherText = parts[1];
+                                } else {
+                                    weatherText = fullText;
+                                }
+                            }
+                            
+                            if (infoDiv.children[1] && infoDiv.children[1].textContent) {
+                                tempText = infoDiv.children[1].textContent.split('：')[1].replace('℃', '').trim();
+                            }
+                        } catch (e) {
+                            console.warn('解析当前天气失败，使用默认值', e);
+                        }
+                    }
+
+                    // 设置选中状态
+                    document.querySelectorAll('.weather-item').forEach(el => {
+                        el.classList.remove('selected');
+                        if (el.querySelector('.weather-name').textContent === weatherText) {
+                            el.classList.add('selected');
+                            selectedWeather = weatherText;
+                        }
+                    });
+                    
+                    // 如果没有匹配的（默认选中第一个）
+                    if (!document.querySelector('.weather-item.selected')) {
+                         document.querySelector('.weather-item').classList.add('selected');
+                         selectedWeather = weatherOptions[0].name;
+                    }
+
+                    document.getElementById('weatherTemp').value = tempText;
+
+                    openSidebar(titleText, '确定', 'weather');
+                });
+            });
+
+            // 关闭侧边栏函数
+            function closeSidebar() {
+                overlay.classList.remove('active');
+                sidebar.classList.remove('active');
+            }
+
+            // 点击遮罩层关闭
+            overlay.addEventListener('click', closeSidebar);
+
+            // 点击取消按钮关闭
+            cancelBtn.addEventListener('click', closeSidebar);
+
+            // 点击确定按钮（暂时也是关闭，后续可添加筛选逻辑）
+            confirmBtn.addEventListener('click', function() {
+                // 判断当前是哪个模式
+                if (document.getElementById('weatherSettingsContent').classList.contains('active')) {
+                    // 天气设置确认逻辑
+                    const temp = document.getElementById('weatherTemp').value;
+                    const cardSelector = currentWeatherType === 'am' ? '.weather-card.am' : '.weather-card.pm';
+                    const card = document.querySelector(cardSelector);
+                    
+                    if (card) {
+                        const weatherInfo = card.querySelector('.weather-info');
+                        const selectedOption = weatherOptions.find(w => w.name === selectedWeather);
+                        const icon = selectedOption ? selectedOption.icon : '';
+                        
+                        weatherInfo.innerHTML = `
+                            <div>天气：${icon} ${selectedWeather}</div>
+                            <div>温度：${temp}℃</div>
+                        `;
+                    }
+                } else {
+                    // 筛选或导出确认逻辑
+                    const startDateInput = document.getElementById('startDate').value;
+                    const endDateInput = document.getElementById('endDate').value;
+                    
+                    // 保存选择的日期到localStorage
+                    if (startDateInput) {
+                        localStorage.setItem('filterStartDate', startDateInput);
+                    }
+                    if (endDateInput) {
+                        localStorage.setItem('filterEndDate', endDateInput);
+                    }
+                    
+                    // 转换日期格式为 YYYY-MM-DD
+                    const startDateMatch = startDateInput.match(/(\d{4})年(\d{2})月(\d{2})日/);
+                    const endDateMatch = endDateInput.match(/(\d{4})年(\d{2})月(\d{2})日/);
+                    
+                    const startDate = startDateMatch ? `${startDateMatch[1]}-${startDateMatch[2]}-${startDateMatch[3]}` : null;
+                    const endDate = endDateMatch ? `${endDateMatch[1]}-${endDateMatch[2]}-${endDateMatch[3]}` : null;
+                    
+                    // 检查是否是导出操作
+                    const sidebarTitle = document.querySelector('.sidebar-header').textContent;
+                    if (sidebarTitle === '选择导出时间' || this.textContent.trim() === '导出施工日志') {
+                        openConstructionLogExportChoiceModal({ mode: 'range', startDate, endDate });
+                    } else {
+                        // 筛选逻辑
+                        filterConstructionLogs(startDate, endDate);
+                    }
+                }
+                closeSidebar();
+            });
+
+            // 注意：字符计数与验证已由富文本编辑器处理
+            // 保留此注释以说明原textarea的事件监听已被RichTextEditor替代
+
+            // Date Picker Logic
+            const datePicker = document.getElementById('datePicker');
+            const pickerCurrentMonthEl = document.getElementById('pickerCurrentMonth');
+            const daysGrid = document.getElementById('daysGrid');
+            const pickerPrevYearBtn = document.getElementById('pickerPrevYear');
+            const pickerPrevMonthBtn = document.getElementById('pickerPrevMonth');
+            const pickerNextMonthBtn = document.getElementById('pickerNextMonth');
+            const pickerNextYearBtn = document.getElementById('pickerNextYear');
+            const pickerTodayBtn = document.getElementById('pickerTodayBtn');
+            
+            let pickerDate = new Date(); // Internal state for picker navigation
+            let activeInputId = null; // 'startDate' or 'endDate'
+
+            // 检查日期是否在未来
+            function isFutureDate(date) {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                // 创建一个副本以避免修改原始日期
+                const checkDate = new Date(date);
+                checkDate.setHours(0, 0, 0, 0);
+                return checkDate > today;
+            }
+
+            // 检查月份是否在未来
+            function isFutureMonth(year, month) {
+                const today = new Date();
+                const currentYear = today.getFullYear();
+                const currentMonth = today.getMonth();
+                
+                if (year > currentYear) return true;
+                if (year === currentYear && month > currentMonth) return true;
+                return false;
+            }
+
+            function renderDatePicker(date) {
+                const year = date.getFullYear();
+                const month = date.getMonth();
+                
+                pickerCurrentMonthEl.textContent = `${year}年 ${month + 1}月`;
+                
+                // 更新导航按钮状态
+                // 检查下一年
+                if (isFutureMonth(year + 1, month)) {
+                    pickerNextYearBtn.style.color = '#ccc';
+                    pickerNextYearBtn.style.pointerEvents = 'none';
+                    pickerNextYearBtn.style.cursor = 'default';
+                } else {
+                    pickerNextYearBtn.style.color = '#999';
+                    pickerNextYearBtn.style.pointerEvents = 'auto';
+                    pickerNextYearBtn.style.cursor = 'pointer';
+                }
+
+                // 检查下个月
+                // 下个月的年份和月份
+                let nextMonthYear = year;
+                let nextMonthIndex = month + 1;
+                if (nextMonthIndex > 11) {
+                    nextMonthYear++;
+                    nextMonthIndex = 0;
+                }
+                
+                if (isFutureMonth(nextMonthYear, nextMonthIndex)) {
+                    pickerNextMonthBtn.style.color = '#ccc';
+                    pickerNextMonthBtn.style.pointerEvents = 'none';
+                    pickerNextMonthBtn.style.cursor = 'default';
+                } else {
+                    pickerNextMonthBtn.style.color = '#999';
+                    pickerNextMonthBtn.style.pointerEvents = 'auto';
+                    pickerNextMonthBtn.style.cursor = 'pointer';
+                }
+
+                // Clear grid
+                daysGrid.innerHTML = '';
+                
+                // First day of the month
+                const firstDay = new Date(year, month, 1);
+                // Day of week (0-6, Sun-Sat). We want Mon(1)-Sun(0)
+                let startDay = firstDay.getDay(); 
+                // Adjust for Mon start: Sun(0) -> 6, Mon(1) -> 0, Tue(2) -> 1...
+                let startDayIndex = (startDay + 6) % 7;
+                
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                const daysInPrevMonth = new Date(year, month, 0).getDate();
+                const todayDate = new Date();
+                todayDate.setHours(0, 0, 0, 0); // Normalize today for comparison
+                
+                // Previous month days
+                for (let i = startDayIndex - 1; i >= 0; i--) {
+                    const dayDiv = document.createElement('div');
+                    dayDiv.className = 'day-cell prev-month';
+                    dayDiv.textContent = daysInPrevMonth - i;
+                    
+                    const prevDate = new Date(year, month - 1, daysInPrevMonth - i);
+                    if (prevDate > todayDate) {
+                        dayDiv.classList.add('disabled');
+                    } else {
+                        dayDiv.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            selectDate(prevDate);
+                        });
+                    }
+                    daysGrid.appendChild(dayDiv);
+                }
+                
+                // Current month days
+                const today = new Date();
+                const currentInputVal = document.getElementById(activeInputId).value;
+                // Parse current input value "YYYY年MM月DD日"
+                let selectedDate = null;
+                const match = currentInputVal.match(/(\d{4})年(\d{2})月(\d{2})日/);
+                if (match) {
+                    selectedDate = new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
+                }
+
+                for (let i = 1; i <= daysInMonth; i++) {
+                    const dayDiv = document.createElement('div');
+                    dayDiv.className = 'day-cell current-month';
+                    dayDiv.textContent = i;
+                    const currentDate = new Date(year, month, i);
+                    
+                    // Check if disabled (future date)
+                    if (currentDate > todayDate) {
+                        dayDiv.classList.add('disabled');
+                    } else {
+                        // Check if selected
+                        if (selectedDate && 
+                            selectedDate.getFullYear() === year && 
+                            selectedDate.getMonth() === month && 
+                            selectedDate.getDate() === i) {
+                            dayDiv.classList.add('selected');
+                        }
+                        
+                        // Check if today
+                        if (today.getFullYear() === year && 
+                            today.getMonth() === month && 
+                            today.getDate() === i) {
+                            dayDiv.classList.add('today');
+                        }
+                        
+                        dayDiv.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            selectDate(currentDate);
+                        });
+                    }
+                    
+                    daysGrid.appendChild(dayDiv);
+                }
+                
+                // Next month days to fill grid (6 rows * 7 cols = 42 cells)
+                const totalCells = 42;
+                const currentCells = startDayIndex + daysInMonth;
+                const remainingCells = totalCells - currentCells;
+                
+                for (let i = 1; i <= remainingCells; i++) {
+                    const dayDiv = document.createElement('div');
+                    dayDiv.className = 'day-cell next-month';
+                    dayDiv.textContent = i;
+                    
+                    const nextDate = new Date(year, month + 1, i);
+                    if (nextDate > todayDate) {
+                        dayDiv.classList.add('disabled');
+                    } else {
+                        dayDiv.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            selectDate(nextDate);
+                        });
+                    }
+                    daysGrid.appendChild(dayDiv);
+                }
+            }
+
+            function selectDate(date) {
+                if (activeInputId) {
+                    const input = document.getElementById(activeInputId);
+                    const year = date.getFullYear();
+                    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                    const day = date.getDate().toString().padStart(2, '0');
+                    let dateStr = `${year}年${month}月${day}日`;
+
+                    // 如果是写日志界面的日期框，且选择了今天，添加 (今天) 标识
+                    if (activeInputId === 'logDate') {
+                        const today = new Date();
+                        if (date.getFullYear() === today.getFullYear() && 
+                            date.getMonth() === today.getMonth() && 
+                            date.getDate() === today.getDate()) {
+                            dateStr += ' (今天)';
+                        }
+                    }
+
+                    input.value = dateStr;
+                }
+                datePicker.style.display = 'none';
+            }
+
+            function showDatePicker(inputId) {
+                activeInputId = inputId;
+                const input = document.getElementById(inputId);
+                const rect = input.getBoundingClientRect();
+                
+                // Parse initial date from input
+                const val = input.value;
+                const match = val.match(/(\d{4})年(\d{2})月(\d{2})日/);
+                if (match) {
+                    pickerDate = new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
+                } else {
+                    pickerDate = new Date();
+                }
+                
+                renderDatePicker(pickerDate);
+                
+                datePicker.style.display = 'block';
+                datePicker.style.top = (rect.bottom + 5) + 'px';
+                // Align right of picker with right of input wrapper
+                // Since sidebar width is fixed (320px) and form-input-wrapper is flex:1 inside sidebar
+                // We can calculate left based on rect.right
+                datePicker.style.left = (rect.right - 250) + 'px'; // 250 is picker width
+            }
+
+            // Event Listeners for Date Picker
+            document.getElementById('startDate').addEventListener('click', (e) => {
+                e.stopPropagation();
+                showDatePicker('startDate');
+            });
+            
+            document.getElementById('endDate').addEventListener('click', (e) => {
+                e.stopPropagation();
+                showDatePicker('endDate');
+            });
+
+            // 新增 logDate 的监听
+            document.getElementById('logDate').addEventListener('click', (e) => {
+                e.stopPropagation();
+                showDatePicker('logDate');
+            });
+            
+            pickerPrevYearBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                pickerDate.setFullYear(pickerDate.getFullYear() - 1);
+                renderDatePicker(pickerDate);
+            });
+            
+            pickerNextYearBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                pickerDate.setFullYear(pickerDate.getFullYear() + 1);
+                renderDatePicker(pickerDate);
+            });
+            
+            pickerPrevMonthBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                pickerDate.setMonth(pickerDate.getMonth() - 1);
+                renderDatePicker(pickerDate);
+            });
+            
+            pickerNextMonthBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                pickerDate.setMonth(pickerDate.getMonth() + 1);
+                renderDatePicker(pickerDate);
+            });
+            
+            pickerTodayBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const today = new Date();
+                selectDate(today);
+            });
+            
+            // Close picker when clicking outside
+            window.addEventListener('click', (e) => {
+                if (!datePicker.contains(e.target) && 
+                    e.target.id !== 'startDate' && 
+                    e.target.id !== 'endDate' &&
+                    e.target.id !== 'logDate') { // 增加排除 logDate
+                    datePicker.style.display = 'none';
+                }
+            });
+            
+            // Prevent sidebar closing when clicking picker
+            datePicker.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+
+            // 初始化富文本编辑器
+            const editor = new RichTextEditor({
+                container: '.write-form-content',
+                textarea: '.log-textarea',
+                placeholder: '请输入日志内容，点击此处显示编辑工具...',
+                maxLength: 2000,
+                onChange: function(content) {
+                    const length = content.length;
+                    document.querySelector('.char-count').textContent = `${length} / 2000`;
+                    
+                    // 验证
+                    const errorMsg = document.querySelector('.error-message');
+                    const editableDiv = document.querySelector('.rich-editor-editable');
+                    
+                    if (length === 0) {
+                        if (editableDiv) editableDiv.classList.add('error');
+                        if (errorMsg) errorMsg.style.visibility = 'visible';
+                    } else {
+                        if (editableDiv) editableDiv.classList.remove('error');
+                        if (errorMsg) errorMsg.style.visibility = 'hidden';
+                    }
+                }
+            });
+            
+            // 处理URL参数中的项目信息
+            const urlParams = new URLSearchParams(window.location.search);
+            const projectNameParam = urlParams.get('project_name');
+            const projectIdParam = urlParams.get('project_id');
+            
+            // 通知父页面更新标题
+            if (window.parent && window.parent !== window) {
+                // 使用当前页面的origin作为targetOrigin，提高安全性
+                const targetOrigin = window.location.origin || '*';
+                window.parent.postMessage({
+                    type: 'updateTitle',
+                    page: '施工日志.html'
+                }, targetOrigin);
+            }
+
+            if (projectNameParam) {
+                const decodedName = decodeURIComponent(projectNameParam);
+                // 更新项目名称输入框
+                const projectNameInput = document.getElementById('projectName');
+                if (projectNameInput) {
+                    projectNameInput.value = decodedName;
+                }
+                // 保存到localStorage
+                localStorage.setItem('currentProjectName', decodedName);
+            } else {
+                 // 如果URL没有，尝试从localStorage获取并更新UI
+                 const storedProjectName = localStorage.getItem('currentProjectName');
+                 if (storedProjectName) {
+                     const projectNameInput = document.getElementById('projectName');
+                     if (projectNameInput) {
+                         projectNameInput.value = storedProjectName;
+                     }
+                 }
+            }
+            
+            if (projectIdParam) {
+                const decodedId = decodeURIComponent(projectIdParam);
+                localStorage.setItem('currentProjectId', decodedId);
+            }
+
+            // 加载施工日志列表
+            async function loadConstructionLogs() {
+                const projectId = localStorage.getItem('currentProjectId');
+                if (!projectId) {
+                    console.log('未找到项目ID，无法加载日志列表');
+                    return;
+                }
+
+                if (!window.constructionLogAPI) {
+                    console.log('API未初始化，等待初始化完成...');
+                    return;
+                }
+
+                try {
+                    // 检查URL参数中是否包含日期信息
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const dateParam = urlParams.get('work_date'); // 使用work_date参数，与云相册页面保持一致
+                    
+                    let filters = {};
+                    if (dateParam) {
+                        // 如果有日期参数，则只获取该日期的日志记录
+                        filters.startDate = dateParam;
+                        filters.endDate = dateParam;
+                    }
+                    
+                    const logs = await window.constructionLogAPI.getConstructionLogs(projectId, filters);
+                    // 保存所有日志到全局变量（用于本地筛选）
+                    allConstructionLogs = logs || [];
+                    renderLogList(logs);
+                } catch (error) {
+                    console.error('加载施工日志列表失败:', error);
+                }
+            }
+
+            // 渲染日志列表
+            function renderLogList(logs) {
+                const logListContainer = document.querySelector('.log-list');
+                if (!logListContainer) return;
+
+                if (!logs || logs.length === 0) {
+                    logListContainer.innerHTML = `
+                        <div class="empty-state" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; text-align: center;">
+                            <div style="width: 120px; height: 100px; margin-bottom: 20px; position: relative;">
+                                <!-- 文件夹图标 -->
+                                <svg viewBox="0 0 120 100" style="width: 100%; height: 100%;">
+                                    <!-- 后面文件夹 -->
+                                    <path d="M20 25 Q20 20 25 20 L45 20 Q50 20 52 25 L55 30 L95 30 Q100 30 100 35 L100 75 Q100 80 95 80 L25 80 Q20 80 20 75 Z" fill="#E3F2FD" stroke="#BBDEFB" stroke-width="1.5"/>
+                                    <!-- 前面文件夹 -->
+                                    <path d="M10 35 Q10 30 15 30 L40 30 Q45 30 47 35 L50 40 L105 40 Q110 40 110 45 L110 85 Q110 90 105 90 L15 90 Q10 90 10 85 Z" fill="#E8F4FD" stroke="#90CAF9" stroke-width="1.5"/>
+                                    <!-- 齿轮图标 -->
+                                    <g transform="translate(45, 50)">
+                                        <circle cx="15" cy="15" r="8" fill="none" stroke="#90CAF9" stroke-width="2"/>
+                                        <circle cx="15" cy="15" r="4" fill="#90CAF9"/>
+                                        <path d="M15 2 L15 5 M15 25 L15 28 M2 15 L5 15 M25 15 L28 15 M6 6 L8 8 M22 22 L24 24 M6 24 L8 22 M22 6 L24 8" stroke="#90CAF9" stroke-width="2" stroke-linecap="round"/>
+                                    </g>
+                                </svg>
+                            </div>
+                            <div style="font-size: 16px; color: #606266; margin-bottom: 20px;">暂无施工日志</div>
+                            <button class="btn btn-primary" onclick="document.getElementById('writeLogBtn').click()" style="padding: 10px 30px; font-size: 14px;">写日志</button>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // 获取当前用户信息用于显示
+                const currentUserStr = localStorage.getItem('currentUser');
+                let userName = '用户';
+                if (currentUserStr) {
+                    try {
+                        const currentUser = JSON.parse(currentUserStr);
+                        userName = currentUser.login_name || '用户';
+                    } catch (e) {
+                        console.error('解析用户信息失败:', e);
+                    }
+                }
+
+                // 清空现有列表
+                logListContainer.innerHTML = '';
+
+                // 渲染每条日志
+                logs.forEach(log => {
+                    const logCard = createLogCard(log, userName);
+                    logListContainer.appendChild(logCard);
+                });
+
+                // 添加底部提示
+                const noMoreData = document.createElement('div');
+                noMoreData.className = 'no-more-data';
+                noMoreData.textContent = '没有更多数据了 ~';
+                logListContainer.appendChild(noMoreData);
+            }
+
+            // 去除BBCode标签的辅助函数
+            function stripBbCode(text) {
+                if (!text) return '';
+                // 使用正则表达式去除BBCode标签
+                let plainText = text;
+
+                // 先去除闭合的标签对 [tag]...[/tag]
+                plainText = plainText.replace(/\[\/?\w+(=[^\]]*)?\]/g, '');
+
+                return plainText;
+            }
+
+            // 将BBCode转换为HTML的辅助函数
+            function convertBbCodeToHtml(text) {
+                if (!text) return '';
+                let html = text;
+                // 转换常见的BBCode标签为HTML
+                html = html.replace(/\[b\]/gi, '<b>');
+                html = html.replace(/\[\/b\]/gi, '</b>');
+                html = html.replace(/\[i\]/gi, '<i>');
+                html = html.replace(/\[\/i\]/gi, '</i>');
+                html = html.replace(/\[u\]/gi, '<u>');
+                html = html.replace(/\[\/u\]/gi, '</u>');
+                html = html.replace(/\[align=(center|left|right)\]/gi, '<div style="text-align: $1;">');
+                html = html.replace(/\[\/align\]/gi, '</div>');
+                html = html.replace(/\[color=([^\]]+)\]/gi, '<span style="color: $1;">');
+                html = html.replace(/\[\/color\]/gi, '</span>');
+                html = html.replace(/\[size=(\d+)\]/gi, '<span style="font-size: $1px;">');
+                html = html.replace(/\[\/size\]/gi, '</span>');
+                // 处理换行
+                html = html.replace(/\n/g, '<br>');
+                return html;
+            }
+
+            // 创建日志卡片
+            function createLogCard(log, userName) {
+                const card = document.createElement('div');
+                card.className = 'log-card';
+                card.dataset.logId = log.log_id;
+
+                // 解析日期
+                const recordDate = new Date(log.record_date);
+                const dateStr = recordDate.toLocaleDateString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                });
+                const weekDay = recordDate.toLocaleDateString('zh-CN', { weekday: 'short' });
+
+                // 获取最后修改时间
+                // 从ISO字符串中提取时间部分，避免时区转换问题
+                const updatedAtStr = log.updated_at;
+                let timeStr = '--:--';
+                if (updatedAtStr) {
+                    // 格式: 2026-02-02T22:31:00+08:00 或 2026-02-02 22:31:00+08
+                    const match = updatedAtStr.match(/(\d{2}):(\d{2}):\d{2}/);
+                    if (match) {
+                        timeStr = `${match[1]}:${match[2]}`;
+                    }
+                }
+
+                // 解析天气信息
+                const weatherInfo = window.constructionLogAPI ? 
+                    window.constructionLogAPI.parseWeatherInfo(log.weather_info) : 
+                    { am: { weather: '晴天', temp: '19' }, pm: { weather: '晴天', temp: '19' } };
+
+                // 获取用户名字的首字母或前两个字
+                const avatarText = userName.substring(0, 2);
+
+                card.innerHTML = `
+                    <div class="log-header">
+                        <div class="avatar">${avatarText}</div>
+                        <div class="user-info">
+                            <span class="user-name">${userName}</span>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span class="log-date">${dateStr} ${weekDay}</span>
+                                <span style="font-size: 12px; color: #909399;">${timeStr}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // 添加点击事件，点击查看详情
+                card.addEventListener('click', function() {
+                    // 移除其他卡片的active状态
+                    document.querySelectorAll('.log-card').forEach(c => c.classList.remove('active'));
+                    // 添加当前卡片的active状态
+                    card.classList.add('active');
+                    // 保存当前日志ID到全局变量
+                    currentEditingLogId = log.log_id;
+                    // 保存当前日志的图片ID列表
+                    currentLogImageIds = log.image_ids || [];
+                    showLogDetail(log);
+                });
+
+                return card;
+            }
+
+            // 显示日志详情
+            function showLogDetail(log) {
+                const logDetailContainer = document.getElementById('logDetailContainer');
+                const listPageContainer = document.getElementById('listPageContainer');
+                const writeLogContainer = document.getElementById('writeLogContainer');
+
+                if (!logDetailContainer) return;
+
+                // 隐藏列表和写日志界面
+                listPageContainer.style.display = 'none';
+                writeLogContainer.style.display = 'none';
+                logDetailContainer.style.display = 'block';
+                currentViewingLog = log;
+
+                // 填充详情数据
+                const currentUserStr = localStorage.getItem('currentUser');
+                let userName = '用户';
+                if (currentUserStr) {
+                    try {
+                        const currentUser = JSON.parse(currentUserStr);
+                        userName = currentUser.login_name || '用户';
+                    } catch (e) {}
+                }
+
+                // 解析日期
+                const recordDate = new Date(log.record_date);
+                const dateStr = recordDate.toLocaleDateString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                });
+                const weekDay = recordDate.toLocaleDateString('zh-CN', { weekday: 'short' });
+
+                // 更新详情页内容
+                const detailAvatar = document.getElementById('detailAvatar');
+                const detailUserName = document.getElementById('detailUserName');
+                const detailDate = document.getElementById('detailDate');
+                const detailContent = document.getElementById('detailContent');
+
+                if (detailAvatar) detailAvatar.textContent = userName.substring(0, 2);
+                if (detailUserName) detailUserName.textContent = userName;
+                if (detailDate) detailDate.textContent = `${dateStr} ${weekDay}`;
+                if (detailContent) {
+                    // 将BBCode转换为HTML
+                    const htmlContent = convertBbCodeToHtml(log.log_content || '');
+                    detailContent.innerHTML = htmlContent;
+                }
+
+                // 更新天气信息
+                const weatherInfo = window.constructionLogAPI ? 
+                    window.constructionLogAPI.parseWeatherInfo(log.weather_info) : 
+                    { am: { weather: '晴天', temp: '19' }, pm: { weather: '晴天', temp: '19' } };
+
+                // 更新详情页天气显示
+                const detailAmCard = logDetailContainer.querySelector('.weather-card.am');
+                const detailPmCard = logDetailContainer.querySelector('.weather-card.pm');
+                
+                if (detailAmCard && weatherInfo.am) {
+                    const amInfoDiv = detailAmCard.querySelector('.weather-info');
+                    if (amInfoDiv) {
+                        const weatherIcon = getWeatherIcon(weatherInfo.am.weather);
+                        amInfoDiv.innerHTML = `
+                            <div style="margin-bottom: 8px;">天气：${weatherIcon} <span style="vertical-align: middle;">${weatherInfo.am.weather}</span></div>
+                            <div>温度：${weatherInfo.am.temp}℃</div>
+                        `;
+                    }
+                }
+                
+                if (detailPmCard && weatherInfo.pm) {
+                    const pmInfoDiv = detailPmCard.querySelector('.weather-info');
+                    if (pmInfoDiv) {
+                        const weatherIcon = getWeatherIcon(weatherInfo.pm.weather);
+                        pmInfoDiv.innerHTML = `
+                            <div style="margin-bottom: 8px;">天气：${weatherIcon} <span style="vertical-align: middle;">${weatherInfo.pm.weather}</span></div>
+                            <div>温度：${weatherInfo.pm.temp}℃</div>
+                        `;
+                    }
+                }
+
+                // 更新图片列表
+                const detailImageList = document.getElementById('detailImageList');
+                if (detailImageList) {
+                    detailImageList.innerHTML = '';
+                    if (log.image_ids && log.image_ids.length > 0) {
+                        log.image_ids.forEach(imageUrl => {
+                            const imgContainer = document.createElement('div');
+                            imgContainer.style.cssText = 'width: 80px; height: 80px; background-color: #f0f2f5; display: flex; align-items: center; justify-content: center; border-radius: 4px; overflow: hidden; position: relative;';
+                            
+                            // 添加加载状态
+                            const loadingDiv = document.createElement('div');
+                            loadingDiv.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(240, 242, 245, 0.8); display: flex; align-items: center; justify-content: center; z-index: 1;';
+                            loadingDiv.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" style="animation: rotate 1s linear infinite;"><circle cx="12" cy="12" r="10" stroke="#409EFF" stroke-width="2" fill="none" stroke-dasharray="31.4 31.4" stroke-linecap="round" style="animation: dash 1.5s ease-in-out infinite;"/></svg>';
+                            imgContainer.appendChild(loadingDiv);
+                            
+                            const img = document.createElement('img');
+                            img.src = imageUrl;
+                            img.alt = '施工日志图片';
+                            img.style.cssText = 'width: 100%; height: 100%; object-fit: cover; cursor: pointer;';
+                            img.className = 'detail-image';
+                            img.addEventListener('click', () => showImageModal(imageUrl));
+                            
+                            // 图片加载完成后隐藏加载状态
+                            img.onload = function() {
+                                loadingDiv.style.display = 'none';
+                            };
+                            
+                            // 图片加载失败后隐藏加载状态
+                            img.onerror = function() {
+                                loadingDiv.style.display = 'none';
+                            };
+                            
+                            imgContainer.appendChild(img);
+                            detailImageList.appendChild(imgContainer);
+                        });
+                    } else {
+                        detailImageList.innerHTML = '<span style="color: #909399; font-size: 13px;">暂无图片</span>';
+                    }
+                }
+
+                // 更新标题
+                document.title = '施工日志详情';
+                window.parent.postMessage({ type: 'updateTitle', title: '施工日志详情' }, '*');
+            }
+
+            // 获取天气图标SVG
+            function getWeatherIcon(weather) {
+                const weatherIcons = {
+                    '晴天': '<svg viewBox="0 0 64 64" width="20" height="20" style="vertical-align: middle;"><circle cx="32" cy="32" r="14" fill="#FFD700" stroke="#FFA500" stroke-width="2"/><g stroke="#FFD700" stroke-width="3" stroke-linecap="round"><line x1="32" y1="10" x2="32" y2="4"/><line x1="32" y1="54" x2="32" y2="60"/><line x1="54" y1="32" x2="60" y2="32"/><line x1="4" y1="32" x2="10" y2="32"/><line x1="48" y1="16" x2="52" y2="12"/><line x1="16" y1="48" x2="12" y2="52"/><line x1="48" y1="48" x2="52" y2="52"/><line x1="16" y1="16" x2="12" y2="12"/></g></svg>',
+                    '多云': '<svg viewBox="0 0 64 64" width="20" height="20" style="vertical-align: middle;"><circle cx="25" cy="25" r="10" fill="#FFD700" stroke="#FFA500" stroke-width="2"/><path d="M15 45 Q15 35 25 35 L45 35 Q55 35 55 45 Q55 55 45 55 L25 55 Q15 55 15 45" fill="#E0E0E0" stroke="#BDBDBD" stroke-width="2"/></svg>',
+                    '阴天': '<svg viewBox="0 0 64 64" width="20" height="20" style="vertical-align: middle;"><path d="M15 45 Q15 35 25 35 L45 35 Q55 35 55 45 Q55 55 45 55 L25 55 Q15 55 15 45" fill="#BDBDBD" stroke="#9E9E9E" stroke-width="2"/></svg>',
+                    '雨天': '<svg viewBox="0 0 64 64" width="20" height="20" style="vertical-align: middle;"><path d="M15 40 Q15 30 25 30 L45 30 Q55 30 55 40 Q55 50 45 50 L25 50 Q15 50 15 40" fill="#90CAF9" stroke="#64B5F6" stroke-width="2"/><line x1="25" y1="55" x2="22" y2="62" stroke="#2196F3" stroke-width="2" stroke-linecap="round"/><line x1="35" y1="55" x2="32" y2="62" stroke="#2196F3" stroke-width="2" stroke-linecap="round"/><line x1="45" y1="55" x2="42" y2="62" stroke="#2196F3" stroke-width="2" stroke-linecap="round"/></svg>',
+                    '雪天': '<svg viewBox="0 0 64 64" width="20" height="20" style="vertical-align: middle;"><path d="M15 40 Q15 30 25 30 L45 30 Q55 30 55 40 Q55 50 45 50 L25 50 Q15 50 15 40" fill="#E3F2FD" stroke="#90CAF9" stroke-width="2"/><circle cx="25" cy="58" r="2" fill="#2196F3"/><circle cx="35" cy="62" r="2" fill="#2196F3"/><circle cx="45" cy="58" r="2" fill="#2196F3"/></svg>',
+                    '雷阵雨': '<svg viewBox="0 0 64 64" width="20" height="20" style="vertical-align: middle;"><path d="M15 35 Q15 25 25 25 L45 25 Q55 25 55 35 Q55 45 45 45 L25 45 Q15 45 15 35" fill="#757575" stroke="#616161" stroke-width="2"/><polygon points="35,48 30,58 34,58 32,68 42,55 37,55" fill="#FFD700" stroke="#FFA500" stroke-width="1.5"/></svg>'
+                };
+                return weatherIcons[weather] || weatherIcons['晴天'];
+            }
+
+            // 根据日期范围筛选施工日志（在本地列表中筛选）
+            function filterConstructionLogs(startDate, endDate) {
+                // 显示加载状态
+                const logListContainer = document.querySelector('.log-list');
+                if (logListContainer) {
+                    logListContainer.innerHTML = `
+                        <div class="loading-state" style="text-align: center; padding: 40px; color: #909399;">
+                            <div style="margin-bottom: 10px;">
+                                <svg viewBox="0 0 24 24" width="32" height="32" style="animation: rotate 1s linear infinite;">
+                                    <circle cx="12" cy="12" r="10" stroke="#409EFF" stroke-width="3" fill="none" stroke-dasharray="31.4 31.4" stroke-linecap="round" style="animation: dash 1.5s ease-in-out infinite;"/>
+                                </svg>
+                            </div>
+                            <div>正在筛选...</div>
+                        </div>
+                    `;
+                }
+
+                // 使用setTimeout让UI有机会更新加载状态
+                setTimeout(() => {
+                    try {
+                        // 在本地日志列表中筛选
+                        let filteredLogs = allConstructionLogs;
+                        
+                        if (startDate) {
+                            filteredLogs = filteredLogs.filter(log => log.record_date >= startDate);
+                        }
+                        if (endDate) {
+                            filteredLogs = filteredLogs.filter(log => log.record_date <= endDate);
+                        }
+
+                        renderLogList(filteredLogs);
+
+                        // 显示筛选结果提示
+                        const dateRangeText = startDate && endDate ? `${startDate} 至 ${endDate}` : 
+                                             startDate ? `${startDate} 之后` : 
+                                             endDate ? `${endDate} 之前` : '全部';
+                        showNotification(`已筛选 ${dateRangeText} 的日志，共 ${filteredLogs.length} 条`, false);
+                    } catch (error) {
+                        console.error('筛选施工日志失败:', error);
+                        showNotification('筛选失败，请重试', true);
+                    }
+                }, 100);
+            }
+
+            // 页面加载完成后加载日志列表
+            loadConstructionLogs();
+
+            // --- 图片上传与预览功能 ---
+            window.selectedImages = []; // 全局存储选中的图片文件
+
+            const addImgBtn = document.getElementById('addImgBtn');
+            const imageUploadInput = document.getElementById('imageUpload');
+            const imageUploadContainer = document.getElementById('imageUploadContainer');
+
+            // 点击添加按钮触发文件选择
+            if (addImgBtn && imageUploadInput) {
+                addImgBtn.addEventListener('click', function() {
+                    imageUploadInput.click();
+                });
+            }
+
+            // 监听文件选择变化
+            if (imageUploadInput) {
+                imageUploadInput.addEventListener('change', function(e) {
+                    if (e.target.files && e.target.files.length > 0) {
+                        Array.from(e.target.files).forEach(file => {
+                            // 添加到全局数组
+                            window.selectedImages.push(file);
+                            
+                            // 获取当前索引
+                            const currentIndex = window.selectedImages.length - 1;
+
+                            // 尝试压缩并预览
+                            processImage(file).then(compressed => {
+                                // 替换为压缩后的文件（如果有需要可以替换，这里暂时保留原文件或使用compressed.blob）
+                                // window.selectedImages[currentIndex] = new File([compressed.blob], file.name, { type: compressed.blob.type });
+                                renderImagePreview(file, currentIndex);
+                            }).catch(error => {
+                                console.warn('图片压缩失败，使用原始图片:', error);
+                                renderImagePreview(file, currentIndex);
+                            });
+                        });
+                        
+                        // 清空input值，允许重复选择
+                        e.target.value = '';
+                    }
+                });
+            }
+
+            // 显示图片预览模态框
+            function showImageModal(imageUrl) {
+                const modal = document.getElementById('imageModal');
+                modal.innerHTML = `
+                    <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2001;" 
+                         onclick="if(event.target === this) document.getElementById('imageModal').style.display='none'">
+                        <img id="draggableImage" src="${imageUrl}" 
+                             style="max-width: 90%; max-height: 90%; position: absolute; cursor: move; top: 50%; left: 50%; transform: translate(-50%, -50%); transition: transform 0.1s ease-out;" 
+                             ondragstart="return false;">
+                        
+                        <!-- 关闭按钮 -->
+                        <button onclick="document.getElementById('imageModal').style.display='none'" 
+                                style="position: fixed; top: 20px; right: 20px; background: #f5222d; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; z-index: 2002; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">×</button>
+                        
+                        <!-- 旋转控制按钮 -->
+                        <div style="position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; z-index: 2002;">
+                            <button id="rotateLeftBtn" style="background: rgba(255,255,255,0.2); backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 8px 16px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; transition: all 0.2s;">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                                <span style="margin-left: 6px;">左旋转</span>
+                            </button>
+                            <button id="flipHorizontalBtn" style="background: rgba(255,255,255,0.2); backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 8px 16px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; transition: all 0.2s;">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M5 9l-3 3 3 3"/><path d="M19 9l3 3-3 3"/></svg>
+                                <span style="margin-left: 6px;">左右镜像</span>
+                            </button>
+                            <button id="flipVerticalBtn" style="background: rgba(255,255,255,0.2); backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 8px 16px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; transition: all 0.2s;">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18"/><path d="M9 5l3-3 3 3"/><path d="M9 19l3 3 3-3"/></svg>
+                                <span style="margin-left: 6px;">上下镜像</span>
+                            </button>
+                            <button id="rotateRightBtn" style="background: rgba(255,255,255,0.2); backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 8px 16px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; transition: all 0.2s;">
+                                <span style="margin-right: 6px;">右旋转</span>
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                modal.style.display = 'block';
+                
+                // 图片拖动、缩放和旋转逻辑
+                const dragImg = document.getElementById('draggableImage');
+                const rotateLeftBtn = document.getElementById('rotateLeftBtn');
+                const rotateRightBtn = document.getElementById('rotateRightBtn');
+                const flipHorizontalBtn = document.getElementById('flipHorizontalBtn');
+                const flipVerticalBtn = document.getElementById('flipVerticalBtn');
+                
+                let isDragging = false;
+                let startX, startY;
+                let initialLeft, initialTop;
+                let scale = 1;
+                let rotation = 0;
+                let scaleX = 1;
+                let scaleY = 1;
+
+                // 统一更新变换样式
+                function updateTransform() {
+                    // 注意变换顺序：先位移居中，然后旋转，然后缩放(包含镜像)
+                    // 由于scaleX/scaleY是基于原始尺寸的镜像，scale是缩放倍数
+                    // 组合缩放因子：总X缩放 = scale * scaleX, 总Y缩放 = scale * scaleY
+                    dragImg.style.transform = `translate(-50%, -50%) rotate(${rotation}deg) scale(${scale * scaleX}, ${scale * scaleY})`;
+                }
+
+                // 旋转按钮事件
+                rotateLeftBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    rotation -= 90;
+                    updateTransform();
+                });
+
+                rotateRightBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    rotation += 90;
+                    updateTransform();
+                });
+
+                // 镜像按钮事件
+                flipHorizontalBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    scaleX = scaleX === 1 ? -1 : 1;
+                    updateTransform();
+                });
+
+                flipVerticalBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    scaleY = scaleY === 1 ? -1 : 1;
+                    updateTransform();
+                });
+
+                // 按钮悬停效果
+                [rotateLeftBtn, rotateRightBtn, flipHorizontalBtn, flipVerticalBtn].forEach(btn => {
+                    btn.addEventListener('mouseenter', () => btn.style.background = 'rgba(255,255,255,0.3)');
+                    btn.addEventListener('mouseleave', () => btn.style.background = 'rgba(255,255,255,0.2)');
+                });
+
+                dragImg.addEventListener('mousedown', function(e) {
+                    isDragging = true;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    const rect = dragImg.getBoundingClientRect();
+                    
+                    // 如果是第一次拖拽，需要初始化style.left和style.top为当前像素值
+                    if (!dragImg.style.left || dragImg.style.left === '50%') {
+                        // 计算当前的中心点位置，避免跳动
+                        // 使用 boundingClientRect 的中心点作为初始 left/top
+                        const centerX = rect.left + rect.width / 2;
+                        const centerY = rect.top + rect.height / 2;
+                        
+                        dragImg.style.left = centerX + 'px';
+                        dragImg.style.top = centerY + 'px';
+                    }
+                    
+                    initialLeft = parseFloat(dragImg.style.left);
+                    initialTop = parseFloat(dragImg.style.top);
+                    
+                    dragImg.style.cursor = 'grabbing';
+                    // 拖动时暂时移除过渡效果以保证跟手
+                    dragImg.style.transition = 'none';
+                });
+
+                document.addEventListener('mousemove', function(e) {
+                    if (!isDragging) return;
+                    e.preventDefault();
+                    const dx = e.clientX - startX;
+                    const dy = e.clientY - startY;
+                    
+                    dragImg.style.left = (initialLeft + dx) + 'px';
+                    dragImg.style.top = (initialTop + dy) + 'px';
+                });
+
+                document.addEventListener('mouseup', function() {
+                    if (isDragging) {
+                        isDragging = false;
+                        if(dragImg) {
+                            dragImg.style.cursor = 'move';
+                            // 恢复过渡效果
+                            dragImg.style.transition = 'transform 0.1s ease-out';
+                        }
+                    }
+                });
+
+                // 滚轮缩放
+                dragImg.addEventListener('wheel', function(e) {
+                    e.preventDefault();
+                    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                    scale += delta;
+                    scale = Math.max(0.5, Math.min(5, scale)); // 稍微放宽缩放限制
+                    updateTransform();
+                });
+            }
+
+            // 监听详情页图片点击
+            document.body.addEventListener('click', function(e) {
+                if (e.target.classList.contains('detail-image')) {
+                    showImageModal(e.target.src);
+                }
+            });
+
+            // 图片压缩函数
+            function processImage(file) {
+                return new Promise((resolve, reject) => {
+                    try {
+                        if (!file || !file.type.startsWith('image/')) {
+                            reject(new Error('不是有效的图片类型'));
+                            return;
+                        }
+                        
+                        if (typeof Compressor === 'undefined') {
+                            reject(new Error('Compressor库未加载'));
+                            return;
+                        }
+
+                        new Compressor(file, {
+                            quality: 0.7,
+                            maxWidth: 1920,
+                            maxHeight: 1080,
+                            success(result) {
+                                resolve({
+                                    blob: result
+                                });
+                            },
+                            error(err) {
+                                reject(err);
+                            }
+                        });
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+            }
+
+            // 渲染图片预览
+            function renderImagePreview(file, index) {
+                const previewItem = document.createElement('div');
+                previewItem.className = 'image-preview-item';
+                previewItem.style.position = 'relative';
+                previewItem.style.width = '100px';
+                previewItem.style.height = '100px';
+                previewItem.style.borderRadius = '6px';
+                previewItem.style.overflow = 'hidden';
+                previewItem.style.border = '1px solid #d9d9d9';
+                
+                // 保存文件引用
+                previewItem.fileObject = file;
+                
+                const tempUrl = URL.createObjectURL(file);
+                
+                // 添加加载状态
+                const loadingDiv = document.createElement('div');
+                loadingDiv.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(240, 242, 245, 0.8); display: flex; align-items: center; justify-content: center; z-index: 1;';
+                loadingDiv.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" style="animation: rotate 1s linear infinite;"><circle cx="12" cy="12" r="10" stroke="#409EFF" stroke-width="2" fill="none" stroke-dasharray="31.4 31.4" stroke-linecap="round" style="animation: dash 1.5s ease-in-out infinite;"/></svg>';
+                previewItem.appendChild(loadingDiv);
+                
+                const img = document.createElement('img');
+                img.style.width = '100%';
+                img.style.height = '100%';
+                img.style.objectFit = 'cover';
+                img.style.cursor = 'pointer';
+                img.src = tempUrl;
+                
+                // 点击查看大图
+                img.addEventListener('click', function() {
+                    showImageModal(tempUrl);
+                });
+                
+                // 图片加载完成后隐藏加载状态
+                img.onload = function() {
+                    loadingDiv.style.display = 'none';
+                };
+                
+                // 图片加载失败后隐藏加载状态
+                img.onerror = function() {
+                    loadingDiv.style.display = 'none';
+                };
+                
+                // 删除按钮
+                const deleteBtn = document.createElement('button');
+                deleteBtn.innerHTML = '×';
+                deleteBtn.style.position = 'absolute';
+                deleteBtn.style.top = '0';
+                deleteBtn.style.right = '0';
+                deleteBtn.style.width = '20px';
+                deleteBtn.style.height = '20px';
+                deleteBtn.style.background = 'rgba(0,0,0,0.5)';
+                deleteBtn.style.color = '#fff';
+                deleteBtn.style.border = 'none';
+                deleteBtn.style.cursor = 'pointer';
+                deleteBtn.style.display = 'flex';
+                deleteBtn.style.alignItems = 'center';
+                deleteBtn.style.justifyContent = 'center';
+                deleteBtn.style.borderBottomLeftRadius = '4px';
+                deleteBtn.style.zIndex = '2'; // 确保删除按钮在加载动画之上
+
+                deleteBtn.addEventListener('click', function(e) {
+                    e.stopPropagation(); // 防止触发图片点击
+                    const idx = window.selectedImages.indexOf(file);
+                    if (idx > -1) {
+                        window.selectedImages.splice(idx, 1);
+                    }
+                    previewItem.remove();
+                });
+
+                previewItem.appendChild(img);
+                previewItem.appendChild(deleteBtn);
+                
+                // 插入到添加按钮之前
+                imageUploadContainer.insertBefore(previewItem, addImgBtn);
+            }
+        });
+    </script>
+
+</body>
+</html>
