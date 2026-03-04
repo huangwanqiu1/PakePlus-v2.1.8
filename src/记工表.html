@@ -1,0 +1,2353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>记工表</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            font-family: Arial, sans-serif;
+            padding: 0;
+            margin: 0;
+            background-color: #f5f5f5;
+            height: 100%;
+        }
+        
+        body {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 100%;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            margin: 0;
+            background-color: white;
+            padding: 5px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            min-height: 0;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            gap: 16px;
+            margin: 0 0 5px 0;
+            padding: 0 0 5px 0;
+            background-color: transparent;
+            border-radius: 4px;
+            border-bottom: 1px solid #e8e8e8;
+        }
+        
+        .date-section {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: linear-gradient(135deg, rgba(230, 247, 255, 0.8), rgba(240, 250, 255, 0.6));
+            border: 1px solid #91d5ff;
+            border-radius: 4px;
+            padding: 0 15px 0 8px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #333;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 1px 2px rgba(24, 144, 255, 0.1);
+            height: 36px;
+        }
+        
+        .date-section:hover {
+            background: linear-gradient(135deg, rgba(24, 144, 255, 0.9), rgba(64, 169, 255, 0.8));
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
+            border-color: #1890ff;
+        }
+        
+        .date-display {
+            font-size: 13px;
+            color: inherit;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .calendar-icon {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        
+        .download-btn {
+            background-color: #1890ff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .download-btn:hover {
+            background-color: #40a9ff;
+        }
+        
+        /* 模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(2px);
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .modal-content {
+            background-color: #ffffff;
+            margin: 15% auto;
+            padding: 0;
+            border-radius: 12px;
+            width: 300px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+            animation: slideUp 0.3s ease;
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* 年份选择栏样式 */
+        .year-selector {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 16px 14px;
+            border-bottom: 1px solid #f0f0f0;
+            background-color: #fafafa;
+            border-radius: 12px 12px 0 0;
+        }
+        
+        .year-btn {
+            background: white;
+            border: 1px solid #e8e8e8;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            color: #666;
+            transition: all 0.3s ease;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+        
+        .year-btn:hover {
+            border-color: #1890ff;
+            color: #1890ff;
+            box-shadow: 0 2px 4px rgba(24, 144, 255, 0.15);
+            transform: translateY(-1px);
+        }
+        
+        .year-btn:active {
+            transform: translateY(0);
+        }
+        
+        .year-display {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        /* 月份选择网格样式 */
+        .month-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+            padding: 16px;
+        }
+        
+        .month-btn {
+            background: white;
+            border: 1px solid #e8e8e8;
+            padding: 8px 3px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #333;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+        
+        .month-btn:hover:not(.disabled) {
+            border-color: #1890ff;
+            color: #1890ff;
+            box-shadow: 0 3px 8px rgba(24, 144, 255, 0.15);
+            transform: translateY(-2px);
+        }
+        
+        .month-btn.active {
+            background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
+            border-color: #1890ff;
+            color: white;
+            box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
+        }
+        
+        .month-btn.disabled {
+            background-color: #fafafa;
+            border-color: #e8e8e8;
+            color: #bfbfbf;
+            cursor: not-allowed;
+        }
+        
+        .month-btn.disabled:hover {
+            border-color: #e8e8e8;
+            color: #bfbfbf;
+            box-shadow: none;
+            transform: none;
+        }
+        
+        /* 记工表表格样式 */
+        .timesheet-table-container {
+            overflow-x: auto;
+            overflow-y: auto;
+            flex: 1;
+            min-height: 0;
+            margin-top: 0;
+            position: relative;
+            border: 1px solid #e8e8e8;
+            border-radius: 8px;
+        }
+        
+        .timesheet-table {
+            width: auto;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 14px;
+            background-color: white;
+        }
+        
+        .timesheet-table th,
+        .timesheet-table td {
+            border: 1px solid #e8e8e8;
+            padding: 8px 12px;
+            text-align: center;
+            white-space: normal;
+            min-width: 80px;
+            vertical-align: middle;
+        }
+        
+        /* 固定表头 */
+        .timesheet-table th {
+            background-color: #f0f2f5;
+            font-weight: bold;
+            color: #333;
+            position: sticky;
+            top: 0;
+            z-index: 120;
+            border-bottom: 2px solid #d9d9d9;
+            white-space: nowrap !important;
+        }
+        
+        /* 固定第一列 - 工号 */
+        .timesheet-table th.fixed-col-1 {
+            position: -webkit-sticky;
+            position: sticky;
+            left: 0;
+            top: 0;
+            background-color: #f0f2f5 !important;
+            z-index: 130;
+            border: 1px solid #e8e8e8 !important;
+            border-bottom: 2px solid #d9d9d9 !important;
+            outline: 1px solid #d9d9d9;
+            outline-offset: -1px;
+            text-align: center !important;
+            padding: 8px 4px !important;
+        }
+        
+        .timesheet-table td.fixed-col-1 {
+            position: -webkit-sticky;
+            position: sticky;
+            left: 0;
+            background-color: white;
+            z-index: 110;
+            border: 1px solid #e8e8e8 !important;
+            outline: 1px solid #d9d9d9;
+            outline-offset: -1px;
+        }
+        
+        /* 固定第二列 - 姓名 */
+        .timesheet-table th.fixed-col-2 {
+            position: -webkit-sticky;
+            position: sticky;
+            left: 40px;
+            top: 0;
+            background-color: #f0f2f5 !important;
+            z-index: 129;
+            border: 1px solid #e8e8e8 !important;
+            border-bottom: 2px solid #d9d9d9 !important;
+            outline: 1px solid #d9d9d9;
+            outline-offset: -1px;
+        }
+        
+        .timesheet-table td.fixed-col-2 {
+            position: -webkit-sticky;
+            position: sticky;
+            left: 40px;
+            background-color: white;
+            z-index: 109;
+            border: 1px solid #e8e8e8 !important;
+            outline: 1px solid #d9d9d9;
+            outline-offset: -1px;
+            text-align: left !important;
+            padding-left: 8px !important;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            max-width: 60px;
+        }
+        
+        /* 固定第三列 - 类型 */
+        .timesheet-table th.fixed-col-3 {
+            position: -webkit-sticky;
+            position: sticky;
+            left: 100px;
+            top: 0;
+            background-color: #f0f2f5 !important;
+            z-index: 128;
+            border: 1px solid #e8e8e8 !important;
+            border-bottom: 2px solid #d9d9d9 !important;
+            outline: 1px solid #d9d9d9;
+            outline-offset: -1px;
+            white-space: nowrap !important;
+        }
+        
+        .timesheet-table td.fixed-col-3 {
+            position: -webkit-sticky;
+            position: sticky;
+            left: 100px;
+            background-color: white;
+            z-index: 108;
+            border: 1px solid #e8e8e8 !important;
+            outline: 1px solid #d9d9d9;
+            outline-offset: -1px;
+            white-space: nowrap !important;
+        }
+        
+        /* 固定第四列 - 总计 */
+        .timesheet-table th.fixed-col-4 {
+            position: -webkit-sticky;
+            position: sticky;
+            left: 150px;
+            top: 0;
+            background-color: #f0f2f5 !important;
+            z-index: 127;
+            border: 1px solid #e8e8e8 !important;
+            border-bottom: 2px solid #d9d9d9 !important;
+            outline: 1px solid #d9d9d9;
+            outline-offset: -1px;
+        }
+        
+        .timesheet-table td.fixed-col-4 {
+            position: -webkit-sticky;
+            position: sticky;
+            left: 150px;
+            background-color: white;
+            z-index: 107;
+            border: 1px solid #e8e8e8 !important;
+            outline: 1px solid #d9d9d9;
+            outline-offset: -1px;
+        }
+        
+        /* 确保固定列的宽度和边框 */
+        .timesheet-table .fixed-col-1 {
+            min-width: 40px;
+            max-width: 40px;
+        }
+        
+        .timesheet-table .fixed-col-2 {
+            min-width: 60px;
+            max-width: 60px;
+        }
+        
+        /* 类型列特殊处理 */
+        .timesheet-table th.fixed-col-3,
+        .timesheet-table td.fixed-col-3 {
+            min-width: 50px;
+            max-width: 50px;
+        }
+        
+        /* 确保总计列与类型列对齐 */
+        .timesheet-table th.fixed-col-4,
+        .timesheet-table td.fixed-col-4 {
+            min-width: 70px;
+            max-width: 70px;
+        }
+        
+        .timesheet-table .fixed-col {
+            border-right: 2px solid #d9d9d9;
+        }
+        
+        /* 确保固定列在偶数行保持白色背景 - 移除此规则，改用上面的奇偶员工类名控制 */
+        /* .timesheet-table tr:nth-child(even) td.fixed-col,
+        .timesheet-table tr:nth-child(even) th.fixed-col {
+            background-color: white !important;
+        } */
+
+        /* JS控制的悬停效果：当前行及关联的固定列变浅蓝色 */
+        /* 优先级必须高于偶数行和普通固定列背景 */
+        /* 极大提高权重，确保覆盖 .timesheet-table tr:nth-child(even) td.fixed-col (0-3-2) */
+        .timesheet-table tbody tr td.highlight-row,
+        .timesheet-table tbody tr th.highlight-row,
+        .timesheet-table tbody tr td.fixed-col.highlight-row,
+        /* 适配新的类名选择器 */
+        .timesheet-table tbody tr.even-employee-row td.fixed-col.highlight-row,
+        .timesheet-table tbody tr.even-employee-row td.highlight-row,
+        .timesheet-table tbody tr.odd-employee-row td.fixed-col.highlight-row,
+        .timesheet-table tbody tr.odd-employee-row td.highlight-row {
+            background-color: #e6f7ff !important; /* Ant Design Light Blue */
+        }
+
+
+
+        /* 确保表头固定列在hover时保持背景色 */
+        .timesheet-table th.fixed-col-1:hover,
+        .timesheet-table th.fixed-col-2:hover,
+        .timesheet-table th.fixed-col-3:hover,
+        .timesheet-table th.fixed-col-4:hover {
+            background-color: #f0f2f5 !important;
+        }
+
+        /* 确保表体固定列在hover时保持白色背景 */
+        .timesheet-table td.fixed-col-1:hover,
+        .timesheet-table td.fixed-col-2:hover,
+        .timesheet-table td.fixed-col-3:hover,
+        .timesheet-table td.fixed-col-4:hover {
+            background-color: white !important;
+        }
+
+        /* 可滚动列 */
+        .timesheet-table .scrollable-col {
+            min-width: 40px;
+        }
+
+        /* 行样式 - 移除之前的 nth-child 规则 */
+        /* .timesheet-table tr:nth-child(even) {
+            background-color: #fafafa;
+        } */
+        
+        /* 奇数员工行背景色 - 白色 */
+        .timesheet-table tr.odd-employee-row {
+            background-color: white;
+        }
+        
+        /* 偶数员工行背景色 - 淡蓝灰色 (Ant Design 标准背景色，对比更明显且护眼) */
+        .timesheet-table tr.even-employee-row {
+            background-color: #f0f2f5;
+        }
+
+        /* 确保固定列背景色跟随行背景色 */
+        /* 奇数员工的固定列 - 白色 */
+        .timesheet-table tr.odd-employee-row td.fixed-col,
+        .timesheet-table tr.odd-employee-row th.fixed-col {
+            background-color: white !important;
+        }
+
+        /* 偶数员工的固定列 - 淡蓝灰色 */
+        .timesheet-table tr.even-employee-row td.fixed-col,
+        .timesheet-table tr.even-employee-row th.fixed-col {
+            background-color: #f0f2f5 !important;
+        }
+
+        /* 确保行背景色不会影响固定列（偶数行） - 修改规则以适配新逻辑 */
+        /* 移除旧的规则，使用新的类名控制 */
+        /* .timesheet-table tr:nth-child(even) td:nth-child(-n+4),
+        .timesheet-table tr:nth-child(even) th:nth-child(-n+4) {
+            background-color: white !important;
+        } */
+
+        /* 确保表格容器有正确的滚动行为 */
+        .timesheet-table-container {
+            -webkit-overflow-scrolling: touch; /* iOS 平滑滚动 */
+            scroll-behavior: smooth;
+        }
+        
+        /* 表格内容样式 */
+        .timesheet-table .total-row {
+            background-color: #f0f0f0;
+            font-weight: bold;
+        }
+        
+        /* 总计行固定列样式 */
+        .timesheet-table .total-row .fixed-col {
+            background-color: #f0f0f0 !important;
+        }
+
+        /* 日期列单元格可点击样式 */
+        .timesheet-table td.scrollable-col {
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .timesheet-table td.scrollable-col:hover {
+            background-color: #e6f7ff !important;
+        }
+
+        /* 特殊单元格悬停效果：日期列和总计列变深蓝 */
+        /* 使用更高优先级覆盖行的浅蓝背景 */
+        /* 增加权重以覆盖 .highlight-row */
+        .timesheet-table tbody tr td.fixed-col-4:hover,
+        .timesheet-table tbody tr td.scrollable-col:hover,
+        .timesheet-table tbody tr td.fixed-col-4.highlight-row:hover,
+        .timesheet-table tbody tr td.scrollable-col.highlight-row:hover,
+        /* 适配新的类名选择器 */
+        .timesheet-table tbody tr.even-employee-row td.scrollable-col.highlight-row:hover,
+        .timesheet-table tbody tr.odd-employee-row td.scrollable-col.highlight-row:hover {
+            background-color: #1890ff !important; /* Primary Blue */
+            color: white !important;
+        }
+
+        /* 下载侧边栏样式 */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .sidebar-overlay.active {
+            display: block;
+            opacity: 1;
+        }
+
+        .sidebar {
+            position: fixed;
+            top: 0;
+            right: -320px;
+            width: 320px;
+            height: 100%;
+            background-color: white;
+            z-index: 2001;
+            box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
+            transition: right 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar.active {
+            right: 0;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid #e8e8e8;
+            font-size: 16px;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .sidebar-content {
+            padding: 24px;
+            flex: 1;
+        }
+
+        .form-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .form-label {
+            width: 80px;
+            text-align: right;
+            margin-right: 16px;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .form-label .required {
+            color: #ff4d4f;
+            margin-right: 4px;
+        }
+
+        .form-input-wrapper {
+            flex: 1;
+            position: relative;
+        }
+
+        .form-input {
+            width: 100%;
+            height: 36px;
+            padding: 0 12px;
+            background: linear-gradient(135deg, rgba(230, 247, 255, 0.8), rgba(240, 250, 255, 0.6));
+            border: 1px solid #91d5ff;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #333;
+            outline: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 1px 2px rgba(24, 144, 255, 0.1);
+            cursor: pointer;
+        }
+        
+        .form-input:hover {
+            background: linear-gradient(135deg, rgba(24, 144, 255, 0.9), rgba(64, 169, 255, 0.8));
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
+            border-color: #1890ff;
+        }
+        
+        .form-input:focus {
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        .form-input:hover ~ .input-icon {
+            color: white;
+        }
+
+        .input-icon {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #bfbfbf;
+            pointer-events: none;
+            width: 16px;
+            height: 16px;
+            transition: color 0.3s;
+        }
+
+        /* 开关样式 */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 70px;
+            height: 28px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #bfbfbf;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 24px;
+            width: 24px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+            z-index: 2;
+        }
+
+        .slider-text {
+            position: absolute;
+            color: white;
+            font-size: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 100%;
+            text-align: center;
+            pointer-events: none;
+            transition: opacity 0.4s;
+            line-height: 1;
+        }
+
+        .slider-text.on {
+            left: -10px;
+            opacity: 0;
+        }
+
+        .slider-text.off {
+            right: -10px;
+            opacity: 1;
+        }
+
+        input:checked + .slider {
+            background-color: #1890ff;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(42px);
+        }
+
+        input:checked + .slider .slider-text.on {
+            opacity: 1;
+        }
+
+        input:checked + .slider .slider-text.off {
+            opacity: 0;
+        }
+
+        .sidebar-footer {
+            margin-top: 20px;
+            padding-left: 40px;
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            height: 36px;
+            padding: 0 20px;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background-color: #1890ff;
+            color: white;
+            border-color: #1890ff;
+        }
+
+        .btn-primary:hover {
+            background-color: #40a9ff;
+            border-color: #40a9ff;
+        }
+
+        .btn-default {
+            background-color: white;
+            color: #666;
+            border-color: #d9d9d9;
+        }
+
+        .btn-default:hover {
+            color: #40a9ff;
+            border-color: #40a9ff;
+        }
+
+        /* Date Picker Styles */
+        .date-picker-dropdown {
+            position: fixed;
+            z-index: 2002;
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            width: 250px;
+            font-size: 13px;
+            display: none;
+            border: 1px solid #e8e8e8;
+        }
+
+        .date-picker-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .date-picker-header span {
+            cursor: pointer;
+            user-select: none;
+            padding: 0 4px;
+            color: #999;
+        }
+        
+        .date-picker-header span:hover {
+            color: #1890ff;
+        }
+
+        .current-year-month {
+            font-weight: bold;
+            color: #333 !important;
+            font-size: 14px;
+        }
+
+        .date-picker-body {
+            padding: 8px;
+        }
+
+        .weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            text-align: center;
+            margin-bottom: 6px;
+            color: #666;
+            font-size: 12px;
+        }
+
+        .days-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+        }
+
+        .day-cell {
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+            border: 1px solid #f0f0f0; /* 添加网格线 */
+        }
+
+        .day-cell:hover {
+            background-color: #f5f5f5;
+            border-color: #d9d9d9;
+        }
+
+        .day-cell.current-month {
+            color: #333;
+        }
+
+        .day-cell.prev-month, .day-cell.next-month {
+            color: #ccc;
+        }
+
+        .day-cell.selected {
+            background-color: #1890ff;
+            color: white;
+            border-color: #1890ff;
+            border-radius: 8px; /* 加大圆角 */
+        }
+        
+        .day-cell.today {
+            border: 1px solid #1890ff;
+            border-radius: 8px; /* 加大圆角 */
+            font-weight: bold;
+        }
+
+        .day-cell.disabled {
+            color: #d9d9d9;
+            background-color: #f5f5f5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        .date-picker-footer {
+            padding: 8px;
+            border-top: 1px solid #f0f0f0;
+            text-align: center;
+        }
+
+        .today-btn {
+            color: #1890ff;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        
+        .today-btn:hover {
+            color: #40a9ff;
+        }
+
+        /* 筛选按钮样式 */
+        .filter-btn {
+            background: linear-gradient(135deg, rgba(230, 247, 255, 0.8), rgba(240, 250, 255, 0.6));
+            border: 1px solid #91d5ff;
+            border-radius: 4px;
+            padding: 0 15px 0 8px; /* 进一步减小内边距 */
+            cursor: pointer;
+            font-size: 13px; /* 稍微减小字体 */
+            color: #333;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 1px 2px rgba(24, 144, 255, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            position: relative;
+            height: 36px; /* 与下载按钮高度一致 */
+        }
+        
+        .filter-btn:hover {
+            background: linear-gradient(135deg, rgba(24, 144, 255, 0.9), rgba(64, 169, 255, 0.8));
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
+            border-color: #1890ff;
+        }
+
+        /* 员工列表模态框样式 */
+        #employeeListModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 3000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #employeeListModal.sidebar-mode {
+            justify-content: flex-end;
+        }
+        
+        #employeeListModal .modal-content {
+            background-color: white;
+            border-radius: 12px;
+            width: 330px; /* 增加宽度 */
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            margin: 0;
+            animation: slideUp 0.3s ease;
+        }
+        
+        #employeeListModal .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 15px;
+            flex-shrink: 0;
+            position: relative;
+        }
+        
+        #employeeListModal .modal-title {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: #343a40;
+            align-self: flex-start;
+        }
+        
+        /* 搜索图标样式 */
+        .search-icon {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #adb5bd;
+            font-size: 14px;
+            pointer-events: none;
+        }
+        
+        /* 筛选输入框样式 */
+        #employeeSearchInput {
+            padding: 8px 12px 8px 32px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+            width: 140px; /* 增加宽度 */
+            outline: none;
+        }
+        
+        #employeeSearchInput::placeholder {
+            color: #adb5bd;
+            font-size: 12px;
+        }
+        
+        #employeeSearchInput:focus {
+            outline: none;
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+        
+        #employeeListModal .modal-header-actions {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            align-items: center;
+        }
+        
+        #employeeListModal .modal-header-select-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        #employeeListModal .modal-header-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        #employeeListModal .close-btn {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #94a3b8;
+            transition: all 0.3s ease;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            padding: 0;
+            z-index: 1000;
+            position: relative;
+        }
+        
+        #employeeListModal .close-btn:hover {
+            color: #ef4444;
+            background-color: #fee2e2;
+            transform: rotate(90deg);
+        }
+        
+        #employeeListModal .modal-body {
+            padding: 20px;
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        /* 员工列表样式 */
+        #employeeList {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .employee-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 20px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            font-size: 14px;
+            height: auto;
+        }
+        
+        .employee-item:hover {
+            background-color: #f8f9fa;
+            border-color: #1890ff;
+        }
+        
+        .employee-item.selected {
+            background: none;
+            border-color: #e9ecef;
+        }
+        
+        .employee-item.selected .employee-id::after {
+            content: '✓';
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 18px;
+            height: 18px;
+            background-color: #f5222d;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 10;
+        }
+        
+        .employee-info {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            position: relative;
+            width: 100%;
+        }
+        
+        .employee-details {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            flex: 1;
+        }
+        
+        .employee-id {
+            background-color: #f0f0f0;
+            color: #666;
+            width: 45px;
+            height: 45px;
+            border-radius: 3px;
+            font-size: 16px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
+            position: relative;
+        }
+        
+        .employee-phone {
+            color: #6c757d;
+            font-size: 12px;
+            margin-top: 2px;
+        }
+        
+        .employee-status {
+            color: #f5222d;
+            font-size: 12px;
+            padding: 4px 8px;
+            background-color: #fff1f0;
+            border: 1px solid #ffccc7;
+            border-radius: 4px;
+        }
+        
+        .employee-item.selected .employee-id {
+            background-color: #1890ff;
+            color: white;
+            border: 2px solid #ff7a45;
+        }
+        
+        .employee-name {
+            color: #343a40;
+            font-size: 16px;
+        }
+        
+        #employeeListModal .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        #employeeListModal .btn-primary {
+            background-color: #1890ff;
+            color: white;
+        }
+        
+        #employeeListModal .btn-primary:hover {
+            background-color: #40a9ff;
+        }
+        
+        #employeeListModal .btn-secondary {
+            background-color: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #bbdefb;
+        }
+        
+        #employeeListModal .btn-secondary:hover {
+            background-color: #bbdefb;
+            color: #1565c0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="date-section">
+                <span class="date-display" id="currentDate">加载中...</span>
+                <svg class="calendar-icon" id="calendarIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+            </div>
+            <!-- 员工列表按钮 -->
+            <div style="position: relative;">
+                <button id="employeeListBtn" class="filter-btn">全部员工 ▼</button>
+                <span id="employeeClearBtn" class="clear-btn" style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #999; font-size: 18px; display: none; font-weight: bold;">✕</span>
+            </div>
+            <button class="download-btn">下载</button>
+        </div>
+        
+        <!-- 记工表表格 -->
+        <div class="timesheet-table-container">
+            <table id="timesheetTable" class="timesheet-table">
+                <thead>
+                    <tr>
+                        <th class="fixed-col-1" style="width: 40px; min-width: 40px; max-width: 40px;">工号</th>
+                        <th class="fixed-col-2" style="width: 60px; min-width: 60px; max-width: 60px;">姓名</th>
+                        <th class="fixed-col-3" style="width: 50px; min-width: 50px; max-width: 50px;">类型</th>
+                        <th class="fixed-col-4" style="width: 70px; min-width: 70px; max-width: 70px;">总计</th>
+                        <!-- 日期列将通过JavaScript动态生成 -->
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- 表格内容将通过JavaScript动态生成或手动添加 -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 下载侧边栏 -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <div class="sidebar" id="downloadSidebar">
+        <div class="sidebar-header">
+            下载报表设置
+        </div>
+        <div class="sidebar-content">
+            <div class="form-item">
+                <label class="form-label"><span class="required">*</span>开始日期</label>
+                <div class="form-input-wrapper">
+                    <input type="text" class="form-input" id="startDate" value="2026年01月01日" readonly>
+                    <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                </div>
+            </div>
+            <div class="form-item">
+                <label class="form-label"><span class="required">*</span>结束日期</label>
+                <div class="form-input-wrapper">
+                    <input type="text" class="form-input" id="endDate" value="2026年01月25日" readonly>
+                    <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                </div>
+            </div>
+            <div class="form-item">
+                <label class="form-label"><span class="required">*</span>员工选择</label>
+                <div class="form-input-wrapper">
+                    <div style="position: relative;">
+                        <button id="exportEmployeeListBtn" class="filter-btn" style="width: 100%; justify-content: space-between;">全部员工 ▼</button>
+                        <span id="exportEmployeeClearBtn" class="clear-btn" style="position: absolute; right: 30px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #999; font-size: 18px; display: none; font-weight: bold; z-index: 10;">✕</span>
+                    </div>
+                </div>
+            </div>
+            <div class="form-item">
+                <label class="form-label"><span class="required">*</span>结算输出</label>
+                <label class="switch">
+                    <input type="checkbox" id="settlementOutput" checked>
+                    <span class="slider">
+                        <span class="slider-text on">输出</span>
+                        <span class="slider-text off">隐藏</span>
+                    </span>
+                </label>
+            </div>
+            <div class="form-item">
+                <label class="form-label"><span class="required">*</span>展示工资</label>
+                <label class="switch">
+                    <input type="checkbox" id="showSalary" checked>
+                    <span class="slider">
+                        <span class="slider-text on">展示</span>
+                        <span class="slider-text off">隐藏</span>
+                    </span>
+                </label>
+            </div>
+            <div class="sidebar-footer">
+                <button class="btn btn-primary">下载报表</button>
+                <button class="btn btn-default" id="cancelSidebar">取 消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Date Picker Dropdown -->
+    <div class="date-picker-dropdown" id="datePicker">
+        <div class="date-picker-header">
+            <span class="year-prev-btn" id="pickerPrevYear" title="上一年">&lt;&lt;</span>
+            <span class="month-prev-btn" id="pickerPrevMonth" title="上个月">&lt;</span>
+            <span class="current-year-month" id="pickerCurrentMonth">2026年 1月</span>
+            <span class="month-next-btn" id="pickerNextMonth" title="下个月">&gt;</span>
+            <span class="year-next-btn" id="pickerNextYear" title="下一年">&gt;&gt;</span>
+        </div>
+        <div class="date-picker-body">
+            <div class="weekdays">
+                <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+            </div>
+            <div class="days-grid" id="daysGrid">
+                <!-- JS generated -->
+            </div>
+        </div>
+        <div class="date-picker-footer">
+            <span class="today-btn" id="pickerTodayBtn">今天</span>
+        </div>
+    </div>
+
+    <!-- 日期选择模态框 -->
+    <div id="dateModal" class="modal">
+        <div class="modal-content">
+            <!-- 年份选择栏 -->
+            <div class="year-selector">
+                <button class="year-btn" id="prevYear">&lt;</button>
+                <span class="year-display" id="modalYear">加载中...</span>
+                <button class="year-btn" id="nextYear">&gt;</button>
+            </div>
+            <!-- 月份选择网格 -->
+            <div class="month-grid">
+                <button class="month-btn" data-month="0">1月</button>
+                <button class="month-btn" data-month="1">2月</button>
+                <button class="month-btn" data-month="2">3月</button>
+                <button class="month-btn" data-month="3">4月</button>
+                <button class="month-btn" data-month="4">5月</button>
+                <button class="month-btn" data-month="5">6月</button>
+                <button class="month-btn" data-month="6">7月</button>
+                <button class="month-btn" data-month="7">8月</button>
+                <button class="month-btn" data-month="8">9月</button>
+                <button class="month-btn" data-month="9">10月</button>
+                <button class="month-btn" data-month="10">11月</button>
+                <button class="month-btn" data-month="11">12月</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 员工列表模态框 -->
+    <div id="employeeListModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div style="position: absolute; top: 15px; right: 20px;">
+                    <button type="button" class="close-btn" id="closeEmployeeListModal">&times;</button>
+                </div>
+                <div style="display: flex; align-items: center; width: 100%;">
+                    <h5 class="modal-title">选择员工</h5>
+                    <div style="position: relative; margin-left: 20px;">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="employeeSearchInput" placeholder="请输入工号或姓名">
+                    </div>
+                </div>
+                <div class="modal-header-actions">
+                    <div class="modal-header-select-buttons">
+                        <button type="button" class="btn btn-secondary" id="selectAllEmployees">全选</button>
+                        <button type="button" class="btn btn-secondary" id="resetEmployeeSelection">重置</button>
+                    </div>
+                    <div class="modal-header-buttons">
+                        <button type="button" class="btn btn-secondary" id="toggleSettledEmployees" title="显示/隐藏结清员工">
+                            <span style="font-size: 16px;">👁️</span>
+                        </button>
+                        <button type="button" class="btn btn-primary" id="confirmEmployeeSelection">确定</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div id="employeeList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const modal = document.getElementById('dateModal');
+        const calendarIcon = document.getElementById('calendarIcon');
+        const dateDisplay = document.getElementById('currentDate');
+        const prevYearBtn = document.getElementById('prevYear');
+        const nextYearBtn = document.getElementById('nextYear');
+        const modalYear = document.getElementById('modalYear');
+        const monthBtns = document.querySelectorAll('.month-btn');
+
+        // 当前选择的日期 - 默认为当前月份
+        const today = new Date();
+        let currentYear = today.getFullYear();
+        let currentMonth = today.getMonth(); // 0-11表示1-12月
+
+        // 获取月份天数
+        function getDaysInMonth(year, month) {
+            return new Date(year, month + 1, 0).getDate();
+        }
+        
+        // 生成日期列
+        function generateDateColumns() {
+            const table = document.getElementById('timesheetTable');
+            const thead = table.querySelector('thead tr');
+            
+            // 移除已有的日期列（保留前4列：工号、姓名、类型、总计）
+            const existingDateColumns = thead.querySelectorAll('th:nth-child(n+5)');
+            existingDateColumns.forEach(col => col.remove());
+            
+            // 计算当前月份的天数
+            const days = getDaysInMonth(currentYear, currentMonth);
+            
+            // 生成日期列
+            for (let i = 1; i <= days; i++) {
+                // 生成表头日期列
+                const th = document.createElement('th');
+                th.className = 'scrollable-col';
+                th.textContent = i + '日';
+                thead.appendChild(th);
+            }
+        }
+
+        // 下载侧边栏逻辑
+        const downloadBtn = document.querySelector('.download-btn');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+        const downloadSidebar = document.getElementById('downloadSidebar');
+        const cancelSidebarBtn = document.getElementById('cancelSidebar');
+
+        function openSidebar() {
+            sidebarOverlay.classList.add('active');
+            downloadSidebar.classList.add('active');
+        }
+
+        function closeSidebar() {
+            sidebarOverlay.classList.remove('active');
+            downloadSidebar.classList.remove('active');
+        }
+
+        downloadBtn.addEventListener('click', openSidebar);
+        cancelSidebarBtn.addEventListener('click', closeSidebar);
+        sidebarOverlay.addEventListener('click', closeSidebar);
+
+        // 结算输出联动展示工资
+        const settlementOutputSwitch = document.getElementById('settlementOutput');
+        const showSalarySwitch = document.getElementById('showSalary');
+
+        settlementOutputSwitch.addEventListener('change', function() {
+            if (this.checked) {
+                // 如果结算输出开启，展示工资也开启
+                showSalarySwitch.checked = true;
+            } else {
+                // 如果结算输出关闭，展示工资也关闭
+                showSalarySwitch.checked = false;
+            }
+        });
+
+        // 确认下载按钮点击事件
+        const confirmDownloadBtn = document.querySelector('#downloadSidebar .btn-primary');
+        confirmDownloadBtn.addEventListener('click', function() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const showSalary = document.getElementById('showSalary').checked;
+            const settlementOutput = document.getElementById('settlementOutput').checked;
+            
+            // 获取导出的选中员工，如果是空数组则传null或空数组，表示全部
+            const filterEmployees = window.exportSelectedEmployees && window.exportSelectedEmployees.length > 0 
+                ? window.exportSelectedEmployees 
+                : null;
+
+            if (window.timesheetExportService) {
+                const originalText = confirmDownloadBtn.textContent;
+                confirmDownloadBtn.textContent = '生成中...';
+                confirmDownloadBtn.disabled = true;
+                
+                setTimeout(async () => {
+                    try {
+                        await window.timesheetExportService.exportReport(startDate, endDate, showSalary, settlementOutput, filterEmployees);
+                        closeSidebar();
+                    } catch (e) {
+                        console.error(e);
+                        alert('导出失败：' + e.message);
+                    } finally {
+                        confirmDownloadBtn.textContent = originalText;
+                        confirmDownloadBtn.disabled = false;
+                    }
+                }, 50);
+            } else {
+                alert('导出服务未加载，请刷新页面重试');
+            }
+        });
+
+        // 员工筛选相关逻辑
+        let originalEmployees = [];
+        let showSettledEmployees = false;
+        window.currentSelectedEmployees = []; // 全局变量，供service使用
+        window.exportSelectedEmployees = []; // 导出用的选中员工
+
+        // 设置员工列表按钮事件
+        function setupEmployeeListEvents() {
+            const employeeListBtn = document.getElementById('employeeListBtn');
+            const exportEmployeeListBtn = document.getElementById('exportEmployeeListBtn');
+            const employeeListModal = document.getElementById('employeeListModal');
+            const closeBtn = document.getElementById('closeEmployeeListModal');
+            const confirmBtn = document.getElementById('confirmEmployeeSelection');
+            const selectAllBtn = document.getElementById('selectAllEmployees');
+            const resetBtn = document.getElementById('resetEmployeeSelection');
+            const toggleSettledBtn = document.getElementById('toggleSettledEmployees');
+            const employeeClearBtn = document.getElementById('employeeClearBtn');
+            const exportEmployeeClearBtn = document.getElementById('exportEmployeeClearBtn');
+            
+            // 当前操作的上下文：'main' 表示主界面，'export' 表示导出侧边栏
+            let currentSelectionContext = 'main';
+
+            // 显示员工列表模态框 - 主界面
+            employeeListBtn.addEventListener('click', function() {
+                currentSelectionContext = 'main';
+                // 标记活跃按钮
+                exportEmployeeListBtn.setAttribute('data-active', 'false');
+                employeeListBtn.setAttribute('data-active', 'true');
+                
+                // 移除侧边栏模式类
+                employeeListModal.classList.remove('sidebar-mode');
+                
+                employeeListModal.style.display = 'flex';
+                loadEmployees('main');
+            });
+
+            // 显示员工列表模态框 - 导出侧边栏
+            exportEmployeeListBtn.addEventListener('click', function() {
+                currentSelectionContext = 'export';
+                // 标记活跃按钮
+                employeeListBtn.setAttribute('data-active', 'false');
+                exportEmployeeListBtn.setAttribute('data-active', 'true');
+                
+                // 添加侧边栏模式类
+                employeeListModal.classList.add('sidebar-mode');
+                
+                employeeListModal.style.display = 'flex';
+                loadEmployees('export');
+            });
+            
+            // 员工清除按钮点击事件 - 主界面
+            employeeClearBtn.addEventListener('click', function(e) {
+                e.stopPropagation(); 
+                handleSelectedEmployees([], true, 'main');
+                if (window.loadAndFillTimesheet) {
+                    window.loadAndFillTimesheet();
+                }
+            });
+
+            // 员工清除按钮点击事件 - 导出侧边栏
+            exportEmployeeClearBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                handleSelectedEmployees([], true, 'export');
+            });
+            
+            // 关闭模态框
+            function closeModal() {
+                employeeListModal.style.display = 'none';
+                employeeListModal.classList.remove('sidebar-mode');
+            }
+            
+            // 关闭按钮点击事件
+            closeBtn.addEventListener('click', function() {
+                closeModal();
+            });
+            
+            // 确定按钮点击事件
+            confirmBtn.addEventListener('click', function() {
+                // 获取所有员工和选中的员工
+                const allEmployees = document.querySelectorAll('.employee-item');
+                const selectedEmployeeItems = Array.from(document.querySelectorAll('.employee-item.selected'));
+                
+                // 判断是否全部选中
+                const isAllSelected = allEmployees.length > 0 && selectedEmployeeItems.length === allEmployees.length;
+                
+                // 处理选中的员工
+                const selectedEmployees = selectedEmployeeItems.map(item => ({
+                    id: item.dataset.id,
+                    name: item.dataset.name,
+                    empCode: item.dataset.empCode
+                }));
+                
+                handleSelectedEmployees(selectedEmployees, isAllSelected, currentSelectionContext);
+                
+                // 关闭模态框
+                closeModal();
+                
+                // 只有主界面上下文才需要重新加载表格
+                if (currentSelectionContext === 'main' && window.loadAndFillTimesheet) {
+                    window.loadAndFillTimesheet();
+                }
+            });
+            
+            // 全选按钮点击事件
+            selectAllBtn.addEventListener('click', function() {
+                const employeeItems = document.querySelectorAll('.employee-item');
+                const allSelected = Array.from(employeeItems).every(item => item.classList.contains('selected'));
+                
+                if (allSelected) {
+                    // 取消全选
+                    employeeItems.forEach(item => {
+                        item.classList.remove('selected');
+                    });
+                    selectAllBtn.textContent = '全选';
+                } else {
+                    // 全选
+                    employeeItems.forEach(item => {
+                        item.classList.add('selected');
+                    });
+                    selectAllBtn.textContent = '取消全选';
+                }
+            });
+            
+            // 重置按钮点击事件
+            resetBtn.addEventListener('click', function() {
+                const employeeItems = document.querySelectorAll('.employee-item');
+                employeeItems.forEach(item => {
+                    item.classList.remove('selected');
+                });
+                // 更新全选按钮文本
+                updateSelectAllButton();
+            });
+            
+        // 切换显示结清员工按钮点击事件
+            toggleSettledBtn.addEventListener('click', function() {
+                // 切换状态
+                showSettledEmployees = !showSettledEmployees;
+                
+                // 更新按钮样式或图标
+                const icon = this.querySelector('span');
+                if (showSettledEmployees) {
+                    icon.textContent = '👁️‍🗨️'; // 睁眼带斜杠，表示隐藏
+                    this.title = '隐藏结清员工';
+                } else {
+                    icon.textContent = '👁️'; // 睁眼，表示显示
+                    this.title = '显示结清员工';
+                }
+                
+                // 重新加载员工列表，使用当前上下文
+                loadEmployees(currentSelectionContext);
+            });
+            
+            // 点击模态框外部关闭
+            employeeListModal.addEventListener('click', function(e) {
+                if (e.target === employeeListModal) {
+                    closeModal();
+                }
+            });
+            
+            // 初始化搜索功能
+            initEmployeeSearch();
+        }
+
+        // 加载员工数据
+        function loadEmployees(context = 'main') {
+            const employeeList = document.getElementById('employeeList');
+            employeeList.innerHTML = '<div style="text-align: center; color: #6c757d; padding: 20px;">加载中...</div>';
+            
+            try {
+                // 使用TimesheetDataService获取员工数据
+                // 注意：getEmployeesByProject是同步的，但如果是从localStorage获取，也可以视为同步
+                // 为了兼容性，我们获取当前项目ID
+                let projectId = '';
+                if (window.TimesheetDataService) {
+                    projectId = window.TimesheetDataService.getCurrentProjectId();
+                } else {
+                    projectId = localStorage.getItem('currentProjectId');
+                }
+                
+                if (!projectId) {
+                    employeeList.innerHTML = '<div style="text-align: center; color: #6c757d; padding: 20px;">未选择项目</div>';
+                    return;
+                }
+                
+                // 获取员工数据
+                let employees = [];
+                if (window.TimesheetDataService) {
+                    employees = window.TimesheetDataService.getEmployeesByProject(projectId);
+                    
+                    // --- 过滤逻辑：只保留有考勤记录或有结算记录的员工，且记录日期在筛选范围内 ---
+                    const allAttendance = window.TimesheetDataService.getAttendanceRecords() || [];
+                    const allSettlement = window.TimesheetDataService.getSettlementRecords() || [];
+                    
+                    // 获取日期筛选范围
+                    let startDate = null;
+                    let endDate = null;
+                    
+                    // 根据上下文获取不同的日期范围
+                    if (context === 'export') {
+                        // 导出侧边栏使用侧边栏的日期选择器
+                        const startDateVal = document.getElementById('startDate').value;
+                        const endDateVal = document.getElementById('endDate').value;
+                        if (startDateVal && endDateVal) {
+                            startDate = new Date(startDateVal.replace(/年|月/g, '-').replace('日', ''));
+                            endDate = new Date(endDateVal.replace(/年|月/g, '-').replace('日', ''));
+                        }
+                    } else {
+                        // 主界面使用顶部的日期选择器
+                        const currentDateText = document.getElementById('currentDate').textContent;
+                        const match = currentDateText.match(/(\d{4})年(\d{1,2})月/);
+                        if (match) {
+                            const year = parseInt(match[1]);
+                            const month = parseInt(match[2]) - 1; // JS月份从0开始
+                            // 主界面通常显示整个月的记录，所以范围是该月第一天到最后一天
+                            startDate = new Date(year, month, 1);
+                            endDate = new Date(year, month + 1, 0); // 下个月第0天即为本月最后一天
+                        }
+                    }
+                    
+                    // 获取当前项目中有符合日期范围记录的员工ID集合
+                    const activeEmployeeIds = new Set();
+                    
+                    // 检查考勤记录
+                    allAttendance.forEach(record => {
+                        const pId = record.project_id || record.projectId;
+                        const eId = record.employee_id || record.employeeId || record.emp_id;
+                        
+                        // 检查项目匹配
+                        if (String(pId) !== String(projectId) || !eId) return;
+                        
+                        // 检查日期匹配
+                        if (startDate && endDate) {
+                            let recordDateStr = record.record_date;
+                            let recordDate = new Date(recordDateStr);
+                            
+                            // 处理中文日期格式
+                            if (isNaN(recordDate.getTime()) && typeof recordDateStr === 'string') {
+                                recordDateStr = recordDateStr.replace(/年|月/g, '-').replace('日', '');
+                                recordDate = new Date(recordDateStr);
+                            }
+                            
+                            // 如果日期无效，视为不匹配，跳过
+                            if (isNaN(recordDate.getTime())) return;
+                            
+                            // 重置时间部分以进行纯日期比较
+                            recordDate.setHours(0, 0, 0, 0);
+                            const compareStart = new Date(startDate);
+                            compareStart.setHours(0, 0, 0, 0);
+                            const compareEnd = new Date(endDate);
+                            compareEnd.setHours(0, 0, 0, 0);
+                            
+                            if (recordDate < compareStart || recordDate > compareEnd) return;
+                        }
+                        
+                        activeEmployeeIds.add(String(eId));
+                    });
+                    
+                    // 检查结算记录
+                    allSettlement.forEach(record => {
+                        const pId = record.project_id || record.projectId;
+                        const eId = record.employee_id || record.employeeId || record.emp_id;
+                        
+                        // 检查项目匹配
+                        if (String(pId) !== String(projectId) || !eId) return;
+                        
+                        // 检查日期匹配
+                        if (startDate && endDate) {
+                            let recordDateStr = record.record_date;
+                            let recordDate = new Date(recordDateStr);
+                            
+                            // 处理中文日期格式
+                            if (isNaN(recordDate.getTime()) && typeof recordDateStr === 'string') {
+                                recordDateStr = recordDateStr.replace(/年|月/g, '-').replace('日', '');
+                                recordDate = new Date(recordDateStr);
+                            }
+                            
+                            // 如果日期无效，视为不匹配，跳过
+                            if (isNaN(recordDate.getTime())) return;
+                            
+                            // 重置时间部分以进行纯日期比较
+                            recordDate.setHours(0, 0, 0, 0);
+                            const compareStart = new Date(startDate);
+                            compareStart.setHours(0, 0, 0, 0);
+                            const compareEnd = new Date(endDate);
+                            compareEnd.setHours(0, 0, 0, 0);
+                            
+                            if (recordDate < compareStart || recordDate > compareEnd) return;
+                        }
+                        
+                        activeEmployeeIds.add(String(eId));
+                    });
+                    
+                    // 过滤员工列表，只保留有记录的员工
+                    employees = employees.filter(emp => {
+                        const empId = emp.employee_id || emp.id;
+                        return activeEmployeeIds.has(String(empId));
+                    });
+                    // --- 过滤逻辑结束 ---
+                }
+                
+                // 保存原始员工数据
+                originalEmployees = employees;
+                
+                // 根据showSettledEmployees变量过滤员工数据
+                const filteredEmployees = showSettledEmployees ? employees : employees.filter(employee => {
+                    const status = employee.状态 || employee.status || '';
+                    return status !== '结清';
+                });
+                
+                // 渲染员工列表
+                renderEmployeeList(filteredEmployees, context);
+                
+            } catch (error) {
+                console.error('加载员工数据失败:', error);
+                employeeList.innerHTML = '<div style="text-align: center; color: #dc3545; padding: 20px;">加载员工数据失败</div>';
+            }
+        }
+
+        // 渲染员工列表
+        function renderEmployeeList(employees, context = 'main') {
+            const employeeList = document.getElementById('employeeList');
+            
+            if (employees.length === 0) {
+                employeeList.innerHTML = '<div style="text-align: center; color: #6c757d; padding: 20px;">暂无员工数据</div>';
+                return;
+            }
+            
+            // 按工号排序
+            employees.sort((a, b) => {
+                const codeA = parseInt(a.emp_code) || 0;
+                const codeB = parseInt(b.emp_code) || 0;
+                return codeA - codeB;
+            });
+            
+            let html = '';
+            employees.forEach(employee => {
+                const hasPhone = employee.phone && employee.phone.trim() !== '';
+                const status = employee.状态 || employee.status || '';
+                const showStatus = ['离职', '隐藏', '结清'].includes(status);
+                // 兼容不同字段名
+                const empId = employee.employee_id || employee.id;
+                const empName = employee.emp_name || employee.name;
+                const empCode = employee.emp_code || employee.empCode;
+                
+                html += `
+                    <div class="employee-item" data-id="${empId}" data-name="${empName}" data-emp-code="${empCode}">
+                        <div class="employee-info">
+                            <div class="employee-id">${empCode}</div>
+                            <div class="employee-details">
+                                <div class="employee-name">${empName}</div>
+                                ${hasPhone ? `<div class="employee-phone">${employee.phone}</div>` : ''}
+                            </div>
+                            ${showStatus ? `<div class="employee-status">${status}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            employeeList.innerHTML = html;
+            
+            // 恢复之前选中的员工状态
+            restoreSelectedEmployees(context);
+            
+            // 添加员工选择事件
+            addEmployeeSelectionEvents();
+        }
+        
+        // 添加员工选择事件
+        function addEmployeeSelectionEvents() {
+            const employeeItems = document.querySelectorAll('.employee-item');
+            
+            employeeItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    this.classList.toggle('selected');
+                    // 更新全选按钮状态
+                    updateSelectAllButton();
+                });
+            });
+        }
+        
+        // 更新全选按钮文本
+        function updateSelectAllButton() {
+            const selectAllBtn = document.getElementById('selectAllEmployees');
+            const employeeItems = document.querySelectorAll('.employee-item');
+            const allSelected = Array.from(employeeItems).every(item => item.classList.contains('selected'));
+            
+            selectAllBtn.textContent = allSelected ? '取消全选' : '全选';
+        }
+        
+        // 恢复之前选中的员工状态
+        function restoreSelectedEmployees(context = 'main') {
+            try {
+                // 根据上下文决定使用哪个变量
+                let selectedEmployees = [];
+                if (context === 'export') {
+                    selectedEmployees = window.exportSelectedEmployees || [];
+                } else {
+                    selectedEmployees = window.currentSelectedEmployees || [];
+                }
+
+                // 清除所有选中状态
+                const employeeItems = document.querySelectorAll('.employee-item');
+                employeeItems.forEach(item => item.classList.remove('selected'));
+                
+                if (selectedEmployees && selectedEmployees.length > 0) {
+                    employeeItems.forEach(item => {
+                        const empId = item.dataset.id;
+                        const isSelected = selectedEmployees.some(emp => (emp.id || emp.employee_id) === empId);
+                        if (isSelected) {
+                            item.classList.add('selected');
+                        }
+                    });
+                }
+                
+                // 更新全选按钮状态
+                updateSelectAllButton();
+            } catch (error) {
+                console.error('恢复选中员工状态失败:', error);
+            }
+        }
+        
+        // 初始化员工筛选功能
+        function initEmployeeSearch() {
+            const searchInput = document.getElementById('employeeSearchInput');
+            
+            // 添加输入事件监听器
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.trim().toLowerCase();
+                
+                // 先根据搜索词筛选员工
+                let filteredEmployees;
+                if (!searchTerm) {
+                    filteredEmployees = originalEmployees;
+                } else {
+                    filteredEmployees = originalEmployees.filter(employee => {
+                        const empCode = employee.emp_code || '';
+                        const empName = employee.emp_name || '';
+                        return empCode.toLowerCase().includes(searchTerm) || empName.toLowerCase().includes(searchTerm);
+                    });
+                }
+                
+                // 再根据showSettledEmployees变量筛选，排除结清的员工
+                if (!showSettledEmployees) {
+                    filteredEmployees = filteredEmployees.filter(employee => {
+                        const status = employee.状态 || employee.status || '';
+                        return status !== '结清';
+                    });
+                }
+                
+                renderEmployeeList(filteredEmployees);
+            });
+        }
+        
+        // 处理选中的员工
+        function handleSelectedEmployees(employees, isAllSelected = false, context = 'main') {
+            // 根据上下文更新不同的变量和按钮
+            if (context === 'export') {
+                const exportEmployeeListBtn = document.getElementById('exportEmployeeListBtn');
+                const exportEmployeeClearBtn = document.getElementById('exportEmployeeClearBtn');
+                
+                // 更新全局变量
+                if (isAllSelected) {
+                    window.exportSelectedEmployees = [];
+                    // 侧边栏的选择不需要保存到 localStorage，或者可以单独保存
+                } else {
+                    window.exportSelectedEmployees = employees;
+                }
+                
+                // 更新按钮文本
+                if (employees.length === 0 || isAllSelected) {
+                    exportEmployeeListBtn.textContent = '全部员工 ▼';
+                    exportEmployeeClearBtn.style.display = 'none';
+                } else {
+                    const employeeNames = employees.map(emp => emp.name || emp.emp_name);
+                    let displayText;
+                    if (employeeNames.length <= 2) {
+                        displayText = `${employeeNames.join(' | ')} | 共${employees.length}人`;
+                    } else {
+                        displayText = `${employeeNames[0]} | ${employeeNames[1]} | ... | 共${employees.length}人`;
+                    }
+                    exportEmployeeListBtn.textContent = displayText;
+                    exportEmployeeClearBtn.style.display = 'inline-block';
+                }
+            } else {
+                // 主界面的逻辑
+                const employeeListBtn = document.getElementById('employeeListBtn');
+                const employeeClearBtn = document.getElementById('employeeClearBtn');
+                
+                // 更新全局变量
+                if (isAllSelected) {
+                    window.currentSelectedEmployees = [];
+                    localStorage.removeItem('selectedEmployees_Timesheet');
+                } else {
+                    window.currentSelectedEmployees = employees;
+                    localStorage.setItem('selectedEmployees_Timesheet', JSON.stringify(employees));
+                }
+                
+                // 更新按钮文本
+                if (employees.length === 0 || isAllSelected) {
+                    employeeListBtn.textContent = '全部员工 ▼';
+                    employeeClearBtn.style.display = 'none';
+                } else {
+                    const employeeNames = employees.map(emp => emp.name || emp.emp_name);
+                    let displayText;
+                    if (employeeNames.length <= 2) {
+                        displayText = `${employeeNames.join(' | ')} | 共${employees.length}人`;
+                    } else {
+                        displayText = `${employeeNames[0]} | ${employeeNames[1]} | ... | 共${employees.length}人`;
+                    }
+                    employeeListBtn.textContent = displayText;
+                    employeeClearBtn.style.display = 'inline-block';
+                }
+            }
+        }
+
+        // 初始化选中状态
+        function initSelectedEmployees() {
+            try {
+                const savedSelected = localStorage.getItem('selectedEmployees_Timesheet');
+                if (savedSelected) {
+                    const employees = JSON.parse(savedSelected);
+                    handleSelectedEmployees(employees, false);
+                } else {
+                    handleSelectedEmployees([], true);
+                }
+            } catch (e) {
+                console.error('初始化选中员工失败:', e);
+                handleSelectedEmployees([], true);
+            }
+        }
+
+        // 初始化
+        function init() {
+            // 设置初始选中的月份按钮
+            monthBtns[currentMonth].classList.add('active');
+            // 更新日期显示
+            updateDateDisplay();
+            // 生成日期列
+            generateDateColumns();
+            
+            // 初始化员工筛选
+            setupEmployeeListEvents();
+            initSelectedEmployees();
+        }
+
+        // 更新日期显示
+        function updateDateDisplay() {
+            const monthStr = (currentMonth + 1).toString().padStart(2, '0');
+            dateDisplay.textContent = `${currentYear}年${monthStr}月`;
+        }
+
+        // 更新模态框显示
+        function updateModalDisplay() {
+            modalYear.textContent = currentYear;
+            // 获取当前日期
+            const today = new Date();
+            const currentYearToday = today.getFullYear();
+            const currentMonthToday = today.getMonth();
+            
+            // 重置所有月份按钮的状态
+            monthBtns.forEach((btn, index) => {
+                btn.classList.remove('active', 'disabled');
+                btn.disabled = false;
+                
+                // 判断是否超过当前日期
+                if (currentYear > currentYearToday || 
+                    (currentYear === currentYearToday && index > currentMonthToday)) {
+                    btn.classList.add('disabled');
+                    btn.disabled = true;
+                }
+            });
+            
+            // 设置当前月份按钮为激活状态
+            if (!monthBtns[currentMonth].disabled) {
+                monthBtns[currentMonth].classList.add('active');
+            }
+        }
+
+        // 打开模态框
+        function openModal() {
+            updateModalDisplay();
+            modal.style.display = 'block';
+        }
+
+        // 关闭模态框
+        function closeModal() {
+            modal.style.display = 'none';
+        }
+
+        // 上一年
+        function prevYear() {
+            currentYear--;
+            updateModalDisplay();
+        }
+
+        // 下一年
+        function nextYear() {
+            currentYear++;
+            updateModalDisplay();
+        }
+
+        // 选择月份
+        function selectMonth(month) {
+            currentMonth = month;
+            updateDateDisplay();
+            // 重新生成日期列
+            generateDateColumns();
+            
+            // 变更日期时重置员工按钮为全部员工
+            handleSelectedEmployees([], true, 'main');
+            if (window.loadAndFillTimesheet) {
+                window.loadAndFillTimesheet();
+            }
+            
+            closeModal();
+        }
+
+        // 事件监听器
+        calendarIcon.addEventListener('click', openModal);
+        prevYearBtn.addEventListener('click', prevYear);
+        nextYearBtn.addEventListener('click', nextYear);
+
+        // 月份按钮点击事件
+        monthBtns.forEach((btn, index) => {
+            btn.addEventListener('click', () => selectMonth(index));
+        });
+
+        // 点击模态框外部关闭
+        window.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+
+        // 点击日期显示也可以打开模态框
+        dateDisplay.addEventListener('click', openModal);
+
+        // Date Picker Logic
+        const datePicker = document.getElementById('datePicker');
+        const pickerCurrentMonthEl = document.getElementById('pickerCurrentMonth');
+        const daysGrid = document.getElementById('daysGrid');
+        const pickerPrevYearBtn = document.getElementById('pickerPrevYear');
+        const pickerPrevMonthBtn = document.getElementById('pickerPrevMonth');
+        const pickerNextMonthBtn = document.getElementById('pickerNextMonth');
+        const pickerNextYearBtn = document.getElementById('pickerNextYear');
+        const pickerTodayBtn = document.getElementById('pickerTodayBtn');
+        
+        let pickerDate = new Date(); // Internal state for picker navigation
+        let activeInputId = null; // 'startDate' or 'endDate'
+
+        function renderDatePicker(date) {
+            const year = date.getFullYear();
+            const month = date.getMonth();
+            
+            pickerCurrentMonthEl.textContent = `${year}年 ${month + 1}月`;
+            
+            // Clear grid
+            daysGrid.innerHTML = '';
+            
+            // First day of the month
+            const firstDay = new Date(year, month, 1);
+            // Day of week (0-6, Sun-Sat). We want Mon(1)-Sun(0)
+            let startDay = firstDay.getDay(); 
+            // Adjust for Mon start: Sun(0) -> 6, Mon(1) -> 0, Tue(2) -> 1...
+            let startDayIndex = (startDay + 6) % 7;
+            
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const daysInPrevMonth = new Date(year, month, 0).getDate();
+            const todayDate = new Date();
+            todayDate.setHours(0, 0, 0, 0); // Normalize today for comparison
+            
+            // Previous month days
+            for (let i = startDayIndex - 1; i >= 0; i--) {
+                const dayDiv = document.createElement('div');
+                dayDiv.className = 'day-cell prev-month';
+                dayDiv.textContent = daysInPrevMonth - i;
+                
+                const prevDate = new Date(year, month - 1, daysInPrevMonth - i);
+                if (prevDate > todayDate) {
+                    dayDiv.classList.add('disabled');
+                } else {
+                    dayDiv.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        selectDate(prevDate);
+                    });
+                }
+                daysGrid.appendChild(dayDiv);
+            }
+            
+            // Current month days
+            const today = new Date();
+            const currentInputVal = document.getElementById(activeInputId).value;
+            // Parse current input value "YYYY年MM月DD日"
+            let selectedDate = null;
+            const match = currentInputVal.match(/(\d{4})年(\d{2})月(\d{2})日/);
+            if (match) {
+                selectedDate = new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
+            }
+
+            for (let i = 1; i <= daysInMonth; i++) {
+                const dayDiv = document.createElement('div');
+                dayDiv.className = 'day-cell current-month';
+                dayDiv.textContent = i;
+                const currentDate = new Date(year, month, i);
+                
+                // Check if disabled (future date)
+                if (currentDate > todayDate) {
+                    dayDiv.classList.add('disabled');
+                } else {
+                    // Check if selected
+                    if (selectedDate && 
+                        selectedDate.getFullYear() === year && 
+                        selectedDate.getMonth() === month && 
+                        selectedDate.getDate() === i) {
+                        dayDiv.classList.add('selected');
+                    }
+                    
+                    // Check if today
+                    if (today.getFullYear() === year && 
+                        today.getMonth() === month && 
+                        today.getDate() === i) {
+                        dayDiv.classList.add('today');
+                    }
+                    
+                    dayDiv.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        selectDate(currentDate);
+                    });
+                }
+                
+                daysGrid.appendChild(dayDiv);
+            }
+            
+            // Next month days to fill grid (6 rows * 7 cols = 42 cells)
+            const totalCells = 42;
+            const currentCells = startDayIndex + daysInMonth;
+            const remainingCells = totalCells - currentCells;
+            
+            for (let i = 1; i <= remainingCells; i++) {
+                const dayDiv = document.createElement('div');
+                dayDiv.className = 'day-cell next-month';
+                dayDiv.textContent = i;
+                
+                const nextDate = new Date(year, month + 1, i);
+                if (nextDate > todayDate) {
+                    dayDiv.classList.add('disabled');
+                } else {
+                    dayDiv.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        selectDate(nextDate);
+                    });
+                }
+                daysGrid.appendChild(dayDiv);
+            }
+        }
+
+        function selectDate(date) {
+            if (activeInputId) {
+                const input = document.getElementById(activeInputId);
+                const year = date.getFullYear();
+                const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                const day = date.getDate().toString().padStart(2, '0');
+                input.value = `${year}年${month}月${day}日`;
+                
+                // 变更日期时重置导出侧边栏的员工选择
+                if (activeInputId === 'startDate' || activeInputId === 'endDate') {
+                    handleSelectedEmployees([], true, 'export');
+                }
+            }
+            datePicker.style.display = 'none';
+        }
+
+        function showDatePicker(inputId) {
+            activeInputId = inputId;
+            const input = document.getElementById(inputId);
+            const rect = input.getBoundingClientRect();
+            
+            // Parse initial date from input
+            const val = input.value;
+            const match = val.match(/(\d{4})年(\d{2})月(\d{2})日/);
+            if (match) {
+                pickerDate = new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
+            } else {
+                pickerDate = new Date();
+            }
+            
+            renderDatePicker(pickerDate);
+            
+            datePicker.style.display = 'block';
+            datePicker.style.top = (rect.bottom + 5) + 'px';
+            // Align right of picker with right of input (input width is small, picker is 280)
+            // Or center it?
+            // Input is in sidebar which is fixed right.
+            // If I align left of picker to left of input:
+            // Input left + 280 might overflow screen if input is too close to right edge?
+            // Sidebar is 320px wide. Input is inside it.
+            // Let's align the right edge of the picker with the right edge of the input wrapper?
+            // rect.right - 280
+            datePicker.style.left = (rect.right - 280) + 'px'; 
+        }
+
+        // Event Listeners
+        document.getElementById('startDate').addEventListener('click', (e) => {
+            e.stopPropagation();
+            showDatePicker('startDate');
+        });
+        
+        document.getElementById('endDate').addEventListener('click', (e) => {
+            e.stopPropagation();
+            showDatePicker('endDate');
+        });
+        
+        pickerPrevYearBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            pickerDate.setFullYear(pickerDate.getFullYear() - 1);
+            renderDatePicker(pickerDate);
+        });
+        
+        pickerNextYearBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            pickerDate.setFullYear(pickerDate.getFullYear() + 1);
+            renderDatePicker(pickerDate);
+        });
+        
+        pickerPrevMonthBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            pickerDate.setMonth(pickerDate.getMonth() - 1);
+            renderDatePicker(pickerDate);
+        });
+        
+        pickerNextMonthBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            pickerDate.setMonth(pickerDate.getMonth() + 1);
+            renderDatePicker(pickerDate);
+        });
+        
+        pickerTodayBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const today = new Date();
+            selectDate(today);
+        });
+        
+        // Close picker when clicking outside
+        window.addEventListener('click', (e) => {
+            if (!datePicker.contains(e.target) && 
+                e.target.id !== 'startDate' && 
+                e.target.id !== 'endDate') {
+                datePicker.style.display = 'none';
+            }
+        });
+        
+        // Prevent sidebar closing when clicking picker
+        datePicker.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        // 初始化
+        init();
+    </script>
+
+    <!-- 引入导出相关库 -->
+    <script src="JavaScript/excel/exceljs.min.js"></script>
+    <script src="JavaScript/excel/FileSaver.min.js"></script>
+    
+    <!-- 引入统计表数据填充服务 -->
+    <script src="JavaScript/记工表/timesheet-data-service.js"></script>
+    <script src="JavaScript/记工表/export-service.js"></script>
+</body>
+</html>
