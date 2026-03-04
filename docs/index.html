@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>飞鱼工地考勤 - 登录/注册</title>
+    <!-- 本地加载完整的Supabase库 -->
+    <script src="JavaScript/supabase/supabase.min.js"></script>
+    
+    <!-- 加载浏览器环境的Supabase配置 -->
+    <script src="JavaScript/supabase/supabase-client.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .auth-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.1),
+                0 2px 8px rgba(0, 0, 0, 0.06),
+                inset 0 1px 0 rgba(255, 255, 255, 0.5);
+            width: 100%;
+            max-width: 420px;
+            padding: 40px;
+            transform: translateY(0);
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .auth-container:hover {
+            transform: translateY(-2px);
+            box-shadow: 
+                0 12px 40px rgba(0, 0, 0, 0.15),
+                0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .auth-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .auth-header h2 {
+            color: #1a1a2e;
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .auth-header p {
+            color: #6b7280;
+            font-size: 16px;
+            font-weight: 400;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .form-group label {
+            color: #374151;
+            font-size: 16px;
+            font-weight: 600;
+            min-width: 70px;
+            text-align: left;
+        }
+
+        .form-group input {
+            flex: 1;
+            padding: 14px 16px;
+            border: 2px solid #d1d5db;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 500;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            transition: all 0.3s ease;
+            background: white;
+            color: #1f2937;
+            letter-spacing: 0.5px;
+            min-width: 0;
+            width: 100%;
+        }
+
+        .form-group input::placeholder {
+            color: #9ca3af;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+            transform: translateY(0);
+            color: #1f2937;
+        }
+
+        .form-group input.error {
+            border-color: #ef4444;
+            background: #fef2f2;
+        }
+
+        .form-group input.error:focus {
+            border-color: #ef4444;
+            box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1);
+        }
+
+        .error-message {
+            color: #ef4444;
+            font-size: 13px;
+            margin-top: 6px;
+            display: none;
+            font-weight: 500;
+            text-align: right;
+        }
+
+        .auth-button {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .auth-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .auth-button:hover:not(:disabled)::before {
+            left: 100%;
+        }
+
+        .auth-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .auth-button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .auth-button:disabled {
+            background: #d1d5db;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .auth-links {
+            text-align: center;
+            margin-top: 24px;
+        }
+
+        .auth-links a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            position: relative;
+            font-size: 14px;
+        }
+
+        .auth-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: #667eea;
+            transition: width 0.3s ease;
+        }
+
+        .auth-links a:hover::after {
+            width: 100%;
+        }
+
+        .auth-form {
+            display: none;
+        }
+
+        .auth-form.active {
+            display: block;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 手机端适配 */
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+                min-height: 100vh;
+                align-items: flex-start;
+                padding-top: 10vh;
+            }
+            
+            .auth-container {
+                margin: 0 15px;
+                padding: 30px 20px;
+                border-radius: 15px;
+                max-width: calc(100% - 30px);
+                box-shadow: 
+                    0 4px 20px rgba(0, 0, 0, 0.1),
+                    0 2px 8px rgba(0, 0, 0, 0.08);
+            }
+            
+            .auth-header {
+                margin-bottom: 25px;
+            }
+            
+            .auth-header h2 {
+                font-size: 22px;
+                margin-bottom: 6px;
+            }
+            
+            .auth-header p {
+                font-size: 14px;
+            }
+            
+            .form-group {
+                margin-bottom: 18px;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+            
+            .form-group label {
+                font-size: 15px;
+                min-width: auto;
+                text-align: left;
+                width: 100%;
+            }
+            
+            .form-group input {
+                width: 100%;
+                padding: 12px 14px;
+                font-size: 16px;
+                border-radius: 10px;
+            }
+            
+            .error-message {
+                text-align: left;
+                margin-left: 0;
+                width: 100%;
+            }
+            
+            .auth-button {
+                padding: 14px;
+                font-size: 16px;
+                border-radius: 10px;
+            }
+        }
+        
+        /* 更小屏幕适配 */
+        @media (max-width: 375px) {
+            .auth-container {
+                margin: 0 10px;
+                padding: 25px 15px;
+                max-width: calc(100% - 20px);
+            }
+            
+            .auth-header h2 {
+                font-size: 20px;
+            }
+            
+            .auth-header p {
+                font-size: 13px;
+            }
+        }
+        
+        /* 防止iOS输入框缩放 */
+        @media screen and (-webkit-min-device-pixel-ratio: 0) {
+            select:focus,
+            textarea:focus,
+            input:focus {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-header">
+            <h2>飞鱼工地考勤</h2>
+            <p id="auth-description">欢迎回来，请登录您的账户</p>
+        </div>
+        
+        <!-- 登录表单 -->
+        <form id="loginForm" class="auth-form active">
+            <div class="form-group">
+                <label for="loginPhone">手机号</label>
+                <input type="tel" id="loginPhone" name="phone" placeholder="请输入手机号" maxlength="11" required>
+                <div class="error-message" id="loginPhoneError">请输入正确的手机号</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="loginPassword">密码</label>
+                <input type="password" id="loginPassword" name="password" placeholder="请输入密码" required>
+                <div class="error-message" id="loginPasswordError">请输入密码</div>
+            </div>
+            
+            <button type="submit" class="auth-button" id="loginButton">
+                登录
+            </button>
+            
+            <div class="auth-links">
+                <a href="javascript:void(0)" onclick="switchToRegister()">没有账号？立即注册</a>
+            </div>
+        </form>
+        
+        <!-- 注册表单 -->
+        <form id="registerForm" class="auth-form">
+            <div class="form-group">
+                <label for="registerName">登录名</label>
+                <input type="text" id="registerName" name="login_name" placeholder="请输入登录名" required>
+                <div class="error-message" id="registerNameError">请输入登录名</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="registerPhone">手机号</label>
+                <input type="tel" id="registerPhone" name="phone" placeholder="请输入手机号" maxlength="11" required>
+                <div class="error-message" id="registerPhoneError">请输入正确的手机号</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="registerPassword">密码</label>
+                <input type="password" id="registerPassword" name="password" placeholder="请输入密码" required>
+                <div class="error-message" id="registerPasswordError">密码长度至少6位</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="confirmPassword">确认密码</label>
+                <input type="password" id="confirmPassword" name="confirmPassword" placeholder="请再次输入密码" required>
+                <div class="error-message" id="confirmPasswordError">两次密码不一致</div>
+            </div>
+            
+            <button type="submit" class="auth-button" id="registerButton">
+                注册
+            </button>
+            
+            <div class="auth-links">
+                <a href="javascript:void(0)" onclick="switchToLogin()">已有账号？立即登录</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- 只引入必要的服务 -->
+    <script src="./JavaScript/登录注册/auth-service.js"></script>
+    <script src="./JavaScript/登录注册/login-register.js"></script>
+</body>
+</html>
