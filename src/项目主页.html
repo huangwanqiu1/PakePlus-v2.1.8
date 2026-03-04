@@ -1,0 +1,2043 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>飞鱼记工 - 项目主页</title>
+    <style>
+        * {
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            color: #333;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* 主内容区域 */
+        .main-content {
+            flex: 1; 
+            margin-left: 0px; 
+            display: flex; 
+            flex-direction: column;
+            border-radius: 25px 25px 0 0;
+            overflow: hidden;
+            box-shadow: 0 0 40px rgba(102, 126, 234, 0.2), 0 10px 30px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+
+
+        /* 内容区域 */
+        .content {
+            flex: 1;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.9);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* 响应式布局调整 */
+        @media (min-width: 768px) {
+            .content {
+                flex-direction: row;
+            }
+        }
+
+        /* 日历看板容器 */
+        .calendar-container {
+            position: relative;
+            margin-bottom: 20px;
+            margin-top: 32px;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        /* 统计卡片容器 */
+        .stats-container {
+            position: relative;
+            margin-bottom: 20px;
+            margin-top: 32px;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        /* 日历标题文字 */
+        .calendar-title-text {
+            position: absolute;
+            top: -50px;
+            left: 20px;
+            background: transparent;
+            color: #1e293b;
+            padding: 8px 16px;
+            border-radius: 0;
+            font-size: 16px;
+            font-weight: 600;
+            box-shadow: none;
+            z-index: 10;
+        }
+
+        /* 统计卡片标题文字 */
+        .stats-title-text {
+            position: absolute;
+            top: -50px;
+            left: 20px;
+            background: transparent;
+            color: #1e293b;
+            padding: 8px 16px;
+            border-radius: 0;
+            font-size: 16px;
+            font-weight: 600;
+            box-shadow: none;
+            z-index: 10;
+        }
+
+        /* 日历看板区域 */
+        .calendar-section {
+            width: 100%; /* 宽度占满容器 */
+            max-width: 500px; /* 最大宽度 */
+            min-width: 280px; /* 最小宽度，确保在手机上也能显示 */
+            min-height: 300px; /* 最小高度 */
+            height: auto; /* 高度自动调整 */
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08), 0 4px 10px rgba(0, 0, 0, 0.03);
+            padding: 0; /* 移除内边距，由内部元素控制 */
+            padding-bottom: 15px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            transition: all 0.3s ease;
+        }
+
+        .calendar-section:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.12), 0 6px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: stretch;
+            margin-bottom: 15px;
+            background-color: #f0f0f0;
+            height: 54px;
+            border-radius: 20px 20px 0 0;
+        }
+
+        .calendar-nav-btn {
+            background: transparent;
+            color: #555;
+            border: none;
+            padding: 0 20px;
+            border-radius: 0;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            box-shadow: none;
+            position: relative;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .calendar-nav-btn::before {
+            display: none;
+        }
+
+        .calendar-nav-btn:hover {
+            background-color: rgba(0,0,0,0.05);
+            color: #333;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        /* 隐藏原来的图标 */
+        .calendar-nav-btn i {
+            display: none;
+        }
+
+        .calendar-title {
+            flex: 0 0 180px;
+            background-color: transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 5px;
+            height: calc(100% - 5px);
+            padding: 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        .calendar-title::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -15px;
+            right: -15px;
+            bottom: 0;
+            background-color: #fff;
+            border-radius: 15px 15px 0 0;
+            transform: perspective(50px) rotateX(10deg);
+            transform-origin: bottom;
+            z-index: -1;
+            box-shadow: 0 -1px 3px rgba(0,0,0,0.05);
+            margin: 0;
+        }
+
+        .calendar-dropdown {
+            background: transparent;
+            border: none;
+            padding: 0 20px 0 10px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            appearance: none;
+            -webkit-appearance: none;
+            position: relative;
+            z-index: 20;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23333%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0 top 55%;
+            background-size: 10px auto;
+            height: 100%;
+            display: flex;
+            align-items: center;
+        }
+
+        .calendar-dropdown:hover {
+            color: #000;
+        }
+
+        /* 修复表格边距 */
+        .calendar-table {
+            width: calc(100% - 30px);
+            margin: 0 15px 5px 15px;
+            border-collapse: collapse;
+            table-layout: auto;
+        }
+
+        /* 月份选择器样式 */
+        .month-picker-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.2); /* 稍微调淡背景，突出弹出感 */
+            display: none;
+            z-index: 1000;
+            /* 移除居中对齐，改为绝对定位 */
+        }
+
+        .month-picker {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            padding: 15px;
+            width: 320px;
+            max-width: 90%;
+            position: absolute; /* 启用绝对定位 */
+            transform-origin: top center;
+            animation: pickerSlideDown 0.2s ease-out;
+        }
+
+        @keyframes pickerSlideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .picker-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .picker-year-btn {
+            background: transparent;
+            border: none;
+            font-size: 18px;
+            font-weight: 600;
+            color: #1e293b;
+            cursor: pointer;
+        }
+
+        .month-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .month-item {
+            padding: 10px;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid #e2e8f0;
+        }
+
+        .month-item:hover {
+            background: #f1f5f9;
+            border-color: #667eea;
+        }
+
+        .month-item.selected {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .month-item.disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            background-color: #f1f5f9;
+            pointer-events: none;
+        }
+
+
+
+        .calendar-header-row th {
+            text-align: center;
+            padding: 8px 4px;
+            color: #64748b;
+            font-weight: 500;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 14px;
+            min-width: 45px;
+        }
+
+        .calendar-day-cell {
+            min-height: 45px;
+            height: auto;
+            text-align: center;
+            vertical-align: top;
+            padding: 4px;
+            border-bottom: 1px solid #e2e8f0;
+            border-right: 1px solid #e2e8f0;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            min-width: 45px;
+            width: auto;
+            white-space: normal;
+        }
+
+        /* 为第一列添加左边框 */
+        tr .calendar-day-cell:first-child {
+            border-left: 1px solid #e2e8f0;
+        }
+
+        .calendar-day-cell:hover {
+            background-color: #f8fafc;
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            z-index: 10;
+        }
+
+        .calendar-day-cell.today {
+            background-color: #e0f2fe;
+            border-radius: 8px;
+            color: #0369a1;
+            font-weight: 600;
+            position: relative;
+        }
+
+        .calendar-day-cell.today::after {
+            content: '今天';
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            left: auto;
+            transform: none;
+            font-size: 9px;
+            color: #0369a1;
+            background: white;
+            padding: 1px 4px;
+            border-radius: 8px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .calendar-day-cell.empty {
+            background-color: #f1f5f9;
+            opacity: 0.5;
+        }
+
+        .calendar-day-cell.future {
+            color: #9ca3af;
+            opacity: 0.6;
+        }
+
+        .future .day-number {
+            color: #9ca3af;
+        }
+
+        .day-number {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 2px;
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            line-height: 20px;
+            border-radius: 50%;
+            text-align: center;
+        }
+
+        .today .day-number {
+            background: linear-gradient(135deg, #0ea5e9, #0284c7);
+            color: white;
+        }
+
+        .day-tasks {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-top: 4px;
+            min-height: 30px;
+            height: auto;
+            overflow: visible;
+        }
+
+        .task-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 2px;
+        }
+
+        .task-text {
+            font-size: 11px;
+            color: #475569;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* 右侧信息区域 */
+        .info-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        /* 项目统计卡片 */
+        .stats-card {
+            background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+            border-radius: 20px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08), 0 4px 10px rgba(0, 0, 0, 0.03);
+            padding: 0;
+            width: 100%; /* 宽度占满容器 */
+            max-width: 500px; /* 最大宽度 */
+            min-width: 280px; /* 最小宽度，确保在手机上也能显示 */
+            height: auto;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            transition: all 0.3s ease;
+        }
+
+        .stats-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.12), 0 6px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .stats-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 50%, #ede9fe 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            box-shadow: 0 8px 20px rgba(148, 163, 184, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.8);
+            transition: all 0.3s ease;
+        }
+
+        .stats-icon:hover {
+            transform: scale(1.05) rotate(5deg);
+            box-shadow: 0 12px 25px rgba(148, 163, 184, 0.3), inset 0 2px 4px rgba(255, 255, 255, 0.9);
+        }
+
+        .stats-icon svg {
+            width: 40px;
+            height: 40px;
+            color: #667eea;
+        }
+
+        .stats-message {
+            font-size: 16px;
+            color: #64748b;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        /* 统计面板滚动条样式 */
+        .stats-card::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .stats-card::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 3px;
+        }
+
+        .stats-card::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+
+        .stats-card::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* 常用功能区域 */
+        .quick-actions {
+            background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+            border-radius: 20px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08), 0 4px 10px rgba(0, 0, 0, 0.03);
+            padding: 15px; /* 减少内边距以适应窄屏 */
+            width: 100%; /* 宽度占满容器 */
+            max-width: 500px; /* 最大宽度 */
+            min-width: 280px; /* 最小宽度，确保在手机上也能显示 */
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            transition: all 0.3s ease;
+        }
+
+        .quick-actions:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.1), 0 6px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .quick-actions-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); /* 自适应列数，最小宽度80px */
+            gap: 12px; /* 减少间距以适应窄屏 */
+            flex: 1;
+        }
+
+        .action-card {
+            background: linear-gradient(145deg, #f8fafc 0%, #f1f5f9 100%);
+            border-radius: 16px;
+            padding: 8px; /* 进一步减少内边距以降低按钮高度 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .action-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(240, 147, 251, 0.1));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .action-card:hover::before {
+            opacity: 1;
+        }
+
+        .action-card:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1), 0 4px 10px rgba(102, 126, 234, 0.2);
+            border-color: rgba(102, 126, 234, 0.3);
+        }
+
+        .action-card .action-icon i {
+            transition: transform 0.3s ease;
+        }
+
+        .action-card:hover .action-icon i.fa-cog {
+            transform: rotate(90deg);
+        }
+
+        .action-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px; /* 圆角矩形 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 8px;
+            color: #fff !important; /* 强制白色图标 */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .action-icon i {
+            font-size: 24px; /* 增大图标尺寸 */
+        }
+
+        .action-text {
+            font-size: 13px;
+            font-weight: 500;
+            color: #333;
+            text-align: center;
+        }
+
+        /* 底部按钮区域 */
+        .bottom-actions {
+            display: flex;
+            justify-content: space-between; /* 让按钮分别靠左和靠右显示 */
+            padding: 15px 0; /* 调整为上下方向15px内边距 */
+            width: 100%; /* 宽度占满容器 */
+            max-width: 500px; /* 最大宽度 */
+            margin-top: 15px; /* 添加与日历看板的间距 */
+        }
+
+        .action-button {
+            width: 120px; /* 设置固定宽度减小按钮尺寸 */
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: 1px solid;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-size: 14px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .action-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+            transition: left 0.5s;
+        }
+
+        .action-button:hover::before {
+            left: 100%;
+        }
+
+        .action-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .action-button.secondary {
+            color: #d97706;
+            border-color: #fbbf24;
+            background: linear-gradient(135deg, #fffbeb, #fef3c7);
+        }
+
+        .action-button.secondary:hover {
+            color: #ffffff;
+            background: rgba(249, 115, 22, 0.85);
+            border-color: #f97316;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 16px rgba(249, 115, 22, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .action-button.primary {
+            color: #ffffff;
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            border-color: #3b82f6;
+            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+        }
+
+        .action-button.primary:hover {
+            color: #ffffff;
+            background: rgba(185, 28, 28, 0.85);
+            border-color: #b91c1c;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 16px rgba(185, 28, 28, 0.4);
+            transform: translateY(-1px);
+        }
+
+        /* 通知提示样式 */
+        .notification {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 15px 20px;
+            border-radius: 5px;
+            background-color: #4CAF50;
+            color: white;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+            display: none;
+            z-index: 2000;
+        }
+        .notification.error {
+            background-color: #f44336;
+        }
+
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- 加载项目统计服务 -->
+    <script src="JavaScript/项目列表/project-statistics-service.js"></script>
+    <!-- 本地加载完整的Supabase库 -->
+    <script src="JavaScript/supabase/supabase.min.js"></script>
+    <!-- 加载浏览器环境的Supabase配置 -->
+    <script src="JavaScript/supabase/supabase-client.js"></script>
+
+</head>
+<body>
+    <!-- 左侧导航栏已移除 -->
+
+    <!-- 主内容区域 -->
+    <div class="main-content">
+
+
+        <!-- 内容区域 -->
+        <div class="content">
+            <!-- 日历看板区域 -->
+            <div class="calendar-container">
+                <div class="calendar-title-text">记工日历看板</div>
+                <div class="calendar-section">
+                <div class="calendar-header">
+                    <button class="calendar-nav-btn"><i class="fas fa-chevron-left"></i> 上一月</button>
+                    <div class="calendar-title">
+                        <div class="calendar-dropdown">2025年8月</div>
+                    </div>
+                    <button class="calendar-nav-btn">下一月 <i class="fas fa-chevron-right"></i></button>
+                </div>
+
+                <!-- 日历表格 -->
+        <table class="calendar-table" id="calendarTable">
+            <thead>
+                <tr class="calendar-header-row">
+                    <th>一</th>
+                    <th>二</th>
+                    <th>三</th>
+                    <th>四</th>
+                    <th>五</th>
+                    <th>六</th>
+                    <th>日</th>
+                </tr>
+            </thead>
+            <tbody id="calendarBody">
+                <!-- 日历内容将通过JavaScript动态生成 -->
+            </tbody>
+        </table>
+
+        <!-- 月份选择器 -->
+        <div class="month-picker-overlay" id="monthPickerOverlay">
+            <div class="month-picker">
+                <div class="picker-header">
+                    <button class="picker-year-btn" id="prevYear"><i class="fas fa-chevron-left"></i></button>
+                    <h3 id="pickerYear">2025</h3>
+                    <button class="picker-year-btn" id="nextYear"><i class="fas fa-chevron-right"></i></button>
+                </div>
+                <div class="month-grid" id="monthGrid">
+                    <div class="month-item" data-month="0">1月</div>
+                    <div class="month-item" data-month="1">2月</div>
+                    <div class="month-item" data-month="2">3月</div>
+                    <div class="month-item" data-month="3">4月</div>
+                    <div class="month-item" data-month="4">5月</div>
+                    <div class="month-item" data-month="5">6月</div>
+                    <div class="month-item" data-month="6">7月</div>
+                    <div class="month-item" data-month="7">8月</div>
+                    <div class="month-item" data-month="8">9月</div>
+                    <div class="month-item" data-month="9">10月</div>
+                    <div class="month-item" data-month="10">11月</div>
+                    <div class="month-item" data-month="11">12月</div>
+                </div>
+                <!-- 按钮区域已移除 -->
+            </div>
+        </div>
+            </div>
+            
+            <!-- 底部按钮区域 -->
+            <div class="bottom-actions">
+                <button class="action-button secondary">
+                    <i class="fas fa-hand-holding-usd"></i> 结算/借支
+                </button>
+                <button class="action-button primary">
+                    <i class="fas fa-edit"></i> 记工
+                </button>
+            </div>
+
+                <!-- 常用功能区域 -->
+                <div class="quick-actions">
+                    <div class="quick-actions-title">常用功能</div>
+                    <div class="actions-grid">
+                        <!-- 员工信息 -->
+                        <div class="action-card">
+                            <div class="action-icon" style="background: #3b82f6;">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div class="action-text">员工信息</div>
+                        </div>
+
+                        <!-- 统计 -->
+                        <div class="action-card">
+                            <div class="action-icon" style="background: #3b82f6; position: relative;">
+                                <i class="fas fa-file" style="font-size: 26px;"></i>
+                                <div style="position: absolute; top: 54%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center;">
+                                    <i class="fas fa-yen-sign" style="color: #3b82f6 !important; font-size: 13px; font-weight: 900;"></i>
+                                    <div style="width: 10px; height: 2px; background-color: #3b82f6; margin-top: 1px;"></div>
+                                </div>
+                            </div>
+                            <div class="action-text">统计</div>
+                        </div>
+
+                        <!-- 未结 -->
+                        <div class="action-card">
+                            <div class="action-icon" style="background: #f97316; position: relative;">
+                                <i class="fas fa-file-invoice-dollar" style="font-size: 22px; margin-right: 3px; margin-bottom: 3px;"></i>
+                                <i class="fas fa-clock" style="position: absolute; bottom: 8px; right: 8px; font-size: 14px; color: #fff; background: #f97316; border-radius: 50%; border: 2px solid #f97316;"></i>
+                            </div>
+                            <div class="action-text">未结</div>
+                        </div>
+
+                        <!-- 记工表 -->
+                        <div class="action-card">
+                            <div class="action-icon" style="background: #3b82f6;">
+                                <i class="fas fa-calendar-check"></i>
+                            </div>
+                            <div class="action-text">记工表</div>
+                        </div>
+
+                        <!-- 项目记账 -->
+                        <div class="action-card">
+                            <div class="action-icon" style="background: #f97316;">
+                                <i class="fas fa-sack-dollar"></i>
+                            </div>
+                            <div class="action-text">项目记账</div>
+                        </div>
+
+                        <!-- 带班设置 -->
+                        <div class="action-card">
+                            <div class="action-icon" style="background: #3b82f6;">
+                                <span style="font-weight: bold; font-size: 24px;">带</span>
+                            </div>
+                            <div class="action-text">带班设置</div>
+                        </div>
+
+                        <!-- 项目设置 -->
+                        <div class="action-card">
+                            <div class="action-icon" style="background: #22c55e;">
+                                <i class="fas fa-cog"></i>
+                            </div>
+                            <div class="action-text">项目设置</div>
+                        </div>
+
+                        <!-- 施工日志 -->
+                        <div class="action-card">
+                            <div class="action-icon" style="background: #22c55e;">
+                                <i class="fas fa-file-pen"></i>
+                            </div>
+                            <div class="action-text">施工日志</div>
+                        </div>
+
+                        <!-- 点工单 -->
+                        <div class="action-card">
+                            <div class="action-icon" style="background: #8b5cf6;">
+                                <i class="fas fa-clipboard-list"></i>
+                            </div>
+                            <div class="action-text">点工单</div>
+                        </div>
+
+                        <!-- 云相册 -->
+                        <div class="action-card">
+                            <div class="action-icon" style="background: #ec4899;">
+                                <i class="fas fa-images"></i>
+                            </div>
+                            <div class="action-text">云相册</div>
+                        </div>
+                    </div>
+                </div>
+        </div>
+
+            <!-- 右侧信息区域 -->
+            <div class="info-section">
+                <!-- 项目统计容器 -->
+                <div class="stats-container">
+                    <!-- 项目统计标题 -->
+                    <div class="stats-title-text">项目统计</div>
+                    <!-- 项目统计卡片 -->
+                    <div class="stats-card" id="statsCard">
+                    <div class="stats-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                    </div>
+                    <div class="stats-message">加载中...</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+
+
+
+    <script>
+        // 加载项目统计数据
+        async function loadProjectStatistics() {
+            try {
+                const projectId = localStorage.getItem('currentProjectId');
+                if (!projectId) {
+                    console.warn('未找到项目ID');
+                    return;
+                }
+
+                // 获取统计卡片容器
+                const statsCard = document.querySelector('.stats-card');
+                const statsIcon = statsCard?.querySelector('.stats-icon');
+                const statsMessage = statsCard?.querySelector('.stats-message');
+
+                // 如果有加载图标和消息，显示加载状态
+                if (statsIcon && statsMessage) {
+                    statsMessage.textContent = '加载中...';
+                }
+
+                // 清除缓存，确保获取最新数据
+                if (window.projectStatisticsService && window.projectStatisticsService.clearCache) {
+                    window.projectStatisticsService.clearCache(projectId);
+                }
+
+                // 获取统计数据
+                const stats = await window.projectStatisticsService.getProjectStatistics(projectId);
+
+                // 生成统计面板HTML
+                const statsHtml = window.projectStatisticsService.generateStatsPanel(stats);
+
+                // 更新统计卡片 - 直接替换整个内容
+                if (statsCard) {
+                    statsCard.innerHTML = statsHtml;
+                    // 移除固定高度，使用自动高度
+                    statsCard.style.height = 'auto';
+                }
+
+            } catch (error) {
+                console.error('加载项目统计数据失败:', error);
+                const statsCard = document.querySelector('.stats-card');
+                const statsMessage = statsCard.querySelector('.stats-message');
+                if (statsMessage) {
+                    statsMessage.textContent = '加载失败';
+                }
+            }
+        }
+
+        // 处理统计项点击事件
+        function handleStatItemClick(type) {
+            try {
+                // 获取当前项目名称和ID
+                const projectName = localStorage.getItem('currentProjectName') || '';
+                const projectId = localStorage.getItem('currentProjectId') || '';
+                const encodedProjectName = encodeURIComponent(projectName);
+                const encodedProjectId = encodeURIComponent(projectId);
+
+                // 保存筛选条件到localStorage（参考结算借支页面的逻辑）
+                const filter = {
+                    projectId: projectId,
+                    projectName: projectName,
+                    workDate: '', // 空字符串表示全部日期
+                    workDateDisplay: '全部',
+                    workDateSelectAll: 'true',
+                    selectedEmployees: JSON.stringify([]), // 空数组表示全部员工
+                    selectedTypes: JSON.stringify([type]), // 只选择点击的类型
+                    activeTab: 'worker',
+                    filterCollapsed: true
+                };
+                localStorage.setItem('statisticFilter', JSON.stringify(filter));
+
+                // 跳转到统计页面
+                window.location.href = `统计.html?project_name=${encodedProjectName}&project_id=${encodedProjectId}`;
+            } catch (error) {
+                console.error('跳转到统计页面失败:', error);
+            }
+        }
+    </script>
+
+    <script>
+        // 日历功能实现
+        let currentDate = new Date();
+        let selectedYear = currentDate.getFullYear();
+        let selectedMonth = currentDate.getMonth();
+
+        // 初始化日历
+        function initCalendar() {
+            renderCalendar(currentDate.getFullYear(), currentDate.getMonth());
+            setupEventListeners();
+        }
+
+        // 获取每日任务数据
+        function getDayTasks(year, month, day) {
+            // 格式化日期为YYYY-MM-DD
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            
+            // 获取项目ID
+            const projectId = localStorage.getItem('currentProjectId');
+            if (!projectId) {
+                console.warn('未找到项目ID');
+                return [];
+            }
+            
+            // 获取用户ID
+            let userId = 'default';
+            try {
+                const currentUserStr = localStorage.getItem('currentUser');
+                if (currentUserStr) {
+                    const currentUser = JSON.parse(currentUserStr);
+                    userId = currentUser.user_id || 'default';
+                }
+            } catch (e) {
+                console.error('解析currentUser失败:', e);
+            }
+            
+            // 获取项目数据以获取工时配置
+            let projectRegularHours = 8; // 默认正常工时
+            let projectOvertimeHours = 4; // 默认加班工时
+            
+            try {
+                // 尝试从本地存储获取项目数据
+                let projectsData = [];
+                if (window.ProjectSyncService && window.ProjectSyncService.getLocalProjectsData) {
+                    projectsData = window.ProjectSyncService.getLocalProjectsData();
+                } else {
+                    const cacheKey = 'project_cache_' + userId;
+                    const cachedData = localStorage.getItem(cacheKey);
+                    if (cachedData) {
+                        projectsData = JSON.parse(cachedData);
+                    }
+                }
+                
+                // 查找指定项目的数据
+                const projectData = projectsData.find(project => project.project_id === projectId);
+                if (projectData) {
+                    projectRegularHours = projectData.regular_hours !== undefined ? projectData.regular_hours : 8;
+                    projectOvertimeHours = projectData.overtime_hours !== undefined ? projectData.overtime_hours : 4;
+                }
+            } catch (error) {
+                console.error('获取项目工时配置失败:', error);
+            }
+            
+            // 从本地存储获取考勤数据和结算数据
+            let attendanceData = [];
+            let settlementData = [];
+            
+            // 尝试从ProjectSyncService获取数据
+            if (window.ProjectSyncService) {
+                if (window.ProjectSyncService.getLocalAttendanceRecordsData) {
+                    attendanceData = window.ProjectSyncService.getLocalAttendanceRecordsData();
+                }
+                if (window.ProjectSyncService.getLocalSettlementRecordsData) {
+                    settlementData = window.ProjectSyncService.getLocalSettlementRecordsData();
+                }
+            } else {
+                // 从localStorage获取数据
+                // 从新的存储位置获取考勤数据
+                const workRecordsKey = 'work_records_' + userId;
+                // 从新的存储位置获取结算数据
+                const settlementRecordsKey = 'settlementRecords';
+                
+                try {
+                    const workRecordsCache = localStorage.getItem(workRecordsKey);
+                    if (workRecordsCache) {
+                        attendanceData = JSON.parse(workRecordsCache);
+                    }
+                } catch (error) {
+                    console.error('解析考勤数据失败:', error);
+                }
+                
+                try {
+                    const settlementCache = localStorage.getItem(settlementRecordsKey);
+                    if (settlementCache) {
+                        settlementData = JSON.parse(settlementCache);
+                    }
+                } catch (error) {
+                    console.error('解析结算数据失败:', error);
+                }
+            }
+            
+            const tasks = [];
+            
+            // 处理考勤数据
+            if (attendanceData.length > 0) {
+                // 过滤当前项目和日期的考勤数据
+                const filteredAttendance = attendanceData.filter(record => {
+                    const projectMatch = record.project_id === projectId;
+                    // 使用record_date字段而不是work_date
+                    const dateMatch = record.record_date === dateStr;
+                    return projectMatch && dateMatch;
+                });
+                
+                if (filteredAttendance.length > 0) {
+                    // 统计点工工时
+                    let totalRegularHours = 0;
+                    let totalOvertimeHours = 0;
+                    let hasPieceWork = false;
+                    let pieceWorkAmount = 0;
+                    
+                    filteredAttendance.forEach(record => {
+                        // 只使用指定的工作类型字段
+                        const workType = record.work_type || '未知';
+                        
+                        if (workType === '点工') {
+                            // 只使用指定的工时字段
+                            const regularHours = record.regular_hours || 0;
+                            const overtimeHours = record.overtime_hours || 0;
+                            totalRegularHours += regularHours;
+                            totalOvertimeHours += overtimeHours;
+                        } else if (workType === '包工' || workType === '工量') {
+                            // 只使用指定的金额字段
+                            const amount = record.contract_amount || 0;
+                            hasPieceWork = true;
+                            pieceWorkAmount += amount;
+                        }
+                    });
+                    
+                    // 显示点工工时和工数
+                    // 正常上班
+                    if (totalRegularHours > 0) {
+                        // 计算正常上班工数
+                        const regularWorkUnits = totalRegularHours / projectRegularHours;
+                        const roundedRegularWorkUnits = parseFloat(regularWorkUnits.toFixed(2));
+                        let workUnitText;
+                        if (roundedRegularWorkUnits === 1.00) {
+                            workUnitText = '1个工';
+                        } else if (roundedRegularWorkUnits === 0.5) {
+                            workUnitText = '半个工';
+                        } else {
+                            workUnitText = `${roundedRegularWorkUnits}工`;
+                        }
+                        tasks.push({ type: 'hours', text: workUnitText });
+                    }
+                    
+                    // 加班
+                    if (totalOvertimeHours > 0) {
+                        // 计算加班工数
+                        const overtimeWorkUnits = totalOvertimeHours / projectOvertimeHours;
+                        const roundedOvertimeWorkUnits = parseFloat(overtimeWorkUnits.toFixed(2));
+                        let workUnitText;
+                        if (roundedOvertimeWorkUnits === 1.00) {
+                            workUnitText = '1个工';
+                        } else if (roundedOvertimeWorkUnits === 0.5) {
+                            workUnitText = '半个工';
+                        } else {
+                            workUnitText = `${roundedOvertimeWorkUnits}工`;
+                        }
+                        tasks.push({ type: 'overtime', text: workUnitText });
+                    }
+                    
+                    // 显示包工或工量金额
+                    if (hasPieceWork && pieceWorkAmount > 0) {
+                        tasks.push({ type: 'piecework', text: `${pieceWorkAmount}` });
+                    }
+                }
+            }
+            
+            // 处理结算数据
+            if (settlementData.length > 0) {
+                // 过滤当前项目和日期的结算数据
+                const filteredSettlement = settlementData.filter(record => 
+                    record.project_id === projectId && record.record_date === dateStr
+                );
+                
+                if (filteredSettlement.length > 0) {
+                    // 检查是否有借支、公司转账或结算记录
+                    let hasLoan = false;
+                    let hasDeduction = false;
+                    
+                    filteredSettlement.forEach(record => {
+                        if (record.record_type === '借支' || record.record_type === '公司转账' || record.record_type === '结算') {
+                            hasLoan = true;
+                        } else if (record.record_type === '扣款') {
+                            hasDeduction = true;
+                        }
+                    });
+                    
+                    // 分别添加借支和扣款任务，以便单独定位
+                    if (hasLoan) {
+                        tasks.push({ type: 'loan', text: '借' });
+                    }
+                    if (hasDeduction) {
+                        tasks.push({ type: 'deduction', text: '扣' });
+                    }
+                }
+            }
+            
+            // 如果没有真实数据，返回空数组
+            if (tasks.length === 0) {
+                return [];
+            }
+            
+            return tasks;
+        }
+
+        // 渲染日历
+        function renderCalendar(year, month) {
+            const calendarBody = document.getElementById('calendarBody');
+            const calendarTitle = document.querySelector('.calendar-title');
+            calendarBody.innerHTML = '';
+
+            // 更新标题显示
+            calendarTitle.innerHTML = `<div class="calendar-dropdown">${year}年${month + 1}月</div>`;
+
+            // 获取当月第一天是星期几
+            const firstDay = new Date(year, month, 1).getDay() || 7; // 转换为1-7，1为周一
+            // 获取当月天数
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            // 获取今天的日期
+            const today = new Date();
+
+            let date = 1;
+            // 创建6行（最多6行）
+            for (let i = 0; i < 6; i++) {
+                const row = document.createElement('tr');
+
+                // 每行7列（周一到周日）
+                for (let j = 1; j <= 7; j++) {
+                    const cell = document.createElement('td');
+                    cell.classList.add('calendar-day-cell');
+
+                    if (i === 0 && j < firstDay) {
+                        // 上个月的空白单元格
+                        cell.classList.add('empty');
+                    } else if (date > daysInMonth) {
+                        // 下个月的空白单元格
+                        cell.classList.add('empty');
+                    } else {
+                        // 当前月的日期
+                        const dayNumber = document.createElement('div');
+                        dayNumber.classList.add('day-number');
+                        dayNumber.textContent = date;
+                        cell.appendChild(dayNumber);
+
+                        // 添加任务显示区域
+                        const dayTasks = document.createElement('div');
+                        dayTasks.classList.add('day-tasks');
+                        cell.appendChild(dayTasks);
+
+                        // 获取当日任务数据
+                        const tasks = getDayTasks(year, month, date);
+                        
+                        // 检查是否有借扣数据
+                        const hasLoanDeduction = tasks.some(task => task.type === 'loan' || task.type === 'deduction');
+                        // 检查是否有其他任务数据
+                        const hasOtherTasks = tasks.some(task => task.type !== 'loan' && task.type !== 'deduction');
+                        
+                        // 根据任务数据调整日期显示位置
+                        if (!hasLoanDeduction && !hasOtherTasks) {
+                            // 没有任务数据，将日期居中显示并保持正方形
+                            dayNumber.style.position = 'absolute';
+                            dayNumber.style.top = '50%';
+                            dayNumber.style.left = '50%';
+                            dayNumber.style.transform = 'translate(-50%, -50%)';
+                            dayNumber.style.margin = '0';
+                            // 设置单元格为正方形
+                            cell.style.height = '45px';
+                            cell.style.minWidth = '45px';
+                            cell.style.width = '45px';
+                        } else {
+                            // 有任务数据，保持默认位置和自动高度
+                            dayNumber.style.position = 'relative';
+                            dayNumber.style.top = 'auto';
+                            dayNumber.style.left = 'auto';
+                            dayNumber.style.transform = 'none';
+                            // 有任务数据时使用自动高度和宽度
+                            cell.style.height = 'auto';
+                            cell.style.minHeight = '45px';
+                            cell.style.minWidth = '45px';
+                            cell.style.width = 'auto';
+                        }
+                        
+                        // 显示任务数据
+                        tasks.forEach(task => {
+                            const taskItem = document.createElement('div');
+                            taskItem.style.display = 'flex';
+                            taskItem.style.alignItems = 'center';
+                            taskItem.style.fontSize = '10px';
+                            taskItem.style.marginBottom = '2px';
+                            
+                            // 添加图标
+                            const taskIcon = document.createElement('i');
+                            taskIcon.style.marginRight = '4px';
+                            taskIcon.style.fontSize = '10px';
+                            
+                            // 处理借和扣的特殊显示 - 分别显示在日期左右两侧
+                            if (task.type === 'loan') {
+                                // 借显示在日期左边
+                                const loanSpan = document.createElement('span');
+                                loanSpan.textContent = '借';
+                                loanSpan.style.backgroundColor = '#f97316'; // 橙色背景
+                                loanSpan.style.color = 'white';
+                                loanSpan.style.padding = '1px 4px';
+                                loanSpan.style.borderRadius = '4px';
+                                loanSpan.style.position = 'absolute';
+                                loanSpan.style.left = '2px';
+                                loanSpan.style.top = '2px';
+                                loanSpan.style.fontSize = '10px';
+                                cell.appendChild(loanSpan);
+                            } else if (task.type === 'deduction') {
+                                // 扣显示在日期右边
+                                const deductionSpan = document.createElement('span');
+                                deductionSpan.textContent = '扣';
+                                deductionSpan.style.backgroundColor = '#22c55e'; // 绿色背景
+                                deductionSpan.style.color = 'white';
+                                deductionSpan.style.padding = '1px 4px';
+                                deductionSpan.style.borderRadius = '4px';
+                                deductionSpan.style.position = 'absolute';
+                                deductionSpan.style.right = '2px';
+                                deductionSpan.style.top = '2px';
+                                deductionSpan.style.fontSize = '10px';
+                                cell.appendChild(deductionSpan);
+                            } else {
+                                // 其他任务类型的常规显示
+                                // 根据任务类型设置不同图标和颜色
+                                switch (task.type) {
+                                    case 'hours':
+                                        taskIcon.className = 'fas fa-clock';
+                                        taskIcon.style.color = '#60a5fa'; // 蓝色
+                                        break;
+                                    case 'overtime':
+                                        taskIcon.className = 'fas fa-clock';
+                                        taskIcon.style.color = '#f97316'; // 橙色
+                                        break;
+                                    case 'piecework':
+                                        taskIcon.className = 'fas fa-box';
+                                        taskIcon.style.color = '#8b5cf6'; // 紫色
+                                        break;
+                                    case 'settlement':
+                                        // 保持原有结算任务的显示逻辑
+                                        const text = task.text;
+                                        if (text.includes('借') && text.includes('扣')) {
+                                            // 分别显示借和扣，添加不同背景色
+                                            const loanSpan = document.createElement('span');
+                                            loanSpan.textContent = '借';
+                                            loanSpan.style.backgroundColor = '#f97316'; // 橙色背景
+                                            loanSpan.style.color = 'white';
+                                            loanSpan.style.padding = '1px 4px';
+                                            loanSpan.style.borderRadius = '4px';
+                                            loanSpan.style.marginRight = '4px';
+                                            taskItem.appendChild(loanSpan);
+                                            
+                                            const deductionSpan = document.createElement('span');
+                                            deductionSpan.textContent = '扣';
+                                            deductionSpan.style.backgroundColor = '#22c55e'; // 绿色背景
+                                            deductionSpan.style.color = 'white';
+                                            deductionSpan.style.padding = '1px 4px';
+                                            deductionSpan.style.borderRadius = '4px';
+                                            taskItem.appendChild(deductionSpan);
+                                        } else if (text.includes('借')) {
+                                            // 只显示借，添加橙色背景
+                                            const loanSpan = document.createElement('span');
+                                            loanSpan.textContent = '借';
+                                            loanSpan.style.backgroundColor = '#f97316'; // 橙色背景
+                                            loanSpan.style.color = 'white';
+                                            loanSpan.style.padding = '1px 4px';
+                                            loanSpan.style.borderRadius = '4px';
+                                            taskItem.appendChild(loanSpan);
+                                        } else if (text.includes('扣')) {
+                                            // 只显示扣，添加绿色背景
+                                            const deductionSpan = document.createElement('span');
+                                            deductionSpan.textContent = '扣';
+                                            deductionSpan.style.backgroundColor = '#22c55e'; // 绿色背景
+                                            deductionSpan.style.color = 'white';
+                                            deductionSpan.style.padding = '1px 4px';
+                                            deductionSpan.style.borderRadius = '4px';
+                                            taskItem.appendChild(deductionSpan);
+                                        }
+                                        break;
+                                    default:
+                                        taskIcon.className = 'fas fa-circle';
+                                        taskIcon.style.color = '#94a3b8'; // 灰色
+                                }
+                                
+                                // 为非借扣任务添加图标
+                                if (task.type !== 'settlement') {
+                                    taskItem.appendChild(taskIcon);
+                                    
+                                    // 添加任务文本
+                                    const taskText = document.createElement('span');
+                                    taskText.classList.add('task-text');
+                                    taskText.textContent = task.text;
+                                    
+                                    // 为加班任务设置橙色文字
+                                    if (task.type === 'overtime') {
+                                        taskText.style.color = '#f97316'; // 橙色文字
+                                    }
+                                    
+                                    taskItem.appendChild(taskText);
+                                }
+                                
+                                // 只为非借扣任务添加到dayTasks
+                                dayTasks.appendChild(taskItem);
+                            }
+                        });
+
+                        // 检查是否是今天
+                        if (date === today.getDate() && month === today.getMonth() && year === today.getFullYear()) {
+                            cell.classList.add('today');
+                        }
+                        
+                        // 检查是否是未来的日期（超出今日）
+                        const cellDate = new Date(year, month, date);
+                        if (cellDate > today) {
+                            cell.classList.add('future');
+                        }
+
+                        date++;
+                    }
+
+                    row.appendChild(cell);
+                }
+
+                calendarBody.appendChild(row);
+
+                // 如果已经渲染完所有日期，跳出循环
+                if (date > daysInMonth) {
+                    break;
+                }
+            }
+
+            // 添加日期点击事件
+            document.querySelectorAll('.calendar-day-cell:not(.empty)').forEach(cell => {
+                cell.addEventListener('click', function() {
+                    const day = this.querySelector('.day-number').textContent;
+                    const year = currentDate.getFullYear();
+                    const month = currentDate.getMonth() + 1; // JavaScript月份从0开始
+                    
+                    // 格式化日期为YYYY-MM-DD
+                    const formattedDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    
+                    // 获取当前日期
+                    const today = new Date();
+                    const currentDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                    
+                    // 检查是否是未来日期
+                    if (formattedDate > currentDateStr) {
+                        // 未来日期，显示提示
+                        showNotification(`未到${month}月${day}日，不可记工`, true);
+                        return;
+                    }
+                    
+                    // 获取当前项目名称和ID
+                    const projectName = localStorage.getItem('currentProjectName') || '';
+                    const projectId = localStorage.getItem('currentProjectId') || '';
+                    const encodedProjectName = encodeURIComponent(projectName);
+                    const encodedProjectId = encodeURIComponent(projectId);
+                    
+                    // 检查当日是否有考勤数据和结算数据
+                    const hasData = getDayTasks(year, currentDate.getMonth(), parseInt(day)).length > 0;
+                    
+                    if (hasData) {
+                        // 当日有数据，跳转到统计页面的明细选项卡
+                        // 保存筛选条件到localStorage
+                        const filter = {
+                            projectId: projectId,
+                            projectName: projectName,
+                            workDate: formattedDate, // 设置为点击的日期
+                            workDateDisplay: formattedDate,
+                            workDateSelectAll: 'false',
+                            selectedEmployees: JSON.stringify([]), // 空数组表示全部员工
+                            selectedTypes: JSON.stringify([]), // 空数组表示全部类型
+                            activeTab: 'detail', // 明细选项卡
+                            filterCollapsed: true
+                        };
+                        localStorage.setItem('statisticFilter', JSON.stringify(filter));
+                        
+                        // 跳转到统计页面
+                        window.location.href = `统计.html?project_name=${encodedProjectName}&project_id=${encodedProjectId}`;
+                    } else {
+                        // 当日无数据，保持原逻辑跳转到记工页面
+                        // 先通知父页面更新标题为"记工"
+                        if (window.parent && window.parent !== window) {
+                            window.parent.postMessage({
+                                type: 'updateTitle',
+                                page: '记工.html'
+                            }, window.location.origin);
+                        }
+                        
+                        // 跳转到记工页面，传递日期、项目名称和ID
+                        window.location.href = `记工.html?project_name=${encodedProjectName}&project_id=${encodedProjectId}&date=${formattedDate}`;
+                    }
+                });
+            });
+
+            // 动态调整日历框架高度 - 现在使用自动高度
+            const calendarSection = document.querySelector('.calendar-section');
+            calendarSection.style.height = 'auto';
+            // 确保有足够的最小高度
+            calendarSection.style.minHeight = '300px';
+        }
+
+        // 设置事件监听器
+        function setupEventListeners() {
+            // 上一月/下一月按钮
+            document.querySelectorAll('.calendar-nav-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    if (this.textContent.includes('上一月')) {
+                        currentDate.setMonth(currentDate.getMonth() - 1);
+                        renderCalendar(currentDate.getFullYear(), currentDate.getMonth());
+                    } else if (this.textContent.includes('下一月')) {
+                        const today = new Date();
+                        // 检查是否已经是当前月份或未来月份
+                        if (currentDate.getFullYear() > today.getFullYear() || 
+                           (currentDate.getFullYear() === today.getFullYear() && currentDate.getMonth() >= today.getMonth())) {
+                            showNotification('下月还没有到哦', true);
+                        } else {
+                            currentDate.setMonth(currentDate.getMonth() + 1);
+                            renderCalendar(currentDate.getFullYear(), currentDate.getMonth());
+                        }
+                    }
+                });
+            });
+
+            // 月份选择器
+            const monthPickerOverlay = document.getElementById('monthPickerOverlay');
+            const pickerYear = document.getElementById('pickerYear');
+            const prevYear = document.getElementById('prevYear');
+            const nextYear = document.getElementById('nextYear');
+            const monthItems = document.querySelectorAll('.month-item');
+
+            // 更新月份选择器状态
+            function updateMonthPickerState() {
+                const today = new Date();
+                const currentYear = today.getFullYear();
+                const currentMonth = today.getMonth(); // 0-11
+                
+                // selectedYear 是全局变量
+                
+                monthItems.forEach(item => {
+                    const month = parseInt(item.dataset.month);
+                    item.classList.remove('disabled');
+                    
+                    // 如果选择的年份大于当前年份，禁用所有月份
+                    if (selectedYear > currentYear) {
+                        item.classList.add('disabled');
+                    } 
+                    // 如果选择的年份等于当前年份，禁用未来月份
+                    else if (selectedYear === currentYear && month > currentMonth) {
+                        item.classList.add('disabled');
+                    }
+                });
+            }
+
+            // 移动到body下，避免被父容器限制
+            document.body.appendChild(monthPickerOverlay);
+            
+            // 重新绑定下拉菜单点击事件（因为renderCalendar会重新创建DOM）
+            document.addEventListener('click', function(e) {
+                // 检查是否点击了下拉菜单，或者点击了下拉菜单内部元素
+                const target = e.target.closest('.calendar-title') || e.target.closest('.calendar-dropdown');
+                if (target) {
+                    e.stopPropagation();
+                    selectedYear = currentDate.getFullYear();
+                    selectedMonth = currentDate.getMonth();
+                    pickerYear.textContent = selectedYear;
+                    // 高亮当前选择的月份
+                    monthItems.forEach(item => {
+                        item.classList.remove('selected');
+                        if (parseInt(item.dataset.month) === selectedMonth) {
+                            item.classList.add('selected');
+                        }
+                    });
+                    
+                    // 更新月份可用状态
+                    updateMonthPickerState();
+                    
+                    // 显示模态框
+                    monthPickerOverlay.style.display = 'block';
+                    
+                    // 计算位置实现对齐
+                    const rect = target.getBoundingClientRect();
+                    const picker = document.querySelector('.month-picker');
+                    
+                    // 获取模态框的宽度（需要先显示才能获取准确宽度）
+                    const pickerWidth = picker.offsetWidth;
+                    
+                    // 计算左侧位置：目标中心点 - 模态框一半宽度
+                    let left = rect.left + (rect.width / 2) - (pickerWidth / 2);
+                    
+                    // 计算顶部位置：目标底部 + 间距
+                    let top = rect.bottom + 8;
+                    
+                    // 边界检查，防止溢出屏幕
+                    if (left < 10) left = 10;
+                    if (left + pickerWidth > window.innerWidth - 10) left = window.innerWidth - pickerWidth - 10;
+                    
+                    // 应用位置
+                    picker.style.left = `${left}px`;
+                    picker.style.top = `${top}px`;
+                }
+            });
+
+            // 年份切换
+            prevYear.addEventListener('click', function() {
+                selectedYear--;
+                pickerYear.textContent = selectedYear;
+                updateMonthPickerState();
+            });
+
+            nextYear.addEventListener('click', function() {
+                selectedYear++;
+                pickerYear.textContent = selectedYear;
+                updateMonthPickerState();
+            });
+
+            // 月份选择
+            monthItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    monthItems.forEach(i => i.classList.remove('selected'));
+                    this.classList.add('selected');
+                    selectedMonth = parseInt(this.dataset.month);
+                    
+                    // 自动执行确认功能
+                    currentDate.setFullYear(selectedYear);
+                    currentDate.setMonth(selectedMonth);
+                    renderCalendar(currentDate.getFullYear(), currentDate.getMonth());
+                    monthPickerOverlay.style.display = 'none';
+                });
+            });
+
+            // 确认和取消按钮已移除
+
+            // 点击外部关闭选择器
+            monthPickerOverlay.addEventListener('click', function(e) {
+                if (e.target === monthPickerOverlay) {
+                    monthPickerOverlay.style.display = 'none';
+                }
+            });
+        }
+
+        // 初始化日历
+        initCalendar();
+
+        // 从URL参数获取项目信息并同步到localStorage和父页面
+        function syncProjectName() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const projectName = urlParams.get('project_name');
+    const projectId = urlParams.get('project_id');
+    
+    if (projectName) {
+        const decodedName = decodeURIComponent(projectName);
+        localStorage.setItem('currentProjectName', decodedName);
+        
+        // 通知父页面更新标题
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage({
+                type: 'updateTitle',
+                project_name: decodedName
+            }, window.location.origin);
+        }
+    }
+    
+    if (projectId) {
+        localStorage.setItem('currentProjectId', projectId);
+    }
+}
+
+        // 页面加载时同步项目名
+        syncProjectName();
+
+
+
+
+        // 显示通知函数
+        function showNotification(message, isError = false) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                padding: 16px 24px;
+                background: ${isError ? '#ef4444' : '#10b981'};
+                color: white;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                z-index: 9999;
+                font-weight: 500;
+                max-width: 300px;
+                text-align: center;
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+
+
+
+
+
+
+
+
+        // 常用功能点击
+        document.querySelectorAll('.action-card').forEach(card => {
+            card.addEventListener('click', function() {
+                const text = this.querySelector('.action-text').textContent;
+                
+                if (text === '员工信息') {
+                    // 获取当前项目名称和ID
+                    const projectName = localStorage.getItem('currentProjectName') || '';
+                    const projectId = localStorage.getItem('currentProjectId') || '';
+                    const encodedProjectName = encodeURIComponent(projectName);
+                    const encodedProjectId = encodeURIComponent(projectId);
+                    
+                    // 先通知父页面更新标题为"员工录入"
+                    if (window.parent && window.parent !== window) {
+                        // 使用当前页面的origin作为targetOrigin，提高安全性
+                        const targetOrigin = window.location.origin || '*';
+                        window.parent.postMessage({
+                            type: 'updateTitle',
+                            page: '员工录入.html'
+                        }, targetOrigin);
+                    }
+                    
+                    // 跳转到员工录入页面，传递项目名称和ID
+                    window.location.href = `员工录入.html?project_name=${encodedProjectName}&project_id=${encodedProjectId}`;
+                } else if (text === '统计') {
+                    // 获取当前项目名称和ID
+                    const projectName = localStorage.getItem('currentProjectName') || '';
+                    const projectId = localStorage.getItem('currentProjectId') || '';
+                    const encodedProjectName = encodeURIComponent(projectName);
+                    const encodedProjectId = encodeURIComponent(projectId);
+                    
+                    // 先通知父页面更新标题为"统计"
+                    if (window.parent && window.parent !== window) {
+                        // 使用当前页面的origin作为targetOrigin，提高安全性
+                        const targetOrigin = window.location.origin || '*';
+                        window.parent.postMessage({
+                            type: 'updateTitle',
+                            page: '统计.html'
+                        }, targetOrigin);
+                    }
+                    
+                    // 跳转到统计页面，传递项目名称和ID
+                    window.location.href = `统计.html?project_name=${encodedProjectName}&project_id=${encodedProjectId}`;
+                } else if (text === '未结') {
+                    // 获取当前项目名称和ID
+                    const projectName = localStorage.getItem('currentProjectName') || '';
+                    const projectId = localStorage.getItem('currentProjectId') || '';
+                    const encodedProjectName = encodeURIComponent(projectName);
+                    const encodedProjectId = encodeURIComponent(projectId);
+                    
+                    // 先通知父页面更新标题为"未结"
+                    if (window.parent && window.parent !== window) {
+                        // 使用当前页面的origin作为targetOrigin，提高安全性
+                        const targetOrigin = window.location.origin || '*';
+                        window.parent.postMessage({
+                            type: 'updateTitle',
+                            page: '未结.html'
+                        }, targetOrigin);
+                    }
+                    
+                    // 跳转到未结页面，传递项目名称和ID
+                    window.location.href = `未结.html?project_name=${encodedProjectName}&project_id=${encodedProjectId}`;
+                } else if (text === '项目设置') {
+                    // 获取当前项目名称和ID
+                    const projectName = localStorage.getItem('currentProjectName') || '';
+                    const projectId = localStorage.getItem('currentProjectId') || '';
+                    const encodedProjectName = encodeURIComponent(projectName);
+                    const encodedProjectId = encodeURIComponent(projectId);
+
+                    // 跳转到项目列表页面，传递项目ID以便打开项目设置模态框
+                    window.location.href = `项目列表.html?open_settings=true&project_id=${encodedProjectId}&project_name=${encodedProjectName}`;
+                } else if (text === '项目记账') {
+                    // 获取当前项目名称和ID
+                    const projectName = localStorage.getItem('currentProjectName') || '';
+                    const projectId = localStorage.getItem('currentProjectId') || '';
+                    const encodedProjectName = encodeURIComponent(projectName);
+                    const encodedProjectId = encodeURIComponent(projectId);
+                    
+                    // 先通知父页面更新标题为"项目记账"
+                    if (window.parent && window.parent !== window) {
+                        // 使用当前页面的origin作为targetOrigin，提高安全性
+                        const targetOrigin = window.location.origin || '*';
+                        window.parent.postMessage({
+                            type: 'updateTitle',
+                            page: '项目记账.html'
+                        }, targetOrigin);
+                    }
+                    
+                    // 跳转到项目记账页面，传递项目名称和ID
+                    window.location.href = `项目记账.html?project_name=${encodedProjectName}&project_id=${encodedProjectId}`;
+                } else if (text === '施工日志') {
+                    // 获取当前项目名称和ID
+                    const projectName = localStorage.getItem('currentProjectName') || '';
+                    const projectId = localStorage.getItem('currentProjectId') || '';
+                    const encodedProjectName = encodeURIComponent(projectName);
+                    const encodedProjectId = encodeURIComponent(projectId);
+                    
+                    // 先通知父页面更新标题为"施工日志"
+                    if (window.parent && window.parent !== window) {
+                        // 使用当前页面的origin作为targetOrigin，提高安全性
+                        const targetOrigin = window.location.origin || '*';
+                        window.parent.postMessage({
+                            type: 'updateTitle',
+                            page: '施工日志.html'
+                        }, targetOrigin);
+                    }
+                    
+                    // 跳转到施工日志页面，传递项目名称和ID
+                    window.location.href = `施工日志.html?project_name=${encodedProjectName}&project_id=${encodedProjectId}`;
+                } else if (text === '记工表') {
+                    // 获取当前项目名称和ID
+                    const projectName = localStorage.getItem('currentProjectName') || '';
+                    const projectId = localStorage.getItem('currentProjectId') || '';
+                    const encodedProjectName = encodeURIComponent(projectName);
+                    const encodedProjectId = encodeURIComponent(projectId);
+                    
+                    // 先通知父页面更新标题为"记工表"
+                    if (window.parent && window.parent !== window) {
+                        // 使用当前页面的origin作为targetOrigin，提高安全性
+                        const targetOrigin = window.location.origin || '*';
+                        window.parent.postMessage({
+                            type: 'updateTitle',
+                            page: '记工表.html'
+                        }, targetOrigin);
+                    }
+                    
+                    // 跳转到记工表页面，传递项目名称和ID
+                    window.location.href = `记工表.html?project_name=${encodedProjectName}&project_id=${encodedProjectId}`;
+                } else if (text === '带班设置') {
+                    // 获取当前项目名称和ID
+                    const projectName = localStorage.getItem('currentProjectName') || '';
+                    const projectId = localStorage.getItem('currentProjectId') || '';
+
+                    // 检查是否是带班身份
+                    try {
+                        let currentUserId = 'default';
+                        const currentUserStr = localStorage.getItem('currentUser');
+                        if (currentUserStr) {
+                            const currentUser = JSON.parse(currentUserStr);
+                            currentUserId = currentUser.user_id || 'default';
+                        }
+                        
+                        // 获取项目列表缓存
+                        const cacheKey = 'project_cache_' + currentUserId;
+                        const cachedData = localStorage.getItem(cacheKey);
+                        if (cachedData) {
+                            const parsed = JSON.parse(cachedData);
+                            const projects = Array.isArray(parsed) ? parsed : (parsed.projects || []);
+                            const currentProject = projects.find(p => p.project_id === projectId);
+                            
+                            // 如果找到项目且项目的user_id与当前登录用户ID不一致，则为带班
+                            if (currentProject && currentProject.user_id && currentProject.user_id !== currentUserId) {
+                                showNotification('你是带班，无权限！', true);
+                                return;
+                            }
+                        }
+                    } catch (error) {
+                        console.error('检查带班权限失败:', error);
+                    }
+
+                    const encodedProjectName = encodeURIComponent(projectName);
+                    const encodedProjectId = encodeURIComponent(projectId);
+                    
+                    // 先通知父页面更新标题为"带班设置"
+                    if (window.parent && window.parent !== window) {
+                        // 使用当前页面的origin作为targetOrigin，提高安全性
+                        const targetOrigin = window.location.origin || '*';
+                        window.parent.postMessage({
+                            type: 'updateTitle',
+                            page: '带班设置.html'
+                        }, targetOrigin);
+                    }
+                    
+                    // 跳转到带班设置页面，传递项目名称和ID
+                    window.location.href = `带班设置.html?project_name=${encodedProjectName}&project_id=${encodedProjectId}`;
+                } else if (text === '点工单') {
+                    const projectName = localStorage.getItem('currentProjectName') || '';
+                    const projectId = localStorage.getItem('currentProjectId') || '';
+                    const encodedProjectName = encodeURIComponent(projectName);
+                    const encodedProjectId = encodeURIComponent(projectId);
+
+                    if (window.parent && window.parent !== window) {
+                        const targetOrigin = window.location.origin || '*';
+                        window.parent.postMessage({
+                            type: 'updateTitle',
+                            page: '点工单.html'
+                        }, targetOrigin);
+                    }
+
+                    window.location.href = `点工单.html?project_name=${encodedProjectName}&project_id=${encodedProjectId}`;
+                } else if (text === '云相册') {
+                    const projectName = localStorage.getItem('currentProjectName') || '';
+                    const projectId = localStorage.getItem('currentProjectId') || '';
+                    const encodedProjectName = encodeURIComponent(projectName);
+                    const encodedProjectId = encodeURIComponent(projectId);
+
+                    if (window.parent && window.parent !== window) {
+                        const targetOrigin = window.location.origin || '*';
+                        window.parent.postMessage({
+                            type: 'updateTitle',
+                            page: '云相册.html'
+                        }, targetOrigin);
+                    }
+
+                    window.location.href = `云相册.html?project_name=${encodedProjectName}&project_id=${encodedProjectId}`;
+                } else {
+                    alert('点击了: ' + text);
+                }
+            });
+        });
+
+        // 底部按钮点击
+        document.querySelectorAll('.action-button').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const buttonText = this.textContent.trim();
+                const projectName = localStorage.getItem('currentProjectName') || '';
+                const encodedProjectName = encodeURIComponent(projectName);
+                
+                if (buttonText.includes('记工')) {
+                    // 获取当前项目名称和ID
+                    const projectName = localStorage.getItem('currentProjectName') || '';
+                    const projectId = localStorage.getItem('currentProjectId') || '';
+                    const encodedProjectName = encodeURIComponent(projectName);
+                    const encodedProjectId = encodeURIComponent(projectId);
+                    
+                    // 先通知父页面更新标题为"记工"
+                    if (window.parent && window.parent !== window) {
+                        window.parent.postMessage({
+                            type: 'updateTitle',
+                            page: '记工.html'
+                        }, window.location.origin);
+                    }
+                    
+                    // 跳转到记工页面，传递项目名称和ID
+                    window.location.href = `记工.html?project_name=${encodedProjectName}&project_id=${encodedProjectId}`;
+                } else if (buttonText.includes('结算/借支')) {
+                    // 获取当前项目名称和ID
+                    const projectName = localStorage.getItem('currentProjectName') || '';
+                    const projectId = localStorage.getItem('currentProjectId') || '';
+                    const encodedProjectName = encodeURIComponent(projectName);
+                    const encodedProjectId = encodeURIComponent(projectId);
+                    
+                    // 先通知父页面更新标题为"结算/借支"
+                    if (window.parent && window.parent !== window) {
+                        window.parent.postMessage({
+                            type: 'updateTitle',
+                            page: '结算借支.html'
+                        }, window.location.origin);
+                    }
+                    
+                    // 跳转到结算借支页面，传递项目名称和ID
+                    window.location.href = `结算借支.html?project_name=${encodedProjectName}&project_id=${encodedProjectId}`;
+                } else {
+                    alert('点击了: ' + buttonText);
+                }
+            });
+        });
+        
+        // 在页面加载完成后调用syncProjectName函数
+        document.addEventListener('DOMContentLoaded', function() {
+
+            // 加载项目统计数据
+            loadProjectStatistics();
+            
+            // 监听数据更新事件
+            window.addEventListener('dataUpdated', function(event) {
+                console.log('📊 数据更新事件触发:', event.detail);
+                // 数据更新后重新加载项目统计数据
+                loadProjectStatistics();
+            });
+            
+            // 监听localStorage变化事件，当其他页面修改本地存储时触发
+            window.addEventListener('storage', function(event) {
+                // 当考勤或结算数据发生变化时，重新加载统计数据
+                if (event.key && (event.key.includes('attendance_cache') || event.key.includes('settlement_cache'))) {
+                    // 静默处理，不输出日志
+                    loadProjectStatistics();
+                }
+            });
+            
+            // 监听页面可见性变化，当页面从后台回到前台时重新加载数据
+            document.addEventListener('visibilitychange', function() {
+                if (document.visibilityState === 'visible') {
+                    console.log('📱 页面变为可见，重新加载项目统计数据');
+                    loadProjectStatistics();
+                }
+            });
+            
+            // 延迟初始化实时订阅，确保所有资源都已加载
+            setTimeout(initRealtimeSubscription, 1000);
+        });
+        
+        // 监听来自父页面的消息，用于实时更新
+        window.addEventListener('message', function(event) {
+            // 验证消息来源（在本地开发环境中可能无法验证）
+            // 在生产环境中应使用具体的域名验证
+            
+            try {
+                if (event.data && typeof event.data === 'object') {
+                    switch (event.data.type) {
+                        case 'refreshData':
+                        case 'refreshAttendanceData':
+                        case 'refreshSettlementData':
+                        case 'refreshEmployeeData':
+                        case 'refreshExpenseData':
+                            console.log('🔄 收到数据刷新指令');
+                            // 刷新统计卡片数据
+                            loadProjectStatistics();
+                            // 刷新日历视图
+                            renderCalendar(selectedYear, selectedMonth);
+                            console.log('✅ 已触发界面刷新');
+                            break;
+                        default:
+                            // 忽略其他类型的消息
+                            break;
+                    }
+                }
+            } catch (error) {
+                console.error('处理消息时发生错误:', error);
+            }
+        });
+        
+        // 初始化实时订阅 - 子页面不需要重复订阅，由首页统一管理
+        function initRealtimeSubscription() {
+            // 子页面不需要重复订阅，由首页统一管理实时订阅
+            // 仅需监听来自父页面的消息即可
+        }
+    </script>
+</body>
+</html>
