@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>计算器</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: transparent; /* 背景透明，由iframe容器决定背景 */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            user-select: none;
+            overflow: hidden; /* 禁止出现滚动条 */
+        }
+
+        .main-container {
+            display: flex;
+            gap: 20px;
+            align-items: stretch;
+            height: 100%;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px;
+        }
+
+        .calculator {
+            background-color: #000;
+            width: 65%; /* 增加宽度占比，配合历史记录 */
+            aspect-ratio: 3/4; /* 设置宽高比 */
+            min-height: 0; 
+            border-radius: 40px;
+            padding: 20px;
+            box-sizing: border-box; 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .history-panel {
+            background-color: #1c1c1c;
+            width: 35%; /* 剩余宽度 */
+            aspect-ratio: 3/4; /* 设置宽高比 */
+            min-height: 0; 
+            border-radius: 40px;
+            padding: 20px;
+            box-sizing: border-box; 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #333;
+            margin-bottom: 10px;
+            flex-shrink: 0; /* 防止标题被压缩 */
+        }
+
+        .history-header span {
+            font-size: 20px;
+            font-weight: 500;
+        }
+
+        .clear-history {
+            background: none;
+            border: none;
+            color: #ff9f0a;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 5px;
+            width: auto; 
+            height: auto;
+            border-radius: 8px;
+            display: inline-block;
+            margin: 0;
+        }
+        
+        .clear-history:hover {
+             background-color: #333;
+        }
+
+        .history-list {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .history-list::-webkit-scrollbar {
+            width: 5px;
+        }
+        
+        .history-list::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 5px;
+        }
+
+        .history-item {
+            padding: 12px 10px;
+            border-bottom: 1px solid #333;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border-radius: 10px;
+            margin-bottom: 5px;
+        }
+
+        .history-item:hover {
+            background-color: #333;
+        }
+
+        .history-content {
+            color: #fff;
+            font-size: 18px;
+            text-align: right;
+            word-break: break-all;
+        }
+
+        .display {
+            color: #fff;
+            font-size: 80px;
+            font-weight: 300;
+            text-align: right;
+            padding: 0 10px;
+            margin-bottom: 10px;
+            margin-top: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            height: auto; 
+            min-height: 60px; /* 减小最小高度 */
+            flex-shrink: 1; 
+            line-height: 1.2;
+            display: flex;
+            align-items: flex-end;
+            justify-content: flex-end;
+        }
+
+        .steps {
+            color: #888;
+            font-size: 30px;
+            text-align: right;
+            padding: 0 15px;
+            margin-top: auto;
+            height: 40px; /* 固定高度，防止形变 */
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+        }
+
+        .buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(5, 1fr); 
+            gap: 8px; /* 减小间距 */
+            flex: 1; 
+            min-height: 0; 
+            padding: 5px; /* 添加内边距 */
+        }
+
+        button {
+            border: none;
+            outline: none;
+            font-size: 32px;
+            aspect-ratio: 1/1; /* 确保宽高比为1:1 */
+            width: 100%;  /* 填满网格单元 */
+            max-width: 80px; /* 设置最大宽度 */
+            border-radius: 50%; /* 使用50%确保圆形 */
+            cursor: pointer;
+            transition: filter 0.2s;
+            margin: 0 auto; /* 居中显示 */
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        button:active {
+            filter: brightness(1.3);
+        }
+
+        /* Number buttons */
+        .btn-num {
+            background-color: #333;
+            color: #fff;
+        }
+
+        /* Function buttons (AC, +/-, %) */
+        .btn-func {
+            background-color: #a5a5a5;
+            color: #000;
+        }
+
+        /* Operator buttons */
+        .btn-op {
+            background-color: #ff9f0a;
+            color: #fff;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        /* Zero button spans two columns */
+        .btn-zero {
+            grid-column: span 2;
+            aspect-ratio: 2/1; /* 宽是高的两倍 */
+            max-width: 170px; /* 设置最大宽度，考虑间距 */
+            border-radius: 35px;
+            padding-left: 28px; /* Align text visually with other numbers */
+            justify-content: flex-start;
+        }
+
+        /* Active state for operators */
+        .btn-op.active {
+            background-color: #fff;
+            color: #ff9f0a;
+        }
+
+        /* Mobile adaptation if needed, but max-width handles it */
+        @media (max-width: 600px) {
+            body {
+                overflow-y: auto; /* 允许出现滚动条 */
+                height: auto; /* 让 body 高度自适应 */
+                display: block; /* 取消 flex 居中，改为块级布局 */
+                background-color: #222; /* 移动端背景色 */
+            }
+
+            .main-container {
+                flex-direction: column;
+                align-items: center;
+                width: 100%;
+                height: auto; /* 高度自适应 */
+                min-height: 100vh;
+                overflow-y: visible;
+                padding: 10px;
+                box-sizing: border-box;
+            }
+
+            .calculator {
+                border-radius: 20px;
+                width: 100%;
+                max-width: none; 
+                flex-shrink: 0;
+                aspect-ratio: 2/3; /* 调整宽高比，增加垂直高度 */
+                min-height: 75vh; /* 增加最小高度 */
+            }
+            
+            .history-panel {
+                width: 100%;
+                max-width: none; 
+                flex-shrink: 0;
+                border-radius: 20px;
+                aspect-ratio: 3/2; /* 历史记录面板保持适当比例 */
+                min-height: 40vh; /* 确保最小高度 */
+                margin-bottom: 20px;
+            }
+            
+            .buttons {
+                gap: 6px; /* 进一步减小间距 */
+                padding: 4px; /* 添加内边距 */
+            }
+            
+            button {
+                font-size: 24px; /* 调整按钮字体大小 */
+                border-radius: 50%; /* 使用50%确保圆形 */
+                max-width: 60px; /* 减小最大宽度 */
+            }
+            
+            .btn-zero {
+                padding-left: 20px; /* 调整零按钮文本对齐 */
+                border-radius: 28px; /* 零按钮使用圆角矩形 */
+                max-width: 128px; /* 减小零按钮最大宽度 */
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="main-container">
+    <div class="calculator">
+        <div class="steps" id="steps"></div>
+        <div class="display" id="display">0</div>
+        <div class="buttons">
+            <button class="btn-func" id="btn-ac">AC</button>
+            <button class="btn-func" onclick="handleNegate()">+/-</button>
+            <button class="btn-func" onclick="handlePercent()">%</button>
+            <button class="btn-op" id="btn-div" onclick="handleOperator('/')">÷</button>
+
+            <button class="btn-num" onclick="appendNumber('7')">7</button>
+            <button class="btn-num" onclick="appendNumber('8')">8</button>
+            <button class="btn-num" onclick="appendNumber('9')">9</button>
+            <button class="btn-op" id="btn-mul" onclick="handleOperator('*')">×</button>
+
+            <button class="btn-num" onclick="appendNumber('4')">4</button>
+            <button class="btn-num" onclick="appendNumber('5')">5</button>
+            <button class="btn-num" onclick="appendNumber('6')">6</button>
+            <button class="btn-op" id="btn-sub" onclick="handleOperator('-')">−</button>
+
+            <button class="btn-num" onclick="appendNumber('1')">1</button>
+            <button class="btn-num" onclick="appendNumber('2')">2</button>
+            <button class="btn-num" onclick="appendNumber('3')">3</button>
+            <button class="btn-op" id="btn-add" onclick="handleOperator('+')">+</button>
+
+            <button class="btn-num btn-zero" onclick="appendNumber('0')">0</button>
+            <button class="btn-num" onclick="appendDecimal()">.</button>
+            <button class="btn-op" onclick="calculate()">=</button>
+        </div>
+    </div>
+
+    <div class="history-panel">
+        <div class="history-header">
+            <span>记忆记录</span>
+            <button class="clear-history" onclick="clearHistory()">清除</button>
+        </div>
+        <div class="history-list" id="historyList">
+            <!-- History items will be added here -->
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentInput = '0';
+    let previousInput = null;
+    let operator = null;
+    let waitingForSecondOperand = false;
+    
+    const displayElement = document.getElementById('display');
+    const stepsElement = document.getElementById('steps');
+    const acButton = document.getElementById('btn-ac');
+    const historyList = document.getElementById('historyList');
+    
+    // Long press logic for AC button
+    let acLongPressTimer;
+    let acLongPressTriggered = false;
+
+    acButton.addEventListener('mousedown', handleAcStart);
+    acButton.addEventListener('touchstart', handleAcStart, {passive: false});
+    acButton.addEventListener('mouseup', handleAcEnd);
+    acButton.addEventListener('touchend', handleAcEnd);
+    acButton.addEventListener('mouseleave', handleAcCancel);
+
+    function handleAcStart(e) {
+        if (e.type === 'touchstart') e.preventDefault(); // Prevent mouse events firing twice
+        acLongPressTriggered = false;
+        acLongPressTimer = setTimeout(() => {
+            acLongPressTriggered = true;
+            clearHistory();
+            
+            // Visual feedback
+            acButton.innerText = '已清空';
+            
+            setTimeout(() => {
+                // Restore text based on current state
+                updateDisplay(); 
+            }, 800);
+            
+        }, 800);
+    }
+
+    function handleAcEnd(e) {
+        clearTimeout(acLongPressTimer);
+        if (!acLongPressTriggered) {
+            handleClear();
+            simulateClickByText(acButton.innerText); // Visual feedback
+        }
+    }
+    
+    function handleAcCancel() {
+        clearTimeout(acLongPressTimer);
+    }
+    
+    function updateDisplay() {
+        // Adjust font size based on length
+        if (currentInput.length > 9) {
+            displayElement.style.fontSize = '50px';
+        } else if (currentInput.length > 6) {
+            displayElement.style.fontSize = '65px';
+        } else {
+            displayElement.style.fontSize = '80px';
+        }
+        
+        // Format with commas if it's a valid number
+        let text = currentInput;
+        if (!text.includes('e') && !isNaN(parseFloat(text))) {
+             const parts = text.split('.');
+             parts[0] = parseFloat(parts[0]).toLocaleString('en-US', {maximumFractionDigits: 0});
+             text = parts.join('.');
+        }
+        
+        displayElement.innerText = text;
+
+        // Update AC button to C if there is input
+        if (currentInput !== '0' && currentInput !== '-0') {
+            acButton.innerText = 'C';
+        } else {
+            acButton.innerText = 'AC';
+        }
+    }
+
+    function appendNumber(num) {
+        if (waitingForSecondOperand) {
+            // Check if we just finished a calculation (operator is null but we are waiting)
+            if (operator === null) {
+                stepsElement.innerText = '';
+            }
+            currentInput = num;
+            waitingForSecondOperand = false;
+            resetOperatorActiveState();
+        } else {
+            if (currentInput === '0') {
+                currentInput = num;
+            } else if (currentInput === '-0') {
+                currentInput = '-' + num;
+            } else {
+                if (currentInput.length < 15) { // Limit length
+                    currentInput += num;
+                }
+            }
+        }
+        updateDisplay();
+    }
+
+    function appendDecimal() {
+        if (waitingForSecondOperand) {
+            // Check if we just finished a calculation
+            if (operator === null) {
+                stepsElement.innerText = '';
+            }
+            currentInput = '0.';
+            waitingForSecondOperand = false;
+            resetOperatorActiveState();
+        } else if (!currentInput.includes('.')) {
+            currentInput += '.';
+        }
+        updateDisplay();
+    }
+
+    function handleClear() {
+        if (acButton.innerText === 'C') {
+            currentInput = '0';
+            acButton.innerText = 'AC';
+        } else {
+            currentInput = '0';
+            previousInput = null;
+            operator = null;
+            waitingForSecondOperand = false;
+            resetOperatorActiveState();
+            stepsElement.innerText = '';
+        }
+        updateDisplay();
+    }
+
+    function handleNegate() {
+        if (currentInput === '0') return;
+        
+        if (currentInput.startsWith('-')) {
+            currentInput = currentInput.substring(1);
+        } else {
+            currentInput = '-' + currentInput;
+        }
+        updateDisplay();
+    }
+
+    function handlePercent() {
+        const value = parseFloat(currentInput);
+        currentInput = (value / 100).toString();
+        updateDisplay();
+    }
+
+    function handleOperator(nextOperator) {
+        const inputValue = parseFloat(currentInput);
+
+        // Map operator to symbol for display
+        const opSymbols = {'+': '+', '-': '−', '*': '×', '/': '÷'};
+
+        if (operator && waitingForSecondOperand) {
+            operator = nextOperator;
+            setActiveOperator(nextOperator);
+            // Update steps with new operator
+            stepsElement.innerText = `${parseFloat(previousInput)} ${opSymbols[operator]}`;
+            return;
+        }
+
+        if (previousInput === null) {
+            previousInput = inputValue;
+        } else if (operator) {
+            const result = performCalculation(operator, previousInput, inputValue);
+            
+            // Record the intermediate step
+            const expression = `${parseFloat(previousInput)} ${opSymbols[operator]} ${inputValue} =`;
+            addToHistory(expression, result);
+            
+            currentInput = String(result);
+            previousInput = result;
+            updateDisplay();
+        }
+
+        waitingForSecondOperand = true;
+        operator = nextOperator;
+        setActiveOperator(nextOperator);
+        
+        stepsElement.innerText = `${parseFloat(previousInput)} ${opSymbols[operator]}`;
+    }
+
+    function performCalculation(op, first, second) {
+        let result = 0;
+        switch(op) {
+            case '+': result = first + second; break;
+            case '-': result = first - second; break;
+            case '*': result = first * second; break;
+            case '/': result = first / second; break;
+            default: return second;
+        }
+        
+        // Handle floating point precision issues
+        return parseFloat(result.toPrecision(12));
+    }
+
+    function calculate() {
+        if (operator === null || previousInput === null) return;
+
+        const inputValue = parseFloat(currentInput);
+        const result = performCalculation(operator, previousInput, inputValue);
+        
+        // Map operator to symbol for display
+        const opSymbols = {'+': '+', '-': '−', '*': '×', '/': '÷'};
+        const expression = `${parseFloat(previousInput)} ${opSymbols[operator]} ${inputValue} =`;
+        // Show full expression with result in steps
+        stepsElement.innerText = `${expression} ${result}`;
+        
+        // Add to history
+        addToHistory(expression, result);
+
+        currentInput = String(result);
+        previousInput = null;
+        operator = null;
+        waitingForSecondOperand = false; 
+        waitingForSecondOperand = true; // Make next number input replace result
+
+        resetOperatorActiveState();
+        updateDisplay();
+    }
+    
+    function addToHistory(expression, result) {
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        item.onclick = function() {
+            // Optional: load result back to calculator
+            currentInput = String(result);
+            updateDisplay();
+        };
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'history-content';
+        contentDiv.innerText = `${expression} ${result}`;
+        
+        item.appendChild(contentDiv);
+        
+        // Append to bottom
+        historyList.appendChild(item);
+        
+        // Scroll to bottom
+        historyList.scrollTop = historyList.scrollHeight;
+    }
+    
+    function clearHistory() {
+        historyList.innerHTML = '';
+    }
+    
+    // UI Helpers for Active Operator
+    function setActiveOperator(op) {
+        resetOperatorActiveState();
+        let btnId = '';
+        if (op === '/') btnId = 'btn-div';
+        if (op === '*') btnId = 'btn-mul';
+        if (op === '-') btnId = 'btn-sub';
+        if (op === '+') btnId = 'btn-add';
+        
+        const btn = document.getElementById(btnId);
+        if (btn) btn.classList.add('active');
+    }
+
+    function resetOperatorActiveState() {
+        document.querySelectorAll('.btn-op').forEach(btn => {
+            btn.classList.remove('active');
+        });
+    }
+
+    // Keyboard Support
+    document.addEventListener('keydown', (event) => {
+        const key = event.key;
+        const code = event.code;
+
+        // Numbers - handle both main keyboard and numpad
+        if (/[0-9]/.test(key) || code.startsWith('Numpad') && code !== 'NumpadEnter' && code !== 'NumpadAdd' && code !== 'NumpadSubtract' && code !== 'NumpadMultiply' && code !== 'NumpadDivide' && code !== 'NumpadDecimal') {
+            event.preventDefault();
+            appendNumber(key);
+            // Visual feedback
+            simulateClickByText(key);
+        }
+        
+        // Operators - handle both main keyboard and numpad
+        if (['+', '-', '*', '/'].includes(key) || ['NumpadAdd', 'NumpadSubtract', 'NumpadMultiply', 'NumpadDivide'].includes(code)) {
+            event.preventDefault();
+            let op = key;
+            if (code === 'NumpadAdd') op = '+';
+            if (code === 'NumpadSubtract') op = '-';
+            if (code === 'NumpadMultiply') op = '*';
+            if (code === 'NumpadDivide') op = '/';
+            handleOperator(op);
+            // Visual feedback
+            let opMap = {'+': '+', '-': '−', '*': '×', '/': '÷'};
+            simulateClickByText(opMap[op]);
+        }
+        
+        // Enter or = (including NumpadEnter)
+        if (key === 'Enter' || key === '=' || code === 'NumpadEnter') {
+            event.preventDefault();
+            calculate();
+            simulateClickByText('=');
+        }
+        
+        // Backspace (as C or delete last char? Apple calc swipe deletes last digit. C clears current.)
+        // Let's make Backspace act as C if not 0, or AC
+        if (key === 'Backspace') {
+            event.preventDefault();
+            // If we want to implement backspace as delete last digit:
+            if (currentInput.length > 1 && currentInput !== '0' && !waitingForSecondOperand) {
+                 currentInput = currentInput.slice(0, -1);
+                 if (currentInput === '-' || currentInput === '') currentInput = '0';
+                 updateDisplay();
+            } else {
+                handleClear();
+                simulateClickByText(acButton.innerText);
+            }
+        }
+        
+        // Escape -> AC
+        if (key === 'Escape') {
+            event.preventDefault();
+            // Force full clear
+            acButton.innerText = 'C'; // Hack to force C logic first if needed, but handleClear checks innerText.
+            // If we want real AC:
+            currentInput = '0';
+            previousInput = null;
+            operator = null;
+            waitingForSecondOperand = false;
+            resetOperatorActiveState();
+            acButton.innerText = 'AC';
+            updateDisplay();
+            simulateClickByText('AC');
+        }
+        
+        // Decimal (including NumpadDecimal)
+        if (key === '.' || code === 'NumpadDecimal') {
+            event.preventDefault();
+            appendDecimal();
+            simulateClickByText('.');
+        }
+        
+        // Percent
+        if (key === '%') {
+            event.preventDefault();
+            handlePercent();
+            simulateClickByText('%');
+        }
+    });
+
+    function simulateClickByText(text) {
+        // Find button with this text
+        const buttons = Array.from(document.querySelectorAll('button'));
+        const btn = buttons.find(b => b.innerText === text);
+        if (btn) {
+            btn.style.filter = 'brightness(1.3)';
+            setTimeout(() => {
+                btn.style.filter = '';
+            }, 100);
+        }
+    }
+
+    // Initial Display
+    updateDisplay();
+
+</script>
+
+</body>
+</html>
