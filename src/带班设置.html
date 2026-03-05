@@ -1,0 +1,1480 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>带班设置</title>
+    <style>
+        /* 权限设置模态框样式 - 美化版 */
+        .perm-group {
+            margin-bottom: 16px;
+            background: #fff;
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid #f1f5f9;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+            transition: all 0.2s ease;
+        }
+        
+        .perm-group:hover {
+            border-color: #e2e8f0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            transform: translateY(-1px);
+        }
+
+        .perm-title {
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #1e293b;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            border-left: none;
+            padding-left: 0;
+        }
+        
+        .perm-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+            color: #4080ff;
+            background: rgba(64, 128, 255, 0.1);
+            padding: 4px;
+            border-radius: 6px;
+            box-sizing: content-box;
+        }
+
+        .perm-options {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .perm-label {
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            color: #64748b;
+            cursor: pointer;
+            padding: 10px 12px;
+            border-radius: 8px;
+            background-color: #f8fafc;
+            border: 1px solid transparent;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+        }
+        
+        .perm-label:hover {
+            background-color: #f1f5f9;
+            color: #334155;
+        }
+        
+        /* 选中状态的高亮样式 */
+        .perm-label:has(input:checked) {
+            background-color: #eff6ff;
+            border-color: #bfdbfe;
+            color: #2563eb;
+            font-weight: 500;
+        }
+
+        /* 自定义复选框样式 */
+        .perm-label input {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border: 2px solid #cbd5e1;
+            border-radius: 5px;
+            margin-right: 10px;
+            position: relative;
+            cursor: pointer;
+            flex-shrink: 0;
+            background-color: white;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .perm-label input:checked {
+            background-color: #4080ff;
+            border-color: #4080ff;
+            transform: scale(1.05);
+        }
+        
+        .perm-label input:checked::after {
+            content: '';
+            position: absolute;
+            left: 5px;
+            top: 1px;
+            width: 4px;
+            height: 9px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+        
+        .perm-label input:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(64, 128, 255, 0.15);
+        }
+        .btn-icon {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 8px;
+            color: #6b7280;
+            border-radius: 6px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-icon:hover {
+            background-color: #f3f4f6;
+            color: #4080ff;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        body {
+            background-color: #fff;
+            padding: 20px;
+        }
+
+        /* 顶部按钮区域 */
+        .header-actions {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            font-weight: 600;
+            outline: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            letter-spacing: 0.5px;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        /* 添加带班按钮 - 渐变蓝 */
+        .btn-add {
+            background: linear-gradient(135deg, #4080ff 0%, #1660f0 100%);
+            color: white;
+            border: none;
+            box-shadow: 0 4px 12px rgba(64, 128, 255, 0.3);
+        }
+
+        .btn-add:hover {
+            box-shadow: 0 6px 16px rgba(64, 128, 255, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .btn-add:active {
+            transform: translateY(0) scale(0.98);
+        }
+
+        /* 删除带班按钮 - 幽灵红 */
+        .btn-delete {
+            background-color: white;
+            color: #ff4d4f;
+            border: 1px solid #ff4d4f;
+        }
+
+        .btn-delete:hover {
+            background-color: #fff0f0;
+            box-shadow: 0 2px 8px rgba(255, 77, 79, 0.15);
+        }
+
+        /* 取消按钮（主界面） */
+        .btn-cancel-main {
+            background-color: #f5f5f5;
+            color: #666;
+            border: 1px solid #d9d9d9;
+            display: none;
+        }
+        
+        .btn-cancel-main:hover {
+            background-color: #e6e6e6;
+            color: #333;
+        }
+
+        /* 确定删除按钮样式 */
+        .btn-confirm-delete {
+            background: #f5f5f5;
+            color: #bbb;
+            border: none;
+            cursor: not-allowed;
+        }
+        
+        .btn-confirm-delete.active {
+            background: linear-gradient(135deg, #ff4d4f 0%, #d9363e 100%);
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(255, 77, 79, 0.3);
+        }
+
+        .btn-confirm-delete.active:hover {
+            box-shadow: 0 6px 16px rgba(255, 77, 79, 0.4);
+            transform: translateY(-1px);
+        }
+
+        /* 列表区域 */
+        .leader-list {
+            list-style: none;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .leader-item {
+            display: flex;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .leader-item:hover {
+            background-color: #f9fafb;
+        }
+
+        /* 列表中的删除复选框 */
+        .delete-checkbox {
+            margin-right: 15px;
+            display: none !important;
+        }
+
+        /* 头像 */
+        .avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #4080ff 0%, #2060df 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            margin-right: 16px;
+            font-weight: 600;
+            flex-shrink: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(64, 128, 255, 0.2);
+        }
+
+        .info {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .name {
+            font-size: 16px;
+            color: #1f2937;
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+
+        .phone {
+            font-size: 13px;
+            color: #6b7280;
+        }
+
+        /* 模态框样式 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal {
+            background-color: white;
+            width: 90%;
+            max-width: 360px;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            display: flex;
+            flex-direction: column;
+            max-height: 85vh;
+            animation: zoomIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
+        }
+
+        @keyframes zoomIn {
+            from { opacity: 0; transform: scale(0.95) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .modal-header {
+            padding: 24px 24px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #111827;
+        }
+
+        .close-btn {
+            background: #f3f4f6;
+            border: none;
+            font-size: 20px;
+            color: #6b7280;
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .close-btn:hover {
+            background-color: #fee2e2;
+            color: #ef4444;
+            transform: rotate(90deg);
+        }
+
+        .modal-body {
+            padding: 0 24px 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid transparent;
+            background-color: #f3f4f6;
+            border-radius: 10px;
+            font-size: 14px;
+            color: #1f2937;
+            margin-bottom: 20px;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .search-box::placeholder {
+            color: #9ca3af;
+        }
+
+        .search-box:focus {
+            background-color: white;
+            border-color: #4080ff;
+            box-shadow: 0 0 0 3px rgba(64, 128, 255, 0.1);
+        }
+
+        .select-all-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            font-size: 15px;
+            color: #333;
+        }
+
+        .checkbox-custom {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #d1d5db;
+            border-radius: 6px;
+            margin-right: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s;
+        }
+
+        .checkbox-custom.checked {
+            background-color: #4080ff;
+            border-color: #4080ff;
+            animation: pulse 0.3s;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(0.9); }
+            100% { transform: scale(1); }
+        }
+
+        .checkbox-custom.checked::after {
+            content: '';
+            width: 5px;
+            height: 9px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+            position: absolute;
+            top: 2px;
+        }
+        
+        /* 字母分组标题 */
+        .group-title {
+            font-size: 13px;
+            color: #9ca3af;
+            margin: 16px 0 8px;
+            font-weight: 600;
+            padding-left: 4px;
+        }
+
+        .worker-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 8px;
+            border-bottom: 1px solid #f3f4f6;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: background-color 0.2s;
+        }
+
+        .worker-item:hover {
+            background-color: #f9fafb;
+        }
+
+        .worker-item:last-child {
+            border-bottom: none;
+        }
+
+        .modal-footer {
+            padding: 20px 24px;
+            border-top: 1px solid #f3f4f6;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            background-color: white;
+        }
+
+        .btn-cancel {
+            background-color: #f3f4f6;
+            border: none;
+            color: #4b5563;
+        }
+        
+        .btn-cancel:hover {
+            background-color: #e5e7eb;
+            color: #1f2937;
+        }
+
+        .btn-confirm {
+            background-color: #f3f4f6;
+            color: #9ca3af;
+            border: none;
+            cursor: not-allowed;
+        }
+        
+        .btn-confirm.active {
+            background: linear-gradient(135deg, #4080ff 0%, #1660f0 100%);
+            color: white;
+            box-shadow: 0 4px 10px rgba(64, 128, 255, 0.3);
+            cursor: pointer;
+        }
+
+        .btn-confirm.active:hover {
+            box-shadow: 0 6px 14px rgba(64, 128, 255, 0.4);
+            transform: translateY(-1px);
+        }
+
+        /* Checkbox styling within list */
+        .item-checkbox {
+            margin-right: 15px;
+        }
+
+        @keyframes notificationPop {
+            0% {
+                transform: translate(-50%, -50%) scale(0.8);
+                opacity: 0;
+            }
+            80% {
+                transform: translate(-50%, -50%) scale(1.05);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="notification" id="notification"></div>
+
+    <div class="header-actions">
+        <button class="btn btn-add" id="addBtn">添加带班</button>
+        <button class="btn btn-delete" id="deleteBtn">删除带班</button>
+        <button class="btn btn-cancel-main" id="cancelDeleteBtn">取 消</button>
+    </div>
+
+    <ul class="leader-list" id="leaderList">
+        <!-- 带班列表动态生成 -->
+    </ul>
+
+    <!-- 模态框 -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">添加带班</span>
+                <button class="close-btn" id="closeBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="text" class="search-box" placeholder="请输入姓名/手机号查找">
+                
+                <div class="worker-list">
+                    <!-- 动态加载员工列表 -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-cancel" id="cancelBtn">取消</button>
+                <button class="btn btn-confirm">设为带班 (0) 人</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 删除确认模态框 -->
+    <div class="modal-overlay" id="deleteConfirmOverlay">
+        <div class="modal" style="height: auto; max-height: auto;">
+            <div class="modal-header" style="border-bottom: none; padding-bottom: 0;">
+                <button class="close-btn" id="closeDeleteConfirmBtn" style="margin-left: auto;">&times;</button>
+            </div>
+            <div class="modal-body" style="flex: 0 0 auto; padding: 10px 30px 30px;">
+                <div style="display: flex; align-items: flex-start; gap: 15px;">
+                    <div style="color: #faad14; flex-shrink: 0; padding-top: 2px;">
+                        <svg viewBox="64 64 896 896" focusable="false" data-icon="exclamation-circle" width="24" height="24" fill="currentColor" aria-hidden="true">
+                            <path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm-32 232c0-4.4 3.6-8 8-8h48c4.4 0 8 3.6 8 8v272c0 4.4-3.6 8-8 8h-48c-4.4 0-8-3.6-8-8V296zm32 440a48.01 48.01 0 010-96 48.01 48.01 0 010 96z"></path>
+                        </svg>
+                    </div>
+                    <div id="deleteConfirmMessage" style="font-size: 16px; color: #333; font-weight: 500;">
+                        确定要移除选中的带班吗？
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-cancel" id="cancelDeleteConfirmBtn">取消</button>
+                <button class="btn btn-confirm active" id="confirmDeleteActionBtn" style="background-color: #ff4d4f; color: white;">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 权限设置模态框 -->
+    <div class="modal-overlay" id="permModalOverlay">
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <span class="modal-title">设置权限 - <span id="permUserName"></span></span>
+                <button class="close-btn" id="closePermBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="permUserId">
+                
+                <div class="perm-group">
+                    <div class="perm-title">
+                        <svg class="perm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        记工数据
+                    </div>
+                    <div class="perm-options">
+                        <label class="perm-label"><input type="checkbox" id="perm_add_work_record"> 添加</label>
+                        <label class="perm-label"><input type="checkbox" id="perm_edit_work_record"> 修改</label>
+                        <label class="perm-label"><input type="checkbox" id="perm_delete_work_record"> 删除</label>
+                    </div>
+                </div>
+
+                <div class="perm-group">
+                    <div class="perm-title">
+                        <svg class="perm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                        结算借支数据
+                    </div>
+                    <div class="perm-options">
+                        <label class="perm-label"><input type="checkbox" id="perm_add_settlement"> 添加</label>
+                        <label class="perm-label"><input type="checkbox" id="perm_edit_settlement"> 修改</label>
+                        <label class="perm-label"><input type="checkbox" id="perm_delete_settlement"> 删除</label>
+                    </div>
+                </div>
+
+                <div class="perm-group">
+                    <div class="perm-title">
+                        <svg class="perm-icon" style="color: #ef4444; background: rgba(239, 68, 68, 0.1);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                        项目支出数据
+                    </div>
+                    <div class="perm-options">
+                        <label class="perm-label"><input type="checkbox" id="perm_add_expense"> 添加</label>
+                        <label class="perm-label"><input type="checkbox" id="perm_edit_expense"> 修改</label>
+                        <label class="perm-label"><input type="checkbox" id="perm_delete_expense"> 删除</label>
+                    </div>
+                </div>
+
+                <div class="perm-group">
+                    <div class="perm-title">
+                        <svg class="perm-icon" style="color: #10b981; background: rgba(16, 185, 129, 0.1);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                        项目收入数据
+                    </div>
+                    <div class="perm-options">
+                        <label class="perm-label"><input type="checkbox" id="perm_add_income"> 添加</label>
+                        <label class="perm-label"><input type="checkbox" id="perm_edit_income"> 修改</label>
+                        <label class="perm-label"><input type="checkbox" id="perm_delete_income"> 删除</label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-cancel" id="cancelPermBtn">取消</button>
+                <button class="btn btn-confirm active" id="savePermBtn">保存权限</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="./JavaScript/supabase/supabase.min.js"></script>
+    <script src="./JavaScript/supabase/supabase-client.js"></script>
+    <script src="./JavaScript/supabase/pinyin-pro.js"></script>
+    <script>
+        function showNotification(message, isError = false) {
+            const notification = document.getElementById('notification');
+            if (!notification) {
+                console.error('未找到notification元素!');
+                alert('提示框元素未找到: ' + message); // 作为备用
+                return;
+            }
+            
+            // 设置文本和样式
+            notification.textContent = message;
+            notification.className = isError ? 'notification error' : 'notification';
+            
+            // 强制显示 - 确保所有样式属性都正确设置
+            notification.style.cssText = `
+                display: block;
+                visibility: visible;
+                opacity: 1;
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                padding: 16px 24px;
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                color: white;
+                border-radius: 8px;
+                box-shadow: 0 15px 40px rgba(16, 185, 129, 0.4), 0 8px 20px rgba(16, 185, 129, 0.2);
+                z-index: 9999;
+                font-weight: 700;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                font-size: 16px;
+                min-width: 200px;
+                text-align: center;
+                animation: notificationPop 0.3s ease-out;
+            `;
+            
+            // 如果是错误消息，覆盖背景和阴影颜色
+            if (isError) {
+                notification.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+                notification.style.boxShadow = '0 15px 40px rgba(239, 68, 68, 0.4), 0 8px 20px rgba(239, 68, 68, 0.2)';
+            }
+            
+            // 3秒后隐藏
+            setTimeout(() => {
+                // 使用CSS动画淡出
+                notification.style.transition = 'opacity 0.3s ease-out';
+                notification.style.opacity = '0';
+                setTimeout(() => {
+                    notification.style.display = 'none';
+                }, 300);
+            }, 3000);
+        }
+
+        // 获取项目ID
+        const urlParams = new URLSearchParams(window.location.search);
+        let projectId = urlParams.get('project_id') || localStorage.getItem('currentProjectId');
+
+        // 主界面删除功能相关逻辑
+        const deleteBtn = document.getElementById('deleteBtn');
+        const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+        const leaderList = document.getElementById('leaderList');
+        let isDeleteMode = false;
+        let selectedLeadersForDelete = new Set(); 
+
+        // 初始化加载带班列表
+        document.addEventListener('DOMContentLoaded', () => {
+            updateParentTitle();
+            if (projectId) {
+                loadForemen();
+            } else {
+                console.error('未找到项目ID');
+            }
+        });
+
+        let foremanPhones = new Set();
+        let foremanDataMap = new Map(); // 缓存带班的权限数据
+
+        // 加载带班列表
+        async function loadForemen() {
+            if (!projectId) return;
+            
+            try {
+                let currentForemanPhones = new Set();
+                foremanDataMap.clear();
+
+                if (window.supabase) {
+                    const { data: userProjects, error } = await window.supabase
+                        .from('user_projects')
+                        .select('*, users!inner(phone)') // 获取所有字段，包括权限字段
+                        .eq('project_id', projectId);
+
+                    if (error) {
+                        console.error('Error fetching user_projects:', error);
+                    } else if (userProjects) {
+                        userProjects.forEach(up => {
+                            if (up.users && up.users.phone) {
+                                const phone = up.users.phone;
+                                currentForemanPhones.add(phone);
+                                foremanDataMap.set(phone, up); // 缓存数据
+                            }
+                        });
+                    }
+                }
+
+                foremanPhones = currentForemanPhones;
+                
+                // 读取本地缓存的员工信息
+                const employees = getEmployeesFromLocalStorage();
+                // 根据手机号匹配带班
+                const foremen = employees.filter(e => e.phone && foremanPhones.has(e.phone));
+                
+                renderForemen(foremen);
+            } catch (e) {
+                console.error('Load foremen failed:', e);
+                showNotification('加载带班列表失败', true);
+                renderForemen([]);
+            }
+        }
+
+        function renderForemen(foremen) {
+            leaderList.innerHTML = '';
+            if (foremen.length === 0) {
+                leaderList.innerHTML = '<li class="leader-item" style="justify-content:center; color:#999;">暂无带班人员</li>';
+                return;
+            }
+
+            foremen.forEach(emp => {
+                const li = document.createElement('li');
+                li.className = 'leader-item';
+                li.dataset.id = emp.employee_id;
+                
+                const name = emp.emp_name || '未命名';
+                const phone = emp.phone || '';
+                const avatarText = emp.emp_code || name.slice(0, 1);
+
+                li.dataset.name = name;
+                li.dataset.phone = phone;
+
+                li.innerHTML = `
+                    <div class="checkbox-custom delete-checkbox"></div>
+                    <div class="avatar">${avatarText}</div>
+                    <div class="info" style="flex:1">
+                        <span class="name">${name}</span>
+                        <span class="phone">${phone}</span>
+                    </div>
+                `;
+                leaderList.appendChild(li);
+            });
+        }
+
+        const deleteConfirmOverlay = document.getElementById('deleteConfirmOverlay');
+        const closeDeleteConfirmBtn = document.getElementById('closeDeleteConfirmBtn');
+        const cancelDeleteConfirmBtn = document.getElementById('cancelDeleteConfirmBtn');
+        const confirmDeleteActionBtn = document.getElementById('confirmDeleteActionBtn');
+        const deleteConfirmMessage = document.getElementById('deleteConfirmMessage');
+
+        deleteBtn.addEventListener('click', async () => {
+            if (!isDeleteMode) {
+                // 进入删除模式
+                if (leaderList.querySelectorAll('.leader-item').length > 0 && !leaderList.textContent.includes('暂无带班人员')) {
+                    enterDeleteMode();
+                }
+            } else {
+                // 确认删除 - 显示模态框
+                if (selectedLeadersForDelete.size > 0) {
+                    deleteConfirmMessage.textContent = `确定要移除选中的 ${selectedLeadersForDelete.size} 位带班吗？`;
+                    deleteConfirmOverlay.classList.add('active');
+                }
+            }
+        });
+
+        // 删除确认框逻辑
+        function closeDeleteConfirmModal() {
+            deleteConfirmOverlay.classList.remove('active');
+        }
+
+        closeDeleteConfirmBtn.addEventListener('click', closeDeleteConfirmModal);
+        cancelDeleteConfirmBtn.addEventListener('click', closeDeleteConfirmModal);
+        
+        deleteConfirmOverlay.addEventListener('click', (e) => {
+            if (e.target === deleteConfirmOverlay) {
+                closeDeleteConfirmModal();
+            }
+        });
+
+        confirmDeleteActionBtn.addEventListener('click', async () => {
+            if (!navigator.onLine) {
+                showNotification('当前网络状态不佳，设置不成功', true);
+                return;
+            }
+            closeDeleteConfirmModal();
+            await removeForemen(Array.from(selectedLeadersForDelete));
+            exitDeleteMode();
+        });
+
+        async function removeForemen(ids) {
+            try {
+                if (window.supabase) {
+                    // Method 2: Remove from user_projects
+                    
+                    // 1. Find phones of selected employees
+                    const employees = getEmployeesFromLocalStorage();
+                    const targetEmployees = employees.filter(e => ids.includes(e.employee_id));
+                    const phones = targetEmployees.map(e => e.phone).filter(p => p);
+
+                    if (phones.length === 0) {
+                        // 如果没有手机号，实际上不可能被加为带班（Method 2要求手机号）
+                        // 但为了健壮性，这里直接返回
+                        showNotification('选中员工无手机号，无法操作', true);
+                        return;
+                    }
+
+                    // 2. Find user_ids
+                    const { data: users, error: userError } = await window.supabase
+                        .from('users')
+                        .select('user_id')
+                        .in('phone', phones);
+                    
+                    if (userError) throw userError;
+                    
+                    if (users && users.length > 0) {
+                        const userIds = users.map(u => u.user_id);
+                        
+                        // 3. Delete from user_projects
+                        const { error } = await window.supabase
+                            .from('user_projects')
+                            .delete()
+                            .eq('project_id', projectId)
+                            .in('user_id', userIds);
+                        
+                        if (error) {
+                            console.error('Supabase移除失败:', error);
+                            throw error;
+                        }
+                    }
+                } else {
+                    console.error('supabase 未定义，无法同步删除操作');
+                    throw new Error('网络连接异常，无法同步到服务器');
+                }
+                
+                // 不再更新 is_foreman 字段 (Method 2)
+                // updateLocalCache(ids, false);
+                
+                // 重新加载
+                loadForemen();
+                showNotification('移除成功');
+            } catch (e) {
+                console.error('移除失败:', e);
+                showNotification('移除失败，请重试: ' + (e.message || '未知错误'), true);
+            }
+        }
+
+        cancelDeleteBtn.addEventListener('click', () => {
+            exitDeleteMode();
+        });
+
+        function enterDeleteMode() {
+            isDeleteMode = true;
+            deleteBtn.textContent = '确定删除';
+            deleteBtn.classList.add('btn-confirm-delete');
+            deleteBtn.classList.remove('btn-delete');
+            
+            cancelDeleteBtn.style.display = 'inline-block';
+            
+            // 显示所有复选框
+            const checkboxes = document.querySelectorAll('.delete-checkbox');
+            checkboxes.forEach(cb => cb.style.setProperty('display', 'flex', 'important'));
+        }
+
+        function exitDeleteMode() {
+            isDeleteMode = false;
+            deleteBtn.textContent = '删除带班';
+            deleteBtn.classList.remove('btn-confirm-delete');
+            deleteBtn.classList.remove('active'); 
+            deleteBtn.classList.add('btn-delete');
+            
+            cancelDeleteBtn.style.display = 'none';
+            
+            selectedLeadersForDelete.clear();
+            loadForemen(); // Reload to reset UI
+        }
+
+        // 委托事件监听列表项点击
+        leaderList.addEventListener('click', (e) => {
+            const item = e.target.closest('.leader-item');
+            if (!item) return;
+
+            if (!isDeleteMode) {
+                // 非删除模式：打开权限设置
+                const employeeId = item.dataset.id;
+                const name = item.dataset.name;
+                const phone = item.dataset.phone;
+                openPermModal(employeeId, name, phone);
+                return;
+            }
+            
+            // 删除模式：选中/取消选中
+            const checkbox = item.querySelector('.delete-checkbox');
+            const id = item.dataset.id; 
+
+            if (checkbox.classList.contains('checked')) {
+                checkbox.classList.remove('checked');
+                selectedLeadersForDelete.delete(id);
+            } else {
+                checkbox.classList.add('checked');
+                selectedLeadersForDelete.add(id);
+            }
+
+            if (selectedLeadersForDelete.size > 0) {
+                deleteBtn.classList.add('active');
+                deleteBtn.textContent = `确定删除 (${selectedLeadersForDelete.size}人)`;
+            } else {
+                deleteBtn.classList.remove('active');
+                deleteBtn.textContent = '确定删除';
+            }
+        });
+
+        const addBtn = document.getElementById('addBtn');
+        const modalOverlay = document.getElementById('modalOverlay');
+        const closeBtn = document.getElementById('closeBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const confirmBtn = document.querySelector('.btn-confirm');
+        const searchBox = document.querySelector('.search-box');
+        const workerListContainer = document.querySelector('.worker-list');
+
+        let allEmployees = []; 
+        let selectedEmployeeIds = new Set(); 
+
+        addBtn.addEventListener('click', () => {
+            modalOverlay.classList.add('active');
+            loadAllEmployees(); 
+        });
+
+        function closeModal() {
+            modalOverlay.classList.remove('active');
+            selectedEmployeeIds.clear();
+            searchBox.value = '';
+            updateFooterButton();
+        }
+
+        closeBtn.addEventListener('click', closeModal);
+        cancelBtn.addEventListener('click', closeModal);
+
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) {
+                closeModal();
+            }
+        });
+        
+        // 获取北京时间（ISO格式）
+        // 用户反馈之前的时间提前了8小时（即存入的是UTC时间，但用户希望存入的是北京时间的数值）
+        // 因此，我们这里手动将时间 +8 小时，并以 UTC 格式（Z结尾）发送给数据库
+        // 这样数据库解析时会认为这是 UTC 时间，从而存入北京时间的数值
+        function getBeijingTimeISO() {
+            const now = new Date();
+            // 加上8小时的毫秒数
+            const beijingTime = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+            return beijingTime.toISOString();
+        }
+
+        // 新增模式变量
+        let isAddingMode = false;
+        let pendingInserts = []; // 存储待插入的用户数据 {user_id, project_id}
+        let tempForemanPerms = new Map(); // 临时存储新增带班的权限设置 Map<employeeId, permObject>
+
+        // 确认添加带班
+        confirmBtn.addEventListener('click', async () => {
+            if (!navigator.onLine) {
+                showNotification('当前网络状态不佳，设置不成功', true);
+                return;
+            }
+
+            if (selectedEmployeeIds.size === 0) return;
+            
+            const ids = Array.from(selectedEmployeeIds);
+
+            // 检查选中的员工是否有手机号
+            const employeesWithoutPhone = allEmployees.filter(emp => ids.includes(emp.employee_id) && !emp.phone);
+            if (employeesWithoutPhone.length > 0) {
+                showNotification('选中员工无手机号，无法设为带班', true);
+                return;
+            }
+
+            try {
+                if (window.supabase) {
+                    // Method 2: Add to user_projects
+                    
+                    // 1. Get phones
+                    const targetEmployees = allEmployees.filter(emp => ids.includes(emp.employee_id));
+                    const phones = targetEmployees.map(e => e.phone);
+                    
+                    // 2. Find users
+                    const { data: users, error: userError } = await window.supabase
+                        .from('users')
+                        .select('user_id, phone')
+                        .in('phone', phones);
+                    
+                    if (userError) throw userError;
+                    
+                    // Check if all employees have corresponding users
+                    const foundPhones = new Set((users || []).map(u => u.phone));
+                    const notFoundEmployees = targetEmployees.filter(e => !foundPhones.has(e.phone));
+                    
+                    if (notFoundEmployees.length > 0) {
+                        const names = notFoundEmployees.map(e => e.emp_name).join(', ');
+                        showNotification(`以下员工未注册系统账号，无法设为带班: ${names}`, true);
+                        return;
+                    }
+                    
+                    // 3. Prepare inserts
+                    const inserts = users.map(u => {
+                        // 查找对应的employeeId来获取自定义权限
+                        const emp = targetEmployees.find(e => e.phone === u.phone);
+                        const customPerms = emp ? tempForemanPerms.get(emp.employee_id) : {};
+                        
+                        // 默认权限（如果未设置，默认全开，或者根据需求全闭？之前的逻辑是默认全开）
+                        // 但既然用户逐个设置，如果有设置就用设置的，没设置就用默认全开
+                        const defaultPerms = {
+                             perm_add_expense: true, perm_edit_expense: true, perm_delete_expense: true,
+                             perm_add_income: true, perm_edit_income: true, perm_delete_income: true,
+                             perm_add_settlement: true, perm_edit_settlement: true, perm_delete_settlement: true,
+                             perm_add_work_record: true, perm_edit_work_record: true, perm_delete_work_record: true
+                        };
+
+                        return {
+                            user_id: u.user_id,
+                            project_id: projectId,
+                            ...(customPerms || defaultPerms)
+                        };
+                    });
+                    
+                    // Check duplicates
+                    const { data: existing, error: checkError } = await window.supabase
+                        .from('user_projects')
+                        .select('user_id')
+                        .eq('project_id', projectId)
+                        .in('user_id', users.map(u => u.user_id));
+                        
+                    if (checkError) throw checkError;
+                    
+                    const existingUserIds = new Set((existing || []).map(u => u.user_id));
+                    const newInserts = inserts.filter(i => !existingUserIds.has(i.user_id));
+                    
+                    if (newInserts.length > 0) {
+                        const { error } = await window.supabase
+                            .from('user_projects')
+                            .insert(newInserts);
+
+                        if (error) throw error;
+
+                        showNotification('添加带班成功');
+                        
+                        // 重置状态
+                        tempForemanPerms.clear();
+                        closeModal();
+                        loadForemen();
+                    } else {
+                        showNotification('选中员工已是带班');
+                        closeModal();
+                    }
+                    
+                } else {
+                    console.error('supabase 未定义，无法上传数据');
+                    throw new Error('网络连接异常，无法同步到服务器');
+                }
+                
+            } catch (e) {
+                console.error('设置失败:', e);
+                showNotification('设置失败，请重试: ' + (e.message || '未知错误'), true);
+            }
+        });
+
+        // 打开权限设置模态框（新增模式 - 单个）
+        function openPermModalForSingleAdd(employeeId, name) {
+            document.getElementById('permUserName').textContent = name;
+            document.getElementById('permUserId').value = employeeId; // 这里存employeeId，用于保存时识别
+            
+            // 标记当前是单个添加模式
+            isAddingMode = true; 
+            
+            // 修改保存按钮文字
+            savePermBtn.textContent = '确认';
+
+            // 获取已存的临时权限或默认权限
+            const existingPerms = tempForemanPerms.get(employeeId);
+            
+            const permissionIds = [
+                'perm_add_expense', 'perm_edit_expense', 'perm_delete_expense',
+                'perm_add_income', 'perm_edit_income', 'perm_delete_income',
+                'perm_add_settlement', 'perm_edit_settlement', 'perm_delete_settlement',
+                'perm_add_work_record', 'perm_edit_work_record', 'perm_delete_work_record'
+            ];
+            
+            permissionIds.forEach(id => {
+                if (existingPerms) {
+                    document.getElementById(id).checked = existingPerms[id] !== false;
+                } else {
+                    document.getElementById(id).checked = true; // 默认全选
+                }
+            });
+
+            permModalOverlay.classList.add('active');
+        }
+
+
+
+        // Load all employees to select from
+        async function loadAllEmployees() {
+            // 直接读取本地缓存
+            let employees = getEmployeesFromLocalStorage();
+            
+            // 过滤掉没有手机号的员工（因为无法匹配users表）
+            employees = employees.filter(e => e.phone);
+
+            if (employees.length === 0) {
+                allEmployees = [];
+                renderWorkerList([]);
+                return;
+            }
+
+            // 筛选出已注册账号的员工
+            try {
+                if (window.supabase) {
+                    const phones = employees.map(e => e.phone);
+                    
+                    // 分批查询，避免URL过长（虽然POST没这限制，但安全起见）
+                    // 假设这里数据量不大，直接查询
+                    const { data: users, error } = await window.supabase
+                        .from('users')
+                        .select('phone')
+                        .in('phone', phones);
+                        
+                    if (error) {
+                        console.error('Error fetching users:', error);
+                        showNotification('获取注册用户失败', true);
+                        allEmployees = [];
+                    } else {
+                        const registeredPhones = new Set(users.map(u => u.phone));
+                        // 只保留已注册的员工
+                        allEmployees = employees.filter(e => registeredPhones.has(e.phone));
+                    }
+                } else {
+                     console.warn('No supabase client');
+                     showNotification('网络连接异常', true);
+                     allEmployees = [];
+                }
+            } catch (e) {
+                console.error('Filter employees failed:', e);
+                allEmployees = [];
+            }
+
+            renderWorkerList(allEmployees);
+        }
+
+        function getEmployeesFromLocalStorage() {
+            try {
+                if (!projectId) return [];
+                const localKey = `employees_${projectId}`;
+                const savedData = localStorage.getItem(localKey);
+                if (savedData) {
+                    const parsedData = JSON.parse(savedData);
+                    return parsedData.employees || [];
+                }
+                return [];
+            } catch (error) {
+                return [];
+            }
+        }
+
+        function renderWorkerList(employees) {
+            // Method 2: filter using foremanPhones set
+            // Note: foremanPhones is populated in loadForemen
+            const nonForemen = employees.filter(e => !foremanPhones.has(e.phone));
+            renderListItems(nonForemen);
+        }
+
+        function toggleSelection(id) {
+            if (selectedEmployeeIds.has(id)) {
+                selectedEmployeeIds.delete(id);
+            } else {
+                selectedEmployeeIds.add(id);
+            }
+        }
+
+        function updateFooterButton() {
+            const count = selectedEmployeeIds.size;
+            confirmBtn.textContent = `设为带班 (${count}) 人`;
+            if (count > 0) {
+                confirmBtn.classList.add('active');
+            } else {
+                confirmBtn.classList.remove('active');
+            }
+        }
+
+        searchBox.addEventListener('input', (e) => {
+            const term = e.target.value.trim().toLowerCase();
+            // Method 2 update: use foremanPhones
+            const nonForemen = allEmployees.filter(e => !foremanPhones.has(e.phone));
+            
+            if (!term) {
+                renderWorkerList(allEmployees); 
+                return;
+            }
+
+             const candidates = nonForemen;
+             const searchResult = candidates.filter(emp => {
+                const name = (emp.emp_name || '').toLowerCase();
+                const phone = (emp.phone || '').toLowerCase();
+                return name.includes(term) || phone.includes(term);
+            });
+            
+            renderListItems(searchResult);
+        });
+        
+        function renderListItems(list) {
+             workerListContainer.innerHTML = '';
+             if (list.length === 0) {
+                workerListContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: #999;">无数据</div>';
+                return;
+             }
+             const sorted = [...list].sort((a, b) => (parseInt(a.emp_code)||0) - (parseInt(b.emp_code)||0));
+             sorted.forEach(emp => {
+                 // ... creation logic ...
+                 const item = document.createElement('div');
+                item.className = 'worker-item';
+                item.dataset.id = emp.employee_id;
+                
+                const isChecked = selectedEmployeeIds.has(emp.employee_id);
+                const name = emp.emp_name || '未命名';
+                const phone = emp.phone || '';
+                const avatarText = emp.emp_code || name.slice(0, 1);
+
+                item.innerHTML = `
+                    <div class="checkbox-custom item-checkbox ${isChecked ? 'checked' : ''}"></div>
+                    <div class="avatar">${avatarText}</div>
+                    <div class="info">
+                        <span class="name">${name}</span>
+                        ${phone ? `<span class="phone">${phone}</span>` : ''}
+                    </div>
+                `;
+                item.addEventListener('click', (e) => {
+                    // 如果点击的是复选框，仅切换选中状态（默认权限）
+                    if (e.target.classList.contains('checkbox-custom') || e.target.classList.contains('item-checkbox')) {
+                        toggleSelection(emp.employee_id);
+                        const checkbox = item.querySelector('.checkbox-custom');
+                        if (selectedEmployeeIds.has(emp.employee_id)) {
+                            checkbox.classList.add('checked');
+                        } else {
+                            checkbox.classList.remove('checked');
+                            // 如果取消选中，移除临时权限配置
+                            tempForemanPerms.delete(emp.employee_id);
+                        }
+                        updateFooterButton();
+                        return;
+                    }
+                    
+                    // 点击行其他区域，弹出权限设置模态框
+                    openPermModalForSingleAdd(emp.employee_id, name);
+                });
+                workerListContainer.appendChild(item);
+             });
+        }
+        
+
+
+        function updateParentTitle() {
+            if (window.parent && window.parent !== window) {
+                const targetOrigin = window.location.origin || '*';
+                window.parent.postMessage({
+                    type: 'updateTitle',
+                    page: '带班设置.html'
+                }, targetOrigin);
+            }
+        }
+
+        // 权限设置相关逻辑
+        const permModalOverlay = document.getElementById('permModalOverlay');
+        const closePermBtn = document.getElementById('closePermBtn');
+        const cancelPermBtn = document.getElementById('cancelPermBtn');
+        const savePermBtn = document.getElementById('savePermBtn');
+        
+        function closePermModal() {
+            permModalOverlay.classList.remove('active');
+        }
+
+        if(closePermBtn) closePermBtn.addEventListener('click', closePermModal);
+        if(cancelPermBtn) cancelPermBtn.addEventListener('click', closePermModal);
+        if(permModalOverlay) permModalOverlay.addEventListener('click', (e) => {
+            if(e.target === permModalOverlay) closePermModal();
+        });
+
+        // 打开权限设置模态框
+        window.openPermModal = function(employeeId, name, phone) {
+            // 如果在删除模式下，不打开
+            if (isDeleteMode) return;
+            if (window.event) window.event.stopPropagation();
+            
+            // 确保退出新增模式
+            isAddingMode = false;
+            
+            // 恢复保存按钮文字
+            savePermBtn.textContent = '保存权限';
+
+            document.getElementById('permUserName').textContent = name;
+            
+            // 从缓存获取数据，避免重复网络请求导致失败
+            const userProject = foremanDataMap.get(phone);
+            
+            if (!userProject) {
+                showNotification('无法获取该带班人员的权限信息，请刷新页面重试', true);
+                return;
+            }
+
+            const userId = userProject.user_id;
+            document.getElementById('permUserId').value = userId;
+
+            // 设置复选框状态 (默认为 true 如果字段不存在 - 兼容旧数据)
+            // Helper to set checked state
+            const setCb = (id, val) => {
+                document.getElementById(id).checked = val !== false; // Default true
+            };
+
+            setCb('perm_add_expense', userProject.perm_add_expense);
+            setCb('perm_edit_expense', userProject.perm_edit_expense);
+            setCb('perm_delete_expense', userProject.perm_delete_expense);
+
+            setCb('perm_add_income', userProject.perm_add_income);
+            setCb('perm_edit_income', userProject.perm_edit_income);
+            setCb('perm_delete_income', userProject.perm_delete_income);
+
+            setCb('perm_add_settlement', userProject.perm_add_settlement);
+            setCb('perm_edit_settlement', userProject.perm_edit_settlement);
+            setCb('perm_delete_settlement', userProject.perm_delete_settlement);
+
+            setCb('perm_add_work_record', userProject.perm_add_work_record);
+            setCb('perm_edit_work_record', userProject.perm_edit_work_record);
+            setCb('perm_delete_work_record', userProject.perm_delete_work_record);
+
+            permModalOverlay.classList.add('active');
+        };
+
+        // 保存权限
+        if(savePermBtn) savePermBtn.addEventListener('click', async () => {
+            const updates = {
+                perm_add_expense: document.getElementById('perm_add_expense').checked,
+                perm_edit_expense: document.getElementById('perm_edit_expense').checked,
+                perm_delete_expense: document.getElementById('perm_delete_expense').checked,
+
+                perm_add_income: document.getElementById('perm_add_income').checked,
+                perm_edit_income: document.getElementById('perm_edit_income').checked,
+                perm_delete_income: document.getElementById('perm_delete_income').checked,
+
+                perm_add_settlement: document.getElementById('perm_add_settlement').checked,
+                perm_edit_settlement: document.getElementById('perm_edit_settlement').checked,
+                perm_delete_settlement: document.getElementById('perm_delete_settlement').checked,
+
+                perm_add_work_record: document.getElementById('perm_add_work_record').checked,
+                perm_edit_work_record: document.getElementById('perm_edit_work_record').checked,
+                perm_delete_work_record: document.getElementById('perm_delete_work_record').checked,
+            };
+
+            try {
+                if (isAddingMode) {
+                    // 新增模式：将权限暂存到 Map 中
+                    const employeeId = document.getElementById('permUserId').value;
+                    if (!employeeId) {
+                        closePermModal();
+                        return;
+                    }
+
+                    // 1. 保存权限到临时Map
+                    tempForemanPerms.set(employeeId, updates);
+
+                    // 2. 自动勾选该员工（如果未勾选）
+                    if (!selectedEmployeeIds.has(employeeId)) {
+                        selectedEmployeeIds.add(employeeId);
+                        
+                        // 更新UI上的复选框状态
+                        const workerItem = document.querySelector(`.worker-item[data-id="${employeeId}"] .checkbox-custom`);
+                        if (workerItem) {
+                            workerItem.classList.add('checked');
+                        }
+                        updateFooterButton();
+                    }
+
+                    // 3. 关闭模态框
+                    closePermModal();
+                    
+                } else {
+                    // 编辑模式：更新单个带班权限 (现有带班)
+                    const userId = document.getElementById('permUserId').value;
+                    if (!userId) return;
+
+                    const { error } = await window.supabase
+                        .from('user_projects')
+                        .update(updates)
+                        .eq('user_id', userId)
+                        .eq('project_id', projectId);
+
+                    if (error) throw error;
+
+                    // 更新本地缓存
+                    for (let [phone, data] of foremanDataMap.entries()) {
+                        if (data.user_id === userId) {
+                            foremanDataMap.set(phone, { ...data, ...updates });
+                            break;
+                        }
+                    }
+
+                    showNotification('权限保存成功');
+                    closePermModal();
+                }
+            } catch (e) {
+                console.error(e);
+                showNotification('保存失败: ' + (e.message || '未知错误'), true);
+            }
+        });
+    </script>
+</body>
+</html>
