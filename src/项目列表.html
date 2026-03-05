@@ -1,0 +1,3283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>飞鱼考勤 - 项目列表</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    <!-- 加载项目统计服务 -->
+    <script src="JavaScript/项目列表/project-statistics-service.js"></script>
+    <!-- 本地加载完整的Supabase库 -->
+    <script src="JavaScript/supabase/supabase.min.js"></script>
+    <!-- 加载浏览器环境的Supabase配置 -->
+    <script src="JavaScript/supabase/supabase-client.js"></script>
+    <!-- 离线同步服务 -->
+    <script src="JavaScript/离线同步/offline-sync-service.js"></script>
+    <script src="JavaScript/离线同步/sync-status-indicator.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #165DFF;
+            --secondary-color: #6B7280;
+            --success-color: #10B981;
+            --danger-color: #EF4444;
+            --warning-color: #F59E0B;
+            --light-bg: #F9FAFB;
+            --dark-bg: #1F2937;
+            --border-color: #E5E7EB;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }
+
+        /* 项目设置信息样式 */
+        .info-display {
+            padding: 10px;
+            background-color: var(--light-bg);
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            margin-top: 5px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+        }
+
+        /* 通知样式 */
+        .notification {
+            font-weight: 500;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+        }
+
+        body {
+            background-color: #f5f7fa;
+            color: #333;
+            padding: 20px;
+        }
+
+        /* 内容区域 */
+        .content {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* 标签页 */
+        .tabs {
+            display: flex;
+            margin-bottom: 24px;
+            border-bottom: 1px solid #e2e8f0;
+            background: white;
+            border-radius: 12px;
+            padding: 4px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            justify-content: flex-start;
+            width: fit-content;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #64748b;
+            border-bottom: none;
+            border-radius: 8px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            flex: none;
+            text-align: center;
+            min-width: 120px;
+        }
+
+        .tab:hover {
+            color: #374151;
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .tab.active {
+            color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        .tab.active.tab-ongoing {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.8), rgba(37, 99, 235, 0.8));
+        }
+
+        .tab.active.tab-settled {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.8), rgba(220, 38, 38, 0.8));
+        }
+
+        /* 新建项目按钮 */
+        .new-project-btn {
+            background: linear-gradient(135deg, #f97316, #ea580c);
+            color: white;
+            border: none;
+            padding: 8px 20px; 
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .new-project-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .new-project-btn:hover::before {
+            left: 100%;
+        }
+
+        .new-project-btn:hover {
+            background: linear-gradient(135deg, #ea580c, #c2410c);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(249, 115, 22, 0.4);
+        }
+
+        .new-project-btn:active {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+        }
+
+        .new-project-btn .icon {
+            margin-right: 6px;
+            font-size: 24px; 
+            font-weight: bold;
+        }
+
+        /* 项目网格 */
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        /* 项目卡片 */
+        .project-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+            padding: 20px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .project-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #3b82f6, #06b6d4, #8b5cf6);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .project-card:hover {
+            transform: translateY(-4px) scale(1.01);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+        }
+
+        .project-card:hover::before {
+            opacity: 1;
+        }
+
+        .project-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .project-name {
+            font-weight: 700;
+            font-size: 18px;
+            color: #1e293b;
+            background: linear-gradient(135deg, #1e293b, #334155);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 4px;
+            letter-spacing: -0.025em;
+        }
+
+        .project-date {
+            color: #000000;
+            font-size: 14px;
+        }
+
+        .project-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .project-count {
+            color: #000000;
+            font-size: 14px;
+        }
+
+        .project-date {
+            color: #000000;
+            font-size: 14px;
+        }
+
+        .last-work-date {
+            color: #3b82f6;
+            font-weight: 600;
+        }
+
+        .last-work-label {
+            background-color: #fff7e6;
+            color: #fa8c16;
+            padding: 2px 6px;
+            border-radius: 4px;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .project-info > .project-date:last-child {
+            text-align: center;
+        }
+
+        .project-count-number {
+            color: #3b82f6;
+            font-weight: 600;
+        }
+
+        .project-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            padding-top: 12px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .project-actions-left {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-start;
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .project-actions-right {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .action-btn {
+            padding: 10px 16px;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            border-radius: 8px;
+            background: linear-gradient(135deg, #ffffff, #f8fafc);
+            color: #374151;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .action-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+            transition: left 0.5s;
+        }
+
+        .action-btn:hover::before {
+            left: 100%;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .settings-btn {
+            color: #1f2937;
+            border-color: #d1d5db;
+            background: linear-gradient(135deg, #ffffff, #f9fafb);
+        }
+
+        .settings-btn:hover {
+            color: #ffffff;
+            border-color: #000000;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .settings-btn svg {
+            transition: transform 0.3s ease;
+        }
+
+        .settings-btn:hover svg {
+            transform: rotate(90deg);
+        }
+
+        .settlement-btn {
+            color: #d97706;
+            border-color: #fbbf24;
+            background: linear-gradient(135deg, #fffbeb, #fef3c7);
+        }
+
+        .settlement-btn:hover {
+            color: #ffffff;
+            background: rgba(249, 115, 22, 0.85);
+            border-color: #f97316;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 16px rgba(249, 115, 22, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .record-btn {
+            color: #ffffff;
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            border-color: #3b82f6;
+            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+        }
+
+        .record-btn:hover {
+            color: #ffffff;
+            background: rgba(185, 28, 28, 0.85);
+            border-color: #b91c1c;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 16px rgba(185, 28, 28, 0.4);
+            transform: translateY(-1px);
+        }
+
+        /* 模态框样式 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.4));
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-overlay.active {
+            display: flex;
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: linear-gradient(135deg, #ffffff, #f8fafc);
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 520px;
+            padding: 32px;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            max-height: 90vh;
+        }
+
+        .modal::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #3b82f6, #06b6d4);
+        }
+
+        .modal-overlay.active .modal {
+            transform: translateY(0);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .modal-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1e293b;
+            background: linear-gradient(135deg, #1e293b, #475569);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: 0;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #94a3b8;
+            transition: all 0.3s ease;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            padding: 0;
+        }
+
+        .modal-close:hover {
+            color: #ef4444;
+            background-color: #fee2e2;
+            transform: rotate(90deg);
+        }
+
+        .modal-body {
+            margin-bottom: 24px;
+            padding: 0;
+        }
+
+        .form-group {
+            margin-bottom: 8px;
+        }
+
+        .half-width {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* 移动端样式：项目名称和地址水平显示 */
+        @media (max-width: 575.98px) {
+            .form-row:first-child {
+                flex-direction: column;
+                gap: 12px;
+            }
+            
+            .form-row:first-child .form-group {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 0;
+            }
+            
+            .form-row:first-child .form-group label {
+                display: inline-block;
+                margin-bottom: 0;
+                min-width: 80px;
+                font-size: 13px;
+            }
+            
+            .form-row:first-child .form-group input {
+                flex: 1;
+                min-width: 0;
+            }
+            
+            /* 移动端统计标签换行显示 */
+            .statistics-label {
+                line-height: 1.2;
+            }
+        }
+        
+        /* 非移动端时统计标签不换行 */
+        @media (min-width: 576px) {
+            .statistics-label br {
+                display: none;
+            }
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background-color: #f9fafb;
+            color: #111827;
+            min-height: 44px;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+            background-color: #ffffff;
+            transform: translateY(-1px);
+        }
+
+        .form-group input:hover {
+            border-color: #d1d5db;
+            background-color: #ffffff;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 0px;
+            padding: 4px;
+            background: linear-gradient(135deg, #ffffff, #f9fafb);
+            border-radius: 12px;
+        }
+
+        .form-control-wrapper {
+            display: flex;
+            align-items: center;
+            position: relative;
+        }
+
+        .form-control-wrapper input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px 0 0 8px;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            background-color: #f9fafb;
+            color: #111827;
+            min-width: 80px;
+            min-height: 42px;
+        }
+
+        .form-control-wrapper .unit {
+            padding: 10px 8px;
+            background-color: #f3f4f6;
+            border: 2px solid #e5e7eb;
+            border-left: none;
+            border-radius: 0 8px 8px 0;
+            color: #6b7280;
+            font-size: 13px;
+            white-space: nowrap;
+            font-weight: 500;
+            min-width: 65px;
+            text-align: center;
+            min-height: 42px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: static;
+            transform: none;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 20px 24px;
+            border-top: 1px solid #e2e8f0;
+            margin-top: 32px;
+            margin-bottom: -8px;
+        }
+
+        #markAsSettled {
+            color: #ef4444;
+            background: linear-gradient(135deg, #fee2e2, #fecaca);
+            border-color: #fca5a5;
+        }
+
+        #markAsSettled:hover {
+            background: linear-gradient(135deg, #fecaca, #f87171);
+            border-color: #ef4444;
+            color: white;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            border-color: #3b82f6;
+            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            border-color: #2563eb;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #374151;
+            border-color: #d1d5db;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .btn-secondary:hover {
+            background: #f9fafb;
+            border-color: #9ca3af;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 响应式设计 */
+        /* 手机设备 (小于 576px) */
+        @media (max-width: 575.98px) {
+            body {
+                padding: 10px;
+            }
+            
+            .content {
+                padding: 5px;
+            }
+
+            .tabs {
+                width: 100%;
+                overflow-x: auto;
+                padding: 4px 0;
+            }
+
+            .tab {
+                padding: 8px 16px;
+                min-width: 100px;
+                font-size: 14px;
+            }
+
+            .new-project-btn {
+                padding: 10px 16px;
+                font-size: 14px;
+            }
+
+            .projects-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            .project-card {
+                padding: 16px;
+            }
+
+            .project-name {
+                font-size: 16px;
+            }
+
+            .action-btn {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+
+            .modal {
+                width: 95%;
+                margin: 10px;
+                padding: 20px;
+            }
+
+            .modal-header {
+                margin-bottom: 16px;
+                padding-bottom: 16px;
+            }
+
+            .modal-title {
+                font-size: 20px;
+            }
+
+            .btn {
+                padding: 8px 16px;
+                font-size: 13px;
+            }
+        }
+
+        /* 平板设备 (576px - 767px) */
+        @media (min-width: 576px) and (max-width: 767.98px) {
+            .projects-grid {
+                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+                gap: 16px;
+            }
+
+            .content {
+                padding: 15px;
+            }
+
+            .tab {
+                padding: 10px 20px;
+            }
+
+            .project-card {
+                padding: 18px;
+            }
+
+            .action-btn {
+                padding: 9px 14px;
+                font-size: 13px;
+            }
+
+            .modal {
+                width: 90%;
+                max-width: 500px;
+            }
+        }
+
+        /* 小屏幕电脑 (768px - 991px) */
+        @media (min-width: 768px) and (max-width: 991.98px) {
+            .projects-grid {
+                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                gap: 20px;
+            }
+
+            .content {
+                padding: 20px;
+            }
+        }
+
+        /* 大屏幕电脑 (992px及以上) */
+        @media (min-width: 992px) {
+            .projects-grid {
+                grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+                gap: 24px;
+            }
+
+            .content {
+                padding: 25px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="content">
+        <!-- 标签页 -->
+        <div class="tabs">
+            <div class="tab active">在建项目 (0)</div>
+            <div class="tab">已结清项目 (0)</div>
+        </div>
+
+        <!-- 新建项目按钮 -->
+        <button class="new-project-btn" onclick="createNewProject()">
+            <span class="icon">+</span> 新建项目
+        </button>
+
+        <!-- 项目网格 -->
+        <div class="projects-grid" id="projectsGrid">
+            <!-- 项目卡片将通过JavaScript动态生成 -->
+        </div>
+    </div>
+
+    <!-- 新建项目模态框 -->
+    <div class="modal-overlay" id="projectModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">新建项目</h3>
+                <button class="modal-close" id="closeModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group half-width">
+                        <label for="projectname"><span style="color: #ef4444; margin-right: 4px;">*</span>项目名称：</label>
+                        <input type="text" id="projectname" placeholder="请输入项目名称" required style="color: #2563eb;">
+                    </div>
+                    <div class="form-group half-width">
+                        <label for="projectaddress"><span style="margin-right: 4px;">&nbsp;</span>项目地址：</label>
+                        <input type="text" id="projectaddress" placeholder="请输入项目地址" style="color: #2563eb;">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group half-width">
+                        <label for="regularHours"><span style="color: #ef4444; margin-right: 4px;">*</span>点工：</label>
+                        <div class="form-control-wrapper">
+                            <input type="number" id="regularHours" placeholder="正常时间" min="0" step="0.5" required style="color: #2563eb;">
+                            <span class="unit">小时/天</span>
+                        </div>
+                    </div>
+                    <div class="form-group half-width">
+                        <label for="overtimeHours"><span style="color: #ef4444; margin-right: 4px;">*</span>加班：</label>
+                        <div class="form-control-wrapper">
+                            <input type="number" id="overtimeHours" placeholder="加班时间" min="0" step="0.5" required style="color: #2563eb;">
+                            <span class="unit">小时/天</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- 项目设置额外信息 -->
+                <div id="projectSettingsInfo" style="display: none;">
+                    <div class="form-row">
+                        <div class="form-group" style="width: 33.33%; margin-right: auto;">
+                            <label>在场员工：</label>
+                            <div id="presentWorkers" class="info-display"></div>
+                        </div>
+                        <div class="form-group" style="width: 33.33%;">
+                            <label class="statistics-label">统计<br>(总工资)：</label>
+                            <div id="statistics" class="info-display"></div>
+                        </div>
+                        <div class="form-group" style="width: 33.33%;">
+                            <label>未结金额：</label>
+                            <div id="unsettled" class="info-display"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-success" id="markAsSettled" style="display: none;">设为已结清</button>
+                <button class="btn btn-secondary" id="cancelProject">取消</button>
+                <button class="btn btn-primary" id="confirmProject">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设为已结清确认模态框 -->
+    <div class="modal-overlay" id="confirmSettleModal">
+          <div class="modal" style="width: 320px; max-width: 90%; max-height: 240px; padding: 16px;">
+            <div class="modal-header" style="margin-bottom: 6px; padding-bottom: 6px;">
+                <h4 class="modal-title" style="font-size: 14px; font-weight: bold;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff8c00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 5px; vertical-align: middle;">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    确认设为已结清吗？
+                </h4>
+                <button class="modal-close" id="closeConfirmSettleModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="text-align: left; display: flex; align-items: center; height: 40px; margin: 6px 0;">
+                    <span style="color: black; font-size: 14px;">设为已结清后，不参与统计和展示</span>
+                </p>
+            </div>
+            <div class="modal-footer" style="margin-top: 0; padding: 6px 12px;">
+                <button class="btn btn-secondary" id="cancelSettleBtn" style="padding: 6px 12px; font-size: 12px;">取消</button>
+                <button class="btn btn-primary" id="confirmSettleBtn" style="padding: 6px 12px; font-size: 12px;">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认恢复为在建模态框 -->
+    <div class="modal-overlay" id="confirmRestoreModal">
+        <div class="modal" style="width: 320px; max-width: 90%; max-height: 240px; padding: 16px;">
+            <div class="modal-header" style="margin-bottom: 6px; padding-bottom: 6px;">
+                <h4 class="modal-title" style="font-size: 16px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 5px; vertical-align: middle;">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    确认设为在建吗？
+                </h4>
+                <button class="modal-close" id="closeConfirmRestoreModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="text-align: left; display: flex; align-items: center; height: 40px; margin: 6px 0;">
+                    <span style="color: black; font-size: 14px;">设为在建后，将参与统计和展示</span>
+                </p>
+            </div>
+            <div class="modal-footer" style="margin-top: 6px; padding: 6px 12px;">
+                <button class="btn btn-secondary" id="cancelRestoreBtn" style="padding: 6px 12px; font-size: 12px;">取消</button>
+                <button class="btn btn-primary" id="confirmRestoreBtn" style="padding: 6px 12px; font-size: 12px;">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 删除项目确认模态框 -->
+    <div class="modal-overlay" id="confirmDeleteModal">
+        <div class="modal" style="width: 350px; max-width: 90%; max-height: 350px; padding: 16px;">
+            <div class="modal-header" style="margin-bottom: 6px; padding-bottom: 6px;">
+                <h4 class="modal-title" style="font-size: 18px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 5px; vertical-align: middle;">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    确定删除该项目？
+                </h4>
+                <button class="modal-close" id="closeConfirmDeleteModal">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 10px 0;">
+                <p style="text-align: left; margin: 6px 0; font-size: 14px;">您将会失去该项目的：</p>
+                <ul style="text-align: left; margin: 6px 0 16px 20px; font-size: 14px; list-style-type: none; padding-left: 5px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+                    <li style="margin: 4px 0;"><span style="display: inline-block; width: 8px; height: 8px; background-color: #ef4444; border-radius: 50%; margin-right: 8px; vertical-align: middle;"></span>员工记录</li>
+                    <li style="margin: 4px 0;"><span style="display: inline-block; width: 8px; height: 8px; background-color: #ef4444; border-radius: 50%; margin-right: 8px; vertical-align: middle;"></span>项目记账记录</li>
+                    <li style="margin: 4px 0;"><span style="display: inline-block; width: 8px; height: 8px; background-color: #ef4444; border-radius: 50%; margin-right: 8px; vertical-align: middle;"></span>借支记录</li>
+                    <li style="margin: 4px 0;"><span style="display: inline-block; width: 8px; height: 8px; background-color: #ef4444; border-radius: 50%; margin-right: 8px; vertical-align: middle;"></span>点工单记录</li>
+                    <li style="margin: 4px 0;"><span style="display: inline-block; width: 8px; height: 8px; background-color: #ef4444; border-radius: 50%; margin-right: 8px; vertical-align: middle;"></span>考勤记录</li>
+                    <li style="margin: 4px 0;"><span style="display: inline-block; width: 8px; height: 8px; background-color: #ef4444; border-radius: 50%; margin-right: 8px; vertical-align: middle;"></span>施工日志记录</li>
+                </ul>
+                <div style="margin: 16px 0 0 0;">
+                    <input type="password" id="deleteConfirmationCode" style="width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px;" placeholder="请输入密码">
+                </div>
+            </div>
+            <div class="modal-footer" style="margin-top: 6px; padding: 6px 12px;">
+                <button class="btn btn-secondary" id="cancelDeleteBtn" style="padding: 6px 12px; font-size: 12px;">取消</button>
+                <button class="btn btn-primary" id="confirmDeleteBtn" style="padding: 6px 12px; font-size: 12px;">确认</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+
+        // 辅助函数：获取正确的北京时间（UTC+8）字符串
+        function getBeijingTimeString() {
+            // 创建一个新的Date对象（注意：JavaScript Date对象内部使用UTC时间，但会根据本地时区显示）
+            const now = new Date();
+            
+            // 直接使用Date对象的UTC方法获取当前时间的UTC时间部分
+            // 这样可以避免时区转换问题，因为我们需要的就是UTC+8时间
+            let year = now.getUTCFullYear();
+            let month = now.getUTCMonth();
+            let day = now.getUTCDate();
+            let hours = now.getUTCHours();
+            
+            // 加上8小时得到北京时间
+            hours += 8;
+            
+            // 处理日期进位
+            if (hours >= 24) {
+                hours -= 24;
+                day += 1;
+                
+                // 处理月份进位
+                const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+                if (day > daysInMonth) {
+                    day = 1;
+                    month += 1;
+                    
+                    // 处理年份进位
+                    if (month > 11) {
+                        month = 0;
+                        year += 1;
+                    }
+                }
+            }
+            
+            // 格式化输出
+            month = String(month + 1).padStart(2, '0');
+            day = String(day).padStart(2, '0');
+            hours = String(hours).padStart(2, '0');
+            const minutes = String(now.getUTCMinutes()).padStart(2, '0');
+            const seconds = String(now.getUTCSeconds()).padStart(2, '0');
+            
+            // 返回格式化为字符串，确保Supabase按字面文本保存而非时间戳类型
+            // 这将避免Supabase自动添加毫秒精度
+            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+        }
+        
+        // 生成当前时间的ISO字符串，正确处理时区
+        function getCurrentTimeISOString() {
+            const now = new Date();
+            // 计算北京时间（UTC+8）
+            const beijingTime = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+            // 返回标准ISO格式字符串
+            return beijingTime.toISOString();
+        }
+
+        // 示例项目数据
+        let projects = [];
+
+        // 页面加载时获取项目数据
+        window.addEventListener('DOMContentLoaded', async function() {
+            // 注意：这个事件监听器会在Supabase初始化之前执行，但loadUserProjects函数会处理本地数据
+            await loadUserProjects();
+
+            // 检查URL参数，如果需要打开项目设置模态框
+            checkUrlForSettings();
+        });
+        
+        // 监听数据更新事件
+        window.addEventListener('dataUpdated', function(event) {
+            console.log('📊 数据更新事件触发:', event.detail);
+            // 数据更新后重新加载项目详细数据
+            loadProjectDetails();
+        });
+        
+        // 监听localStorage变化事件，当其他页面修改本地存储时触发
+        window.addEventListener('storage', function(event) {
+            // 当考勤、结算数据、员工数量数据或员工数据更新通知发生变化时，重新加载详细数据
+            if (event.key && (event.key.includes('work_records_') || event.key === 'settlementRecords' || event.key.includes('employee_counts_') || event.key === 'employeeDataUpdated')) {
+                // 静默处理，不输出日志
+                loadProjectDetails();
+            }
+        });
+        
+        // 监听页面可见性变化，当页面从后台回到前台时重新加载数据
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') {
+                loadProjectDetails();
+            }
+        });
+        
+
+        
+        // 查询employees表中status为"在职"和"隐藏"的个数之和
+        async function getEmployeeCount(projectId) {
+            try {
+                // 从本地存储获取员工数量
+                let userId = 'default';
+                try {
+                    const currentUserStr = localStorage.getItem('currentUser');
+                    if (currentUserStr) {
+                        const currentUser = JSON.parse(currentUserStr);
+                        userId = currentUser.user_id || 'default';
+                    }
+                } catch (e) {
+                    console.error('解析currentUser失败:', e);
+                }
+                
+                // 从本地存储获取员工数量
+                const employeeCountsStr = localStorage.getItem('employee_counts_' + userId);
+                if (employeeCountsStr) {
+                    try {
+                        const employeeCounts = JSON.parse(employeeCountsStr);
+                        if (employeeCounts[projectId] !== undefined) {
+                            return employeeCounts[projectId];
+                        }
+                    } catch (e) {
+                        console.error('解析员工数量数据失败:', e);
+                    }
+                }
+                
+                // 如果本地没有数据，返回0
+                return 0;
+            } catch (error) {
+                console.error('获取员工数量失败:', error);
+                return 0;
+            }
+        }
+
+        // 项目数据加载函数
+        async function loadUserProjects() {
+            try {
+                // 清空项目数组
+                ongoingProjects = [];
+                settledProjects = [];
+                
+                try {
+                    // 从本地加载项目数据
+                    loadProjectsFromLocal();
+                    
+                    // 先渲染项目列表（只显示基本信息）
+                    renderProjects('ongoing');
+                    updateTabCounts();
+                    
+                    // 在后台异步加载详细数据
+                    loadProjectDetails();
+                } catch (dbError) {
+                    showNotification('加载项目数据失败', true);
+                    console.error('加载项目数据失败:', dbError);
+                }
+            } catch (error) {
+                showNotification('加载项目失败', true);
+                console.error('加载项目时发生错误:', error);
+                // 加载失败时使用空项目列表
+                ongoingProjects = [];
+                settledProjects = [];
+                renderProjects('ongoing');
+                updateTabCounts();
+            }
+        }
+        
+        // 后台加载项目详细数据
+        async function loadProjectDetails() {
+            try {
+                // 为每个项目并行查询所需数据
+                const projectsWithData = await Promise.all(
+                    [...ongoingProjects, ...settledProjects].map(async (project) => {
+                        // 清除该项目的缓存，强制从数据库查询最新数据
+                        window.projectStatisticsService.clearCache(project.project_id);
+
+                        // 获取完整统计数据
+                        const stats = await window.projectStatisticsService.getProjectStatistics(project.project_id);
+
+                        // 并行查询员工数量
+                        const employeeCount = await getEmployeeCount(project.project_id);
+
+                        // 将数据存储到项目对象中
+                        return {
+                            ...project,
+                            employeeCount,
+                            totalWage: stats.总工资,
+                            unsettledAmount: stats.未结金额
+                        };
+                    })
+                );
+
+                // 重新分类项目
+                ongoingProjects = projectsWithData.filter(p => p.status === '在建');
+                settledProjects = projectsWithData.filter(p => p.status === '结清');
+
+                // 更新项目列表（显示详细数据）
+                renderProjects('ongoing');
+            } catch (error) {
+                console.error('加载项目详细数据失败:', error);
+            }
+        }
+
+        // 检查URL参数，如果存在open_settings=true，则自动打开项目设置模态框
+        function checkUrlForSettings() {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const openSettings = urlParams.get('open_settings');
+                const projectId = urlParams.get('project_id');
+
+                if (openSettings === 'true' && projectId) {
+                    // 解码项目ID
+                    const decodedProjectId = decodeURIComponent(projectId);
+
+                    // 隐藏项目列表容器，直接显示模态框
+                    const projectsGrid = document.getElementById('projectsGrid');
+                    const tabsContainer = document.querySelector('.tabs');
+                    if (projectsGrid) {
+                        projectsGrid.style.display = 'none';
+                    }
+                    if (tabsContainer) {
+                        tabsContainer.style.display = 'none';
+                    }
+
+                    // 查找项目
+                    let project = ongoingProjects.find(p => p.project_id === decodedProjectId);
+                    if (!project) {
+                        project = settledProjects.find(p => p.project_id === decodedProjectId);
+                    }
+
+                    if (project) {
+                        // 延迟一点时间等待项目列表完全渲染
+                        setTimeout(() => {
+                            // 调用projectSettings函数打开模态框
+                            if (typeof projectSettings === 'function') {
+                                projectSettings(decodedProjectId);
+                            } else {
+                                console.error('projectSettings函数不存在');
+                            }
+                        }, 300);
+                    } else {
+                        console.error('未找到项目，ID:', decodedProjectId);
+                        // 如果找不到项目，恢复显示项目列表
+                        if (projectsGrid) {
+                            projectsGrid.style.display = 'grid';
+                        }
+                        if (tabsContainer) {
+                            tabsContainer.style.display = 'flex';
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('检查URL参数失败:', error);
+            }
+        }
+
+        // 显示通知函数 
+        function showNotification(message, isError = false) {
+            // 避免短时间内显示多个相同的通知
+            const existingNotifications = document.querySelectorAll('.notification');
+            const hasDuplicate = Array.from(existingNotifications).some(notification => 
+                notification.textContent === message
+            );
+            
+            if (hasDuplicate) {
+                return;
+            }
+            
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            notification.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                padding: 16px 24px;
+                background: ${isError ? '#ef4444' : '#10b981'};
+                color: white;
+                border-radius: 12px;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+                z-index: 9999;
+                font-weight: 500;
+                font-size: 16px;
+                max-width: 350px;
+                text-align: center;
+                animation: fadeInOut 3s ease;
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+    </script>
+    <script>
+        // 项目数据
+        let ongoingProjects = []; // 在建项目
+        let settledProjects = []; // 结清项目
+
+        // 从本地加载项目数据
+        function loadProjectsFromLocal() {
+            try {
+                // 获取当前登录用户信息
+                let currentUser = {};
+                let userId = 'default';
+                try {
+                    const currentUserStr = localStorage.getItem('currentUser');
+                    if (currentUserStr) {
+                        currentUser = JSON.parse(currentUserStr);
+                        userId = currentUser.user_id || 'default';
+                    }
+                } catch (e) {
+                    console.error('解析currentUser失败:', e);
+                }
+                
+                let projectsData = localStorage.getItem('project_cache_' + userId);
+                
+                if (projectsData) {
+                    let projects = JSON.parse(projectsData);
+                    
+                    projects = projects.map(project => {
+                        const effectiveUserId = project.user_id || currentUser.user_id;
+                        return {
+                            // 保留原始字段并添加必要的映射
+                            ...project,
+                            // 确保所有必要字段都有值
+                            project_name: project.project_name || '未命名项目',
+                            address: project.address || '暂无地址',
+                            status: project.status || '在建',
+                            project_id: project.project_id || '',
+                            user_id: effectiveUserId,
+                            created_at: project.created_at || getCurrentTimeISOString(),
+                            updated_at: project.updated_at || getCurrentTimeISOString(),
+                            // 工时相关字段的默认值
+                            regular_hours: project.regular_hours || 0,
+                            overtime_hours: project.overtime_hours || 0,
+                            // 重新计算是否为带班项目: 如果项目所属用户不是当前登录用户，则是带班项目
+                            is_foreman_project: effectiveUserId !== userId
+                        };
+                    });
+                    
+                    // 使用处理后的数据，按状态分类
+                    ongoingProjects = projects.filter(p => p.status === '在建');
+                    settledProjects = projects.filter(p => p.status === '结清');
+                    
+                } else {
+                    console.log('本地未存储项目数据');
+                    ongoingProjects = [];
+                    settledProjects = [];
+                }
+            } catch (error) {
+                console.error('从本地加载项目失败:', error);
+                ongoingProjects = [];
+                settledProjects = [];
+                showNotification('加载项目失败: ' + error.message, true);
+                throw error;
+            }
+        }
+        
+
+        
+
+
+
+
+
+
+        // 从本地项目索引加载项目数据
+        async function loadLocalProjectIndex() {
+            try {
+                // 获取当前登录用户信息
+                let currentUser = {};
+                let userId = 'default';
+                try {
+                    const currentUserStr = localStorage.getItem('currentUser');
+                    if (currentUserStr) {
+                        currentUser = JSON.parse(currentUserStr);
+                        userId = currentUser.user_id || 'default';
+                    }
+                } catch (e) {
+                    console.error('解析currentUser失败:', e);
+                }
+                
+                // 只使用project_cache_${userId}格式
+                const cacheKey = 'project_cache_' + userId;
+                const cacheData = localStorage.getItem(cacheKey);
+                
+                if (cacheData) {
+                    const parsed = JSON.parse(cacheData);
+                    console.log('使用project_cache格式的项目数据');
+                    return Array.isArray(parsed) ? parsed : (parsed.projects || []);
+                }
+                
+                return [];
+            } catch (error) {
+                console.error('从缓存加载项目失败:', error);
+                return [];
+            }
+        }
+
+        // 更新标签页计数
+        function updateTabCounts() {
+            const tabs = document.querySelectorAll('.tab');
+            const ongoingCount = ongoingProjects.length;
+            const settledCount = settledProjects.length;
+            
+            // 只有当计数发生变化时才更新DOM和输出日志
+            if (tabs[0].textContent !== `在建项目 (${ongoingCount})` || 
+                tabs[1].textContent !== `已结清项目 (${settledCount})`) {
+                tabs[0].textContent = `在建项目 (${ongoingCount})`;
+                tabs[1].textContent = `已结清项目 (${settledCount})`;
+                // console.log(`✅ 标签页计数已更新：在建项目 ${ongoingCount} 个，已结清项目 ${settledCount} 个`);
+            }
+        }
+
+        // 渲染项目卡片
+        // 日期格式化函数
+        function formatDate(dateString) {
+            if (!dateString) return '无日期';
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return '无效日期';
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        // 获取项目的上次记工日期
+        function getLastWorkDate(projectId) {
+            try {
+                // 从currentUser获取user_id
+                let userId = 'default';
+                try {
+                    const currentUserStr = localStorage.getItem('currentUser');
+                    if (currentUserStr) {
+                        const currentUser = JSON.parse(currentUserStr);
+                        userId = currentUser.user_id || 'default';
+                    }
+                } catch (e) {
+                    console.error('解析currentUser失败:', e);
+                }
+
+                // 获取考勤记录数据
+                const workRecordsKey = 'work_records_' + userId;
+                const workRecords = localStorage.getItem(workRecordsKey);
+                
+                // 获取结算记录数据
+                const settlementRecordsKey = 'settlementRecords';
+                const settlementRecordsData = localStorage.getItem(settlementRecordsKey);
+                
+                let allDates = [];
+                
+                // 处理考勤记录
+                if (workRecords) {
+                    const records = JSON.parse(workRecords);
+                    const projectRecords = records.filter(record => record.project_id === projectId);
+                    
+                    projectRecords.forEach(record => {
+                        if (record.record_date) {
+                            allDates.push(new Date(record.record_date));
+                        }
+                    });
+                }
+                
+                // 处理结算记录
+                if (settlementRecordsData) {
+                    const settlementRecords = JSON.parse(settlementRecordsData);
+                    const projectSettlements = settlementRecords.filter(record => record.project_id === projectId);
+                    
+                    projectSettlements.forEach(record => {
+                        if (record.record_date) {
+                            allDates.push(new Date(record.record_date));
+                        }
+                    });
+                }
+                
+                if (allDates.length > 0) {
+                    // 找出最大的日期
+                    const maxDate = new Date(Math.max(...allDates));
+                    // 格式化为"X月X日"格式
+                    const month = maxDate.getMonth() + 1;
+                    const day = maxDate.getDate();
+                    return `${month}月${day}日`;
+                }
+                
+                return '未记工';
+            } catch (error) {
+                console.error('获取上次记工日期失败:', error);
+                return '未记工';
+            }
+        }
+
+        async function renderProjects(tab = 'ongoing') {
+            const projectsGrid = document.getElementById('projectsGrid');
+            
+            let projectsToRender = [];
+            switch (tab) {
+                case 'ongoing':
+                    projectsToRender = ongoingProjects;
+                    break;
+                case 'settled':
+                    projectsToRender = settledProjects;
+                    break;
+                default:
+                    projectsToRender = ongoingProjects;
+            }
+
+            // 隐藏或显示新建项目按钮
+            const newProjectBtn = document.querySelector('.new-project-btn');
+            if (tab === 'settled') {
+                newProjectBtn.style.display = 'none';
+            } else {
+                newProjectBtn.style.display = 'flex';
+            }
+
+            // 清空所有现有卡片，避免动画冲突
+            projectsGrid.innerHTML = '';
+
+            // 渲染项目卡片
+            projectsToRender.forEach((project) => {
+                // 创建新卡片
+                const projectCard = document.createElement('div');
+                projectCard.className = 'project-card';
+                projectCard.dataset.projectId = project.project_id;
+                
+                // 获取该项目的在职人数（从内存中读取）
+                const activeEmployeeCount = project.employeeCount || 0;
+                
+                // 根据项目类型生成不同的卡片内容
+                let cardContent = '';
+                
+                // 带班项目标识
+                const foremanBadge = project.is_foreman_project ? 
+                    `<span style="background-color: #fff7e6; color: #fa8c16; -webkit-text-fill-color: #fa8c16; padding: 2px 8px; border-radius: 4px; font-size: 12px; border: 1px solid #ffd591; margin-left: 8px; vertical-align: middle; display: inline-block; font-weight: normal;">带班</span>` : '';
+                
+                if (tab === 'settled') {
+                    // 已结清项目的卡片内容
+                    cardContent = `
+                        <div class="project-header">
+                            <div class="project-name" style="display: flex; align-items: center;">
+                                <span>${project.project_name}</span>
+                                ${foremanBadge}
+                            </div>
+                        </div>
+                        <div class="project-info">
+                                <div class="project-count">班组人数: <span class="project-count-number" data-field="employeeCount">${activeEmployeeCount}</span>人</div>
+                                <div class="project-date"><span class="last-work-label">上次记工</span><br><span class="last-work-date">${getLastWorkDate(project.project_id)}</span></div>
+                            </div>
+                        <div class="project-actions">
+                            <div class="project-actions-left">
+                                <!-- 已结清项目没有项目设置按钮 -->
+                            </div>
+                            <div class="project-actions-right">
+                                <button class="action-btn restore-btn" onclick="window.restoreProject('${project.project_id}')" style="background: transparent; border: none; box-shadow: none; padding: 5px 10px; color: #333; display: flex; align-items: center;">
+                                    <i class="fas fa-reply" style="color: #4379FF; margin-right: 6px; font-size: 16px;"></i>
+                                    恢复为在建
+                                </button>
+                                <button class="action-btn delete-btn" onclick="window.deleteProject('${project.project_id}')" style="background: transparent; border: none; box-shadow: none; padding: 5px 10px; color: #333; display: flex; align-items: center;">
+                                    <i class="fas fa-trash-alt" style="color: #FF2B2B; margin-right: 6px; font-size: 16px;"></i>
+                                    删除
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // 在建项目的卡片内容
+                    cardContent = `
+                        <div class="project-header">
+                            <div class="project-name" style="display: flex; align-items: center;">
+                                <span>${project.project_name}</span>
+                                ${foremanBadge}
+                            </div>
+                        </div>
+                        <div class="project-info">
+                                <div class="project-count">班组人数: <span class="project-count-number" data-field="employeeCount">${activeEmployeeCount}</span>人</div>
+                                <div class="project-date"><span class="last-work-label">上次记工</span><br><span class="last-work-date">${getLastWorkDate(project.project_id)}</span></div>
+                            </div>
+                        <div class="project-actions">
+                            <div class="project-actions-left">
+                                <button class="action-btn settings-btn" onclick="projectSettings('${project.project_id}')">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; display: inline-block; vertical-align: middle;">
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                                    </svg>
+                                    项目设置
+                                </button>
+                            </div>
+                            <div class="project-actions-right">
+                                <button class="action-btn settlement-btn" onclick="window.location.href='结算借支.html?project_id=${project.project_id}&project_name=${encodeURIComponent(project.project_name)}'">
+                                    <i class="fas fa-hand-holding-usd"></i> 结算/借支
+                                </button>
+                                <button class="action-btn record-btn" onclick="goToRecord('${project.project_name}', '${project.project_id}')">
+                                    <i class="fas fa-edit"></i> 记 工
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // 设置卡片内容
+                projectCard.innerHTML = cardContent;
+                
+                // 只有在建项目才添加卡片点击事件（空白区域），已结清项目不添加
+                if (tab !== 'settled') {
+                    // 添加卡片点击事件（空白区域）
+                    projectCard.addEventListener('click', function(e) {
+                        // 检查点击的是否是按钮
+                        if (e.target.closest('button')) {
+                            return; // 如果点击的是按钮，不执行跳转
+                        }
+                        // 设置项目名称到localStorage，用于首页标题显示
+                        localStorage.setItem('currentProjectName', project.project_name);
+                        localStorage.setItem('currentProjectId', project.project_id);
+                        // 跳转到项目主页，传递项目名称参数
+                        const encodedProjectName = encodeURIComponent(project.project_name);
+                        window.location.href = '项目主页.html?project_id=' + project.project_id + '&project_name=' + encodedProjectName;
+                    });
+                }
+                
+                // 添加到网格
+                projectsGrid.appendChild(projectCard);
+            });
+        }
+
+        // 初始化模态框相关元素
+        const modalOverlay = document.getElementById('projectModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const projectnameInput = document.getElementById('projectname');
+        const projectaddressInput = document.getElementById('projectaddress');
+        const regularHoursInput = document.getElementById('regularHours');
+        const overtimeHoursInput = document.getElementById('overtimeHours');
+        const workerCountElement = document.getElementById('workerCount');
+        const statisticsElement = document.getElementById('statistics');
+        const unsettledElement = document.getElementById('unsettled');
+        const markAsSettledBtn = document.getElementById('markAsSettled');
+        const closeModalBtn = document.getElementById('closeModal');
+        const cancelProjectBtn = document.getElementById('cancelProject');
+        const confirmProjectBtn = document.getElementById('confirmProject');
+        let currentProjectid = null;
+
+        // 为设为已结清按钮添加点击事件
+        markAsSettledBtn.addEventListener('click', markAsSettled);
+
+        // 跳转到记工页面函数
+        function goToRecord(project_name, project_id) {
+            try {
+                // 记工按钮点击，项目ID: ${project_id}
+                
+                if (!project_id) {
+                    console.error('项目ID为空，无法执行跳转');
+                    showNotification('项目ID获取失败，请重试', true);
+                    return;
+                }
+                
+                // 将项目ID和项目名称作为URL参数传递到记工页面
+                const encodedProjectName = encodeURIComponent(project_name);
+                const targetUrl = `记工.html?project_id=${project_id}&project_name=${encodedProjectName}`;
+                
+                // 检查是否在iframe中
+                const inIframe = window.parent && window.parent !== window;
+                
+                // 简化导航逻辑
+                if (inIframe) {
+                    // 在iframe中，通过父窗口导航
+                    window.parent.postMessage({
+                        type: 'navigate',
+                        page: targetUrl,
+                        title: '记工'
+                    }, window.location.origin);
+                    
+                    // 同时执行直接跳转以提高响应速度
+                    window.location.href = targetUrl;
+                } else {
+                    // 直接访问，正常跳转
+                    window.location.href = targetUrl;
+                }
+            } catch (error) {
+                // 保留错误日志以便调试
+                console.error('执行goToRecord函数时发生错误:', error);
+                showNotification('跳转失败，请重试', true);
+            }
+        }
+
+        // 打开模态框
+        function openModal() {
+            modalOverlay.classList.add('active');
+            // 注意：不再清空输入框，因为projectSettings函数会在调用openModal前填充数据
+            // 新建项目时会手动清空输入框
+        }
+
+        // 关闭模态框
+        function closeModal() {
+            modalOverlay.classList.remove('active');
+            // 重置模态框状态
+            modalTitle.textContent = '新建项目';
+            document.getElementById('projectSettingsInfo').style.display = 'none';
+            markAsSettledBtn.style.display = 'none';
+
+            // 恢复显示项目列表和标签（如果之前被隐藏了）
+            const projectsGrid = document.getElementById('projectsGrid');
+            const tabsContainer = document.querySelector('.tabs');
+            if (projectsGrid && projectsGrid.style.display === 'none') {
+                projectsGrid.style.display = 'grid';
+            }
+            if (tabsContainer && tabsContainer.style.display === 'none') {
+                tabsContainer.style.display = 'flex';
+            }
+
+            if (!document.getElementById('confirmSettleModal').classList.contains('active') &&
+                !document.getElementById('confirmRestoreModal').classList.contains('active')) {
+                currentProjectid = null;
+            }
+        }
+
+        // 设为已结清
+        function markAsSettled() {
+            if (currentProjectid) {
+                // 保存项目ID到确认模态框，避免模态框关闭后丢失
+                document.getElementById('confirmSettleModal').dataset.projectId = currentProjectid;
+                // 显示确认模态框
+                openConfirmSettleModal();
+            } else {
+                console.error('当前项目ID为空，无法设为已结清');
+                showNotification('请先选择项目', true);
+            }
+        }
+
+        // 执行设为已结清操作
+        async function executeMarkAsSettled(projectId = null) {
+            // 使用传入的项目ID，如果没有则使用currentProjectid
+            const targetProjectId = projectId || currentProjectid;
+            if (targetProjectId) {
+                // 查找项目 - 使用正确的字段名
+                const projectIndex = ongoingProjects.findIndex(p => p.project_id === targetProjectId);
+                if (projectIndex !== -1) {
+                    const project = ongoingProjects[projectIndex];
+                    
+                    try {
+                        // 获取当前登录用户信息
+                        let currentUser = {};
+                        try {
+                            const currentUserStr = localStorage.getItem('currentUser');
+                            if (currentUserStr) {
+                                currentUser = JSON.parse(currentUserStr);
+                            }
+                        } catch (e) {
+                            console.error('解析currentUser失败:', e);
+                        }
+                        
+                        if (!currentUser.user_id) {
+                            console.error('未找到用户ID');
+                            showNotification('操作失败：未找到用户信息', true);
+                            return;
+                        }
+                        
+                        // 使用统一的时间处理函数
+                        const beijingTimeString = getBeijingTimeString();
+                        const isoTimeString = getCurrentTimeISOString();
+                        
+                        // 按照数据库列顺序定义：project_id、user_id、project_name、address、regular_hours、overtime_hours、status、updated_at
+                        const updatedProjectData = {
+                            project_id: targetProjectId,  // 项目唯一标识符（保持顺序，虽然是不可变字段）
+                            user_id: project.user_id || currentUser.user_id,
+                            project_name: project.project_name || '未命名项目',
+                            address: project.address || '',
+                            regular_hours: project.regular_hours || 0,
+                            overtime_hours: project.overtime_hours || 0,
+                            status: '结清',  // 更新为结清状态
+                            updated_at: isoTimeString  // 使用ISO时间格式进行冲突检测
+                        };
+
+                        // 清理数据，只更新status和updated_at字段
+                        const cleanProjectData = {
+                            project_id: updatedProjectData.project_id,
+                            status: updatedProjectData.status,
+                            updated_at: updatedProjectData.updated_at
+                        };
+
+                        // 从在建项目移除
+                        ongoingProjects.splice(projectIndex, 1);
+                        // 添加到已结清项目，并更新状态
+                        const settledProject = {
+                            ...project,
+                            project_id: project.project_id,
+                            user_id: project.user_id || currentUser.user_id,
+                            project_name: project.project_name,
+                            regular_hours: project.regular_hours || 0,
+                            overtime_hours: project.overtime_hours || 0,
+                            status: '结清',
+                            updated_at: isoTimeString  // 使用ISO时间格式进行冲突检测
+                        };
+                        settledProjects.push(settledProject);
+
+                        // 更新本地索引
+                        await updateLocalProjectIndex();
+
+                        // 更新UI
+                        renderProjects('ongoing');
+                        updateTabCounts();
+                        closeModal();
+                        closeConfirmSettleModal();
+                        // 检查网络状态并显示相应的提示信息
+                        const isOnline = window.offlineSyncService && window.offlineSyncService.syncStatus.isOnline;
+                        showNotification(isOnline ? '项目已设为结清状态' : '项目已设为结清状态，将在网络恢复后同步到云端', false);
+                        
+                        console.log('✅ 项目状态已更新到本地');
+                        
+                        // 异步更新云端数据（后台处理，不影响用户体验）
+                        setTimeout(() => {
+                            handleProjectStatusChangeToSupabase(cleanProjectData, targetProjectId, false); // 传入false表示不显示通知
+                        }, 0);
+                        
+                    } catch (error) {
+                        console.error('执行设为已结清操作失败:', error);
+                        showNotification('操作失败: ' + error.message, true);
+                        return;
+                    }
+                }
+            }
+        }
+
+        // 创建新项目
+        function createNewProject() {
+            currentProjectid = null; // 重置为null，确保执行创建操作
+            
+            // 确保按钮可见且输入框可用（重置可能被带班项目禁用的状态）
+            if (confirmProjectBtn) confirmProjectBtn.style.display = 'flex';
+            if (projectnameInput) projectnameInput.disabled = false;
+            if (projectaddressInput) projectaddressInput.disabled = false;
+            if (regularHoursInput) regularHoursInput.disabled = false;
+            if (overtimeHoursInput) overtimeHoursInput.disabled = false;
+
+            // 清空表单，确保没有残留数据
+            projectnameInput.value = '';
+            projectaddressInput.value = '';
+            projectaddressInput.placeholder = '请输入项目地址'; // 重置为默认占位符
+            regularHoursInput.value = '';
+            overtimeHoursInput.value = '';
+            // 重置模态框标题
+            modalTitle.textContent = '新建项目';
+            // 隐藏任何编辑模式下的特殊元素
+            document.getElementById('projectSettingsInfo').style.display = 'none';
+            openModal();
+        }
+
+        // 确认更新项目（项目设置保存）
+        async function confirmUpdateProject() {
+            // 检查是否是更新项目（currentProjectid存在）还是新建项目
+            if (currentProjectid) {
+                console.log('执行更新项目保存操作');
+            } else {
+                console.log('执行新建项目保存操作');
+            }
+            const projectname = projectnameInput.value.trim();
+            const address = projectaddressInput.value.trim();
+            const regularHours = parseFloat(regularHoursInput.value) || 0;
+            const overtimeHours = parseFloat(overtimeHoursInput.value) || 0;
+
+            if (!projectname) {
+                showNotification('请输入项目名称', true);
+                return;
+            }
+
+            try {
+                const phone = localStorage.getItem('loggedInPhone');
+                if (!phone) {
+                    showNotification('未找到登录信息', true);
+                    return;
+                }
+                
+                // 如果currentProjectid不存在，说明是新建项目
+                if (!currentProjectid) {
+                    // 执行创建项目逻辑
+                    await confirmCreateProject();
+                    return;
+                }
+
+                // 查找原项目信息
+                let originalProject;
+                let originalStatus = '';
+                
+                if (ongoingProjects.some(p => p.project_id === currentProjectid)) {
+                    originalProject = ongoingProjects.find(p => p.project_id === currentProjectid);
+                    originalStatus = '在建';
+                } else if (settledProjects.some(p => p.project_id === currentProjectid)) {
+                    originalProject = settledProjects.find(p => p.project_id === currentProjectid);
+                    originalStatus = '结清';
+                }
+
+                if (!originalProject) {
+                    // 未找到原项目信息，改为创建新项目
+                    await confirmCreateProject();
+                    return;
+                }
+
+                // 检查新的项目名称是否已被其他项目使用（排除当前项目）
+                const allProjects = [...ongoingProjects, ...settledProjects];
+                const isNameDuplicate = allProjects.some(project => 
+                    project.project_name === projectname && project.project_id !== currentProjectid
+                );
+                
+                if (isNameDuplicate) {
+                    showNotification('该项目名称已存在！', true);
+                    return;
+                }
+
+                // 获取北京时间并创建时间戳
+                const beijingTime = getBeijingTimeString();
+                const currentTimeISO = getCurrentTimeISOString();
+                
+                // 获取当前登录用户信息
+                let currentUser = {};
+                try {
+                    const currentUserStr = localStorage.getItem('currentUser');
+                    if (currentUserStr) {
+                        currentUser = JSON.parse(currentUserStr);
+                    }
+                } catch (e) {
+                    console.error('解析currentUser失败:', e);
+                }
+                
+                // 创建更新后的项目数据（仅包含数据库表存在的基本字段）
+                const updatedProjectData = {
+                    project_id: currentProjectid,
+                    user_id: originalProject.user_id || currentUser.user_id,
+                    project_name: projectname,
+                    address: address || '',
+                    regular_hours: regularHours,
+                    overtime_hours: overtimeHours,
+                    status: originalStatus,
+                    created_at: originalProject.created_at, // 保持创建时间不变
+                    updated_at: currentTimeISO,
+                    // 保持带班项目标识
+                    is_foreman_project: originalProject.is_foreman_project
+                };
+
+                // 先更新本地数据（立即反馈用户）
+                try {
+                    await updateProjectInMemory(currentProjectid, updatedProjectData);
+                    await updateLocalProjectIndex();
+                    console.log('✅ 项目已更新到本地');
+                } catch (error) {
+                    console.error('更新项目数据到本地失败', error);
+                    showNotification('更新项目失败: ' + error.message, true);
+                    return;
+                }
+
+                // 保存currentProjectid副本，因为closeModal会将其设为null
+                const projectIdForSync = currentProjectid;
+                
+                // 关闭模态框并更新UI
+                closeModal();
+                renderProjects();
+                updateTabCounts();
+
+                // 异步处理云端同步（后台处理，不影响用户体验）
+                setTimeout(async () => {
+                    const syncSuccess = await handleProjectUpdateToSupabase(updatedProjectData);
+                    if (syncSuccess) {
+                        showNotification('项目更新成功!', false);
+                    } else {
+                        showNotification('项目更新成功，将在网络恢复后同步到云端', false);
+                    }
+                }, 0);
+            } catch (error) {
+                console.error('更新项目失败:', error);
+                showNotification('更新项目失败: ' + error.message, true);
+            }
+        }
+
+        // 处理项目添加到Supabase
+        async function handleProjectAddToSupabase(projectData) {
+            try {
+                // 检查是否在线
+                if (navigator.onLine && window.supabase && typeof window.supabase.from === 'function') {
+                    // 在线时直接保存到云端
+                const { data, error } = await window.supabase
+                    .from('projects')
+                    .insert(projectData);
+                
+                if (error) {
+                    console.error('❌ 创建项目失败 - 详细错误:', error);
+                    console.error('❌ 错误详情 - 代码:', error.code);
+                    console.error('❌ 错误详情 - 消息:', error.message);
+                    console.error('❌ 错误详情 - 详情:', error.details);
+                    console.error('❌ 发送的数据:', projectData);
+                    
+                    // 如果云端保存失败，添加到同步队列
+                    if (window.offlineSyncService) {
+                        await window.offlineSyncService.addToSyncQueue('add', projectData, projectData.project_id, 'project');
+                    }
+                    return false;
+                } else {
+                    console.log('✅ 项目已成功保存到Supabase');
+                    return true;
+                }
+                } else {
+                    console.log('📡 离线状态，添加到同步队列');
+                    // 离线状态，添加到同步队列
+                    if (window.offlineSyncService) {
+                        await window.offlineSyncService.addToSyncQueue('add', projectData, projectData.project_id, 'project');
+                    }
+                    return false;
+                }
+            } catch (error) {
+                console.error('💥 保存项目数据到云端失败:', error);
+                console.error('💥 错误堆栈:', error.stack);
+                // 发生异常时添加到同步队列
+                if (window.offlineSyncService) {
+                    await window.offlineSyncService.addToSyncQueue('add', projectData, projectData.project_id, 'project');
+                }
+                return false;
+            }
+        }
+
+        // 处理项目更新到Supabase
+        async function handleProjectUpdateToSupabase(projectData) {
+            try {
+                // 检查是否在线
+                if (navigator.onLine && window.supabase && typeof window.supabase.from === 'function') {
+                    // 在线时直接更新到云端
+                    const { error } = await window.supabase
+                        .from('projects')
+                        .update(projectData)
+                        .eq('project_id', projectData.project_id);
+                    
+                    if (error) {
+                        console.error('❌ 更新项目失败 - 详细错误:', error);
+                        console.error('❌ 错误详情 - 代码:', error.code);
+                        console.error('❌ 错误详情 - 消息:', error.message);
+                        console.error('❌ 错误详情 - 详情:', error.details);
+                        console.error('❌ 发送的数据:', projectData);
+                        
+                        // 如果云端更新失败，添加到同步队列
+                        if (window.offlineSyncService) {
+                            await window.offlineSyncService.addToSyncQueue('update', projectData, projectData.project_id, 'project');
+                        }
+                        return false;
+                    } else {
+                        console.log('✅ 项目已成功更新到Supabase');
+                        return true;
+                    }
+                } else {
+                    console.log('📡 离线状态，添加到同步队列');
+                    // 离线状态，添加到同步队列
+                    if (window.offlineSyncService) {
+                        await window.offlineSyncService.addToSyncQueue('update', projectData, projectData.project_id, 'project');
+                    }
+                    return false;
+                }
+            } catch (error) {
+                console.error('💥 更新项目数据到云端失败:', error);
+                console.error('💥 错误堆栈:', error.stack);
+                // 发生异常时添加到同步队列
+                if (window.offlineSyncService) {
+                    await window.offlineSyncService.addToSyncQueue('update', projectData, projectData.project_id, 'project');
+                }
+                return false;
+            }
+        }
+
+        // 确认创建项目
+        async function confirmCreateProject() {
+            const projectname = projectnameInput.value.trim();
+            const address = projectaddressInput.value.trim();
+            const regularHours = parseFloat(regularHoursInput.value) || 0;
+            const overtimeHours = parseFloat(overtimeHoursInput.value) || 0;
+
+            if (!projectname) {
+                showNotification('请输入项目名称', true);
+                return;
+            }
+
+            // 检查本地项目列表中是否已存在同名项目
+            const allProjects = [...ongoingProjects, ...settledProjects];
+            const isLocalDuplicate = allProjects.some(project => project.project_name === projectname);
+            
+            if (isLocalDuplicate) {
+                showNotification('该项目名称已存在！', true);
+                return;
+            }
+
+            // 生成项目ID (PRO_前缀 + 16位随机字符)
+            const project_id = 'PRO_' + Math.random().toString(36).substring(2, 12) + '_' + Math.random().toString(36).substring(2, 7);
+
+            // 获取北京时间并创建时间戳
+            const beijingTime = getBeijingTimeString();
+            const currentTimeISO = getCurrentTimeISOString();
+            
+            // 获取当前登录用户信息
+            let currentUser = {};
+            try {
+                const currentUserStr = localStorage.getItem('currentUser');
+                if (currentUserStr) {
+                    currentUser = JSON.parse(currentUserStr);
+                }
+            } catch (e) {
+                console.error('解析currentUser失败:', e);
+            }
+            
+            // 创建新项目数据（仅包含数据库表存在的基本字段）
+            const newProjectData = {
+                project_id: project_id,
+                user_id: currentUser.user_id,
+                project_name: projectname,
+                address: address || '',
+                regular_hours: regularHours,
+                overtime_hours: overtimeHours,
+                status: '在建',
+                created_at: currentTimeISO,
+                updated_at: currentTimeISO
+            };
+
+            // 先保存到本地（立即反馈用户）
+            try {
+                ongoingProjects.push(newProjectData);
+                await updateLocalProjectIndex();
+                console.log('✅ 项目已保存到本地');
+            } catch (error) {
+                console.error('保存项目数据到本地失败:', error);
+                showNotification('保存项目失败: ' + error.message, true);
+                return;
+            }
+
+            // 关闭模态框并更新UI
+            closeModal();
+            renderProjects();
+            updateTabCounts();
+
+            // 异步处理云端同步（后台处理，不影响用户体验）
+            setTimeout(async () => {
+                const syncSuccess = await handleProjectAddToSupabase(newProjectData);
+                if (syncSuccess) {
+                    showNotification('项目创建成功!', false);
+                } else {
+                    showNotification('项目创建成功，将在网络恢复后同步到云端', false);
+                }
+            }, 0);
+        }
+
+        // 更新项目索引
+        async function updateProjectIndex() {
+            try {
+                const phone = localStorage.getItem('loggedInPhone');
+                if (!phone) return;
+
+                // 使用数据存储服务处理项目索引
+                let index = { projects: [] };
+
+                // 尝试加载现有索引
+                try {
+                    const storageKey = `project_index_${phone}`;
+                    // 直接从localStorage获取索引数据
+                    const existingIndexStr = localStorage.getItem(storageKey);
+                    if (existingIndexStr) {
+                        index = JSON.parse(existingIndexStr);
+                    }
+                } catch (error) {
+                    console.log('创建新索引');
+                }
+
+                // 更新项目列表
+                index.projects = projects.map(p => ({
+                    id: p.project_id,  // 使用project_id作为id
+                    name: p.project_name,
+                    date: p.date,
+                    count: p.count
+                }));
+
+                console.log('项目索引已更新，不再使用JSON文件存储');
+            } catch (error) {
+                console.error('更新项目索引失败:', error);
+            }
+        }
+
+        // 项目相关函数
+        async function projectSettings(project_id) {
+            currentProjectid = project_id;
+            
+            try {
+                // 从本地项目数据中查找匹配的项目
+                let project = null;
+                
+                // 先在进行中的项目中查找 
+                project = ongoingProjects.find(p => p.project_id === project_id);
+                
+                // 如果在进行中的项目中没找到，再到已结清的项目中查找
+                if (!project) {
+                    project = settledProjects.find(p => p.project_id === project_id);
+                }
+                
+                if (project) {
+                    let projectStatus = project.status || '在建';
+                    
+                    // 设置模态框标题和内容 - 使用本地数据
+                    modalTitle.textContent = '项目设置: ' + project.project_name;
+                    
+                    // 显示项目设置额外信息
+                    document.getElementById('projectSettingsInfo').style.display = 'block';
+
+                    // 检查是否为带班项目，如果是则禁止修改
+                    if (project.is_foreman_project) {
+                        // 带班不能修改项目信息，也不能设为已结清
+                        if (markAsSettledBtn) markAsSettledBtn.style.display = 'none';
+                        if (confirmProjectBtn) confirmProjectBtn.style.display = 'none';
+                        
+                        // 禁用输入框
+                        if (projectnameInput) projectnameInput.disabled = true;
+                        if (projectaddressInput) projectaddressInput.disabled = true;
+                        if (regularHoursInput) regularHoursInput.disabled = true;
+                        if (overtimeHoursInput) overtimeHoursInput.disabled = true;
+                    } else {
+                        // 非带班项目（或者是项目创建者），允许修改
+                        if (confirmProjectBtn) confirmProjectBtn.style.display = 'flex';
+                        
+                        // 启用输入框
+                        if (projectnameInput) projectnameInput.disabled = false;
+                        if (projectaddressInput) projectaddressInput.disabled = false;
+                        if (regularHoursInput) regularHoursInput.disabled = false;
+                        if (overtimeHoursInput) overtimeHoursInput.disabled = false;
+
+                        // 根据项目状态显示/隐藏设为已结清按钮
+                        if (projectStatus === '在建') {
+                            if (markAsSettledBtn) markAsSettledBtn.style.display = 'flex';
+                        } else {
+                            if (markAsSettledBtn) markAsSettledBtn.style.display = 'none';
+                        }
+                    }
+
+                    // 使用本地数据填充输入框
+                    if (projectnameInput && projectaddressInput && regularHoursInput && overtimeHoursInput) {
+                        projectnameInput.value = project.project_name?.trim() || '未命名项目';
+                        
+                        // 处理项目地址：如果为空则设置占位符
+                        const addressValue = project.address?.trim() || '';
+                        if (addressValue) {
+                            projectaddressInput.value = addressValue;
+                            projectaddressInput.placeholder = '请输入项目地址';
+                        } else {
+                            projectaddressInput.value = '';
+                            projectaddressInput.placeholder = '地址未填写';
+                        }
+                        
+                        // 仅使用小写字段名
+                        regularHoursInput.value = project.regular_hours?.toString() || '0';
+                        overtimeHoursInput.value = project.overtime_hours?.toString() || '0';
+                        
+                        // 触发输入事件更新UI
+                        projectnameInput.dispatchEvent(new Event('input'));
+                        projectaddressInput.dispatchEvent(new Event('input'));
+                        regularHoursInput.dispatchEvent(new Event('input'));
+                    }
+                    
+                    // 清除缓存并实时计算最新统计数据
+                    window.projectStatisticsService.clearCache(project_id);
+                    const stats = await window.projectStatisticsService.getProjectStatistics(project_id);
+                    const employeeCount = await getEmployeeCount(project_id);
+                    
+                    // 辅助函数：格式化金额显示
+                    function formatAmount(amount) {
+                        if (Number.isInteger(amount)) {
+                            return amount;
+                        } else {
+                            return Math.floor(amount);
+                        }
+                    }
+                    
+                    // 更新UI显示
+                    if (document.getElementById('presentWorkers')) {
+                        document.getElementById('presentWorkers').innerHTML = '<span style="color: purple;">' + employeeCount + '</span>&nbsp;&nbsp;&nbsp;人';
+                    }
+                    
+                    if (document.getElementById('statistics')) {
+                        document.getElementById('statistics').innerHTML = '<span style="color: orange;">' + formatAmount(stats.总工资) + '</span>&nbsp;&nbsp;&nbsp;元';
+                    }
+                    
+                    if (document.getElementById('unsettled')) {
+                        document.getElementById('unsettled').innerHTML = '<span style="color: red;">' + formatAmount(stats.未结金额) + '</span>&nbsp;&nbsp;&nbsp;元';
+                    }
+                    
+                    // 更新项目对象中的数据，确保下次打开时也是最新的
+                    project.employeeCount = employeeCount;
+                    project.totalWage = stats.总工资;
+                    project.unsettledAmount = stats.未结金额;
+                    
+                    // 显示模态框
+                    openModal();
+                    
+                    // ✅ 模态框打开完成
+                } else {
+                    console.error('❌ 未在本地项目数据中找到项目，项目ID:', projectId);
+                    showNotification('未找到项目数据', true);
+                    return;
+                }
+            } catch (e) {
+                console.error('💥 查找本地项目数据异常:', e);
+                showNotification('查找项目数据异常: ' + (e.message || e), true);
+                return;
+            }
+        }
+
+        function recordWork(project_id) {
+            showNotification(`记工: ${project_id}`, false);
+        }
+        
+
+        // 更新本地项目索引
+        async function updateLocalProjectIndex() {
+            try {
+                const allProjects = [
+                    ...ongoingProjects.map(p => ({...p, status: '在建'})),
+                    ...settledProjects.map(p => ({...p, status: '结清'}))
+                ];
+                
+                // 获取当前登录用户信息
+                let currentUser = {};
+                let userId = 'default';
+                try {
+                    const currentUserStr = localStorage.getItem('currentUser');
+                    if (currentUserStr) {
+                        currentUser = JSON.parse(currentUserStr);
+                        userId = currentUser.user_id || 'default';
+                    }
+                } catch (e) {
+                    console.error('解析currentUser失败:', e);
+                }
+                
+                // 使用数组格式的project_cache_${userId}
+                const cacheKey = 'project_cache_' + userId;
+                localStorage.setItem(cacheKey, JSON.stringify(allProjects));
+                
+                // ✅ 项目已保存到本地
+            } catch (error) {
+                console.error('更新项目数据失败:', error);
+            }
+        }
+
+        function updateProjectInMemory(projectId, updatedProject) {
+            // 从两个数组中移除旧项目 
+            ongoingProjects = ongoingProjects.filter(p => p.project_id !== projectId);
+            settledProjects = settledProjects.filter(p => p.project_id !== projectId);
+            
+            // 根据项目状态添加到相应的数组
+            if (updatedProject.status === '结清') {
+                settledProjects.push(updatedProject);
+            } else {
+                ongoingProjects.push(updatedProject);
+            }
+            
+            // 更新本地索引
+            updateLocalProjectIndex();
+        }
+
+        function settlement(projectId) {
+            showNotification(`结算/借支: ${projectId}`, false);
+        }
+
+        function recordWork(project_id) {
+            showNotification(`记工: ${project_id}`, false);
+        }
+
+        // 事件监听器
+        closeModalBtn.addEventListener('click', closeModal);
+        cancelProjectBtn.addEventListener('click', closeModal);
+        confirmProjectBtn.addEventListener('click', async function() {
+            // 检查是否是更新项目（currentProjectid存在）还是新建项目
+            if (currentProjectid) {
+                console.log('点击项目设置确认按钮');
+            } else {
+                console.log('点击新建项目确认按钮');
+            }
+            await confirmUpdateProject();
+        });
+
+        // 点击模态框外部关闭
+        modalOverlay.addEventListener('click', function(e) {
+            if (e.target === modalOverlay) {
+                closeModal();
+            }
+        });
+
+        // 确认设为已结清模态框相关函数
+        function openConfirmSettleModal() {
+            document.getElementById('confirmSettleModal').classList.add('active');
+        }
+
+        function closeConfirmSettleModal() {
+            document.getElementById('confirmSettleModal').classList.remove('active');
+        }
+
+        // 确认设为已结清模态框事件监听器
+        document.getElementById('closeConfirmSettleModal').addEventListener('click', closeConfirmSettleModal);
+        document.getElementById('cancelSettleBtn').addEventListener('click', closeConfirmSettleModal);
+        document.getElementById('confirmSettleBtn').addEventListener('click', async function() {
+            // 从确认模态框获取保存的项目ID
+            const projectId = document.getElementById('confirmSettleModal').dataset.projectId;
+            if (projectId) {
+                // 确认设为已结清
+                // 直接传递项目ID给executeMarkAsSettled函数，避免依赖currentProjectid
+                closeConfirmSettleModal();
+                await executeMarkAsSettled(projectId);
+            } else {
+                console.error('未找到项目ID，无法执行设为已结清操作');
+                showNotification('操作失败：未找到项目信息', true);
+            }
+        });
+
+        // 点击确认设为已结清模态框外部关闭
+        document.getElementById('confirmSettleModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeConfirmSettleModal();
+            }
+        });
+
+        // 确认恢复为在建模态框相关函数
+        function openConfirmRestoreModal() {
+            document.getElementById('confirmRestoreModal').classList.add('active');
+        }
+
+        function closeConfirmRestoreModal() {
+            document.getElementById('confirmRestoreModal').classList.remove('active');
+        }
+
+        // 确认恢复为在建模态框事件监听器
+        document.getElementById('closeConfirmRestoreModal').addEventListener('click', closeConfirmRestoreModal);
+        document.getElementById('cancelRestoreBtn').addEventListener('click', closeConfirmRestoreModal);
+        document.getElementById('confirmRestoreBtn').addEventListener('click', async function() {
+            closeConfirmRestoreModal();
+            await executeRestoreProject();
+        });
+
+        // 删除确认模态框事件监听器
+        document.getElementById('closeConfirmDeleteModal').addEventListener('click', closeConfirmDeleteModal);
+        document.getElementById('cancelDeleteBtn').addEventListener('click', closeConfirmDeleteModal);
+        document.getElementById('confirmDeleteBtn').addEventListener('click', async function() {
+            await executeDeleteProject();
+        });
+
+        // 点击确认恢复为在建模态框外部关闭
+        document.getElementById('confirmRestoreModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeConfirmRestoreModal();
+            }
+        });
+
+        // 点击删除确认模态框外部关闭
+        document.getElementById('confirmDeleteModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeConfirmDeleteModal();
+            }
+        });
+
+        // 监听删除确认输入框的键盘事件，支持Enter键确认
+        document.getElementById('deleteConfirmationCode').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault(); // 防止可能的表单提交
+                document.getElementById('confirmDeleteBtn').click();
+            }
+        });
+
+        let projectToRestoreId = null;
+
+        // 执行恢复项目操作
+        async function executeRestoreProject() {
+            if (!projectToRestoreId) return;
+
+            try {
+                // 查找项目 - 使用正确的project_id字段
+                const projectIndex = settledProjects.findIndex(p => p.project_id === projectToRestoreId);
+                if (projectIndex === -1) {
+                    showNotification('未找到项目', true);
+                    return;
+                }
+                const project = settledProjects[projectIndex];
+                
+                // 获取当前登录用户信息
+                let currentUser = {};
+                try {
+                    const currentUserStr = localStorage.getItem('currentUser');
+                    if (currentUserStr) {
+                        currentUser = JSON.parse(currentUserStr);
+                    }
+                } catch (e) {
+                    console.error('解析currentUser失败:', e);
+                }
+                
+                if (!currentUser.user_id) {
+                    showNotification('未找到登录信息', true);
+                    return;
+                }
+
+                // 获取本地时间并应用时区偏移，解决时差问题
+                const now = new Date();
+                // 调整时间戳，加上时区偏移量（北京时间为东八区，需要+8小时）
+                const adjustedTime = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+                
+                // 创建更新后的项目数据（使用小写字段名以匹配数据库表结构）
+                // 使用统一的时间处理函数
+                const beijingTimeString = getBeijingTimeString();
+                const isoTimeString = getCurrentTimeISOString();
+                
+                const updatedProjectData = {
+                    project_id: projectToRestoreId,
+                    user_id: project.user_id || currentUser.user_id,
+                    project_name: project.project_name || '未命名项目',
+                    address: project.address || '',
+                    regular_hours: project.regular_hours || 0,
+                    overtime_hours: project.overtime_hours || 0,
+                    status: '在建',
+                    updated_at: isoTimeString  // 使用ISO时间格式进行冲突检测
+                };
+
+                // 清理数据，只更新status和updated_at字段
+                const cleanProjectData = {
+                    project_id: updatedProjectData.project_id,
+                    status: updatedProjectData.status,
+                    updated_at: updatedProjectData.updated_at
+                };
+
+                // 先更新本地数据（无论云端是否成功，都更新本地）
+                // 从已结清项目移除
+                settledProjects.splice(projectIndex, 1);
+                // 添加到在建项目，并更新状态
+                const restoredProject = {
+                    ...project,
+                    project_id: project.project_id,
+                    user_id: project.user_id || currentUser.user_id,
+                    project_name: project.project_name,
+                    regular_hours: project.regular_hours || 0,
+                    overtime_hours: project.overtime_hours || 0,
+                    status: '在建',
+                    updated_at: isoTimeString  // 使用ISO时间格式进行冲突检测
+                };
+                ongoingProjects.push(restoredProject);
+
+                // 更新本地索引
+                await updateLocalProjectIndex();
+
+                // 更新UI
+                renderProjects('settled');
+                updateTabCounts();
+                closeConfirmRestoreModal();
+                
+                // 检查网络状态并显示相应的提示信息
+                const isOnline = window.offlineSyncService && window.offlineSyncService.syncStatus.isOnline;
+                showNotification(isOnline ? '项目已恢复为在建状态' : '项目已恢复为在建状态，将在网络恢复后同步到云端', false);
+                
+                console.log('✅ 项目状态已更新到本地');
+                
+                // 异步更新云端数据（后台处理，不影响用户体验）
+                // 捕获当前projectToRestoreId值到局部变量，避免异步执行时被finally块修改
+                const currentProjectId = projectToRestoreId;
+                setTimeout(() => {
+                    handleProjectStatusChangeToSupabase(cleanProjectData, currentProjectId, false); // 传入false表示不显示通知
+                }, 0);
+            } catch (error) {
+                // 恢复项目失败
+                showNotification('恢复项目失败: ' + error.message, true);
+                return;
+            } finally {
+                projectToRestoreId = null;
+            }
+        }
+
+        // 恢复项目为在建状态
+        function restoreProject(project_id) {
+            // 存储要恢复的项目ID
+              projectToRestoreId = project_id;
+            // 打开确认恢复模态框
+            openConfirmRestoreModal();
+        }
+        // 暴露到全局作用域
+        window.restoreProject = restoreProject;
+
+        // 删除项目相关变量
+        let projectToDeleteId = null;
+        let deleteConfirmCode = '';
+
+        // 获取项目相关缓存统计（只删除与当前项目确切相关的数据）
+        function getProjectCacheStats(projectId) {
+            const projectKeys = [];
+            
+            // 只匹配确切的项目相关键，避免模糊匹配
+            const exactProjectPatterns = [
+                `project_${projectId}_data`,           // 项目数据
+                `project_${projectId}_attendance`,   // 项目考勤数据
+                `project_${projectId}_settlement`,   // 项目结算数据
+                `project_${projectId}_borrow`,       // 项目借支数据
+                `project_${projectId}_wage`,         // 项目工资数据
+                `project_${projectId}_index`,        // 项目索引
+                `project_${projectId}_cache`,        // 项目缓存
+                `attendance_${projectId}`,           // 考勤记录
+                `settlement_${projectId}`,           // 结算记录
+                `borrow_${projectId}`,               // 借支记录
+                `wage_${projectId}`                  // 工资记录
+            ];
+
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (!key) continue; // 跳过空键
+                
+                // 只匹配确切的项目相关键
+                if (exactProjectPatterns.includes(key)) {
+                    projectKeys.push(key);
+                }
+                // 或者键名以项目ID结尾（更精确的匹配）
+                else if (key.endsWith(`_${projectId}`) || key === `project_${projectId}`) {
+                    projectKeys.push(key);
+                }
+            }
+
+            return projectKeys;
+        }
+
+        // 打开删除确认模态框
+        function openConfirmDeleteModal(project_id) {
+            // 存储要删除的项目ID
+              projectToDeleteId = project_id;
+            // 清空输入框
+            document.getElementById('deleteConfirmationCode').value = '';
+            // 显示模态框
+            document.getElementById('confirmDeleteModal').classList.add('active');
+        }
+
+        // 关闭删除确认模态框
+        function closeConfirmDeleteModal() {
+            document.getElementById('confirmDeleteModal').classList.remove('active');
+            projectToDeleteId = null;
+        }
+
+        // 删除项目
+        async function deleteProject(project_id) {
+            // 打开删除确认模态框
+              openConfirmDeleteModal(project_id);
+        }
+        // 暴露到全局作用域
+        window.deleteProject = deleteProject;
+
+        // 删除项目关联数据（数据库）
+        async function deleteProjectRelatedData(projectId) {
+            console.log(`开始删除项目 ${projectId} 的关联数据...`);
+            
+            // 分两步进行，先删除依赖表，再删除被依赖表(employees)
+            
+            // 第一步：删除引用了employees的表和其他独立表
+            const dependentTables = [
+                'attendance_records', // 引用 employees
+                'settlement_records', // 引用 employees
+                'construction_logs',
+                'project_expenses',
+                'project_income',
+                'work_records'
+            ];
+            
+            console.log('开始删除依赖表数据...');
+            const dependentDeletePromises = dependentTables.map(async (table) => {
+                try {
+                    const { error } = await supabase
+                        .from(table)
+                        .delete()
+                        .eq('project_id', projectId);
+                    
+                    if (error) {
+                        console.error(`删除表 ${table} 数据失败:`, error);
+                        // 不抛出错误，尝试继续删除其他表
+                    } else {
+                        console.log(`已删除表 ${table} 关联数据`);
+                    }
+                } catch (e) {
+                    console.error(`删除表 ${table} 数据时发生异常:`, e);
+                }
+            });
+
+            await Promise.all(dependentDeletePromises);
+            
+            // 第二步：删除 employees 表
+            console.log('开始删除 employees 表数据...');
+            try {
+                const { error } = await supabase
+                    .from('employees')
+                    .delete()
+                    .eq('project_id', projectId);
+                
+                if (error) {
+                    console.error('删除 employees 表数据失败:', error);
+                } else {
+                    console.log('已删除 employees 表关联数据');
+                }
+            } catch (e) {
+                console.error('删除 employees 表数据时发生异常:', e);
+            }
+            
+            console.log('项目关联数据删除流程结束');
+        }
+
+        // 删除项目关联文件（存储桶）
+        async function deleteProjectStorage(projectId) {
+            const bucketName = 'FYKQ';
+            console.log(`开始删除项目 ${projectId} 的存储文件...`);
+
+            // 递归删除文件夹内容的辅助函数
+            async function deleteFolderRecursively(path) {
+                try {
+                    // 列出当前路径下的所有文件和文件夹
+                    const { data, error } = await supabase
+                        .storage
+                        .from(bucketName)
+                        .list(path, {
+                            limit: 100,
+                            offset: 0,
+                            sortBy: { column: 'name', order: 'asc' },
+                        });
+
+                    if (error) {
+                        console.error(`列出目录 ${path} 失败:`, error);
+                        return;
+                    }
+
+                    if (!data || data.length === 0) return;
+
+                    const filesToDelete = [];
+                    const subFolders = [];
+
+                    for (const item of data) {
+                        // 这里的判断逻辑依赖于Supabase Storage API的具体表现
+                        // 通常如果有id则为文件，没有id则为文件夹（或者根据metadata判断）
+                        // 为保险起见，我们对每个item都尝试作为文件删除，并尝试作为文件夹递归
+                        
+                        // 注意：Supabase list API 返回的 item.id 对于文件是存在的
+                        // 对于文件夹（占位符），行为可能不同
+                        // 简单策略：如果是文件（有id或metadata.mimetype），加入删除列表
+                        // 如果看起来像文件夹（没有id），加入递归列表
+                        // 实际上，我们构建全路径，如果是文件夹，remove可能会忽略或失败，这没关系
+                        
+                        if (item.id) {
+                            filesToDelete.push(`${path}/${item.name}`);
+                        } else {
+                            subFolders.push(`${path}/${item.name}`);
+                        }
+                    }
+
+                    // 批量删除文件
+                    if (filesToDelete.length > 0) {
+                        const { error: removeError } = await supabase
+                            .storage
+                            .from(bucketName)
+                            .remove(filesToDelete);
+                        
+                        if (removeError) {
+                            console.error(`删除文件失败:`, removeError);
+                        } else {
+                            console.log(`已删除文件: ${filesToDelete.length} 个`);
+                        }
+                    }
+
+                    // 递归处理子文件夹
+                    for (const subFolder of subFolders) {
+                        await deleteFolderRecursively(subFolder);
+                    }
+                    
+                } catch (e) {
+                    console.error(`处理目录 ${path} 时发生异常:`, e);
+                }
+            }
+
+            // 从项目根目录开始递归删除
+            // 注意：projectId 本身在 bucket 中可能不是一个物理文件夹对象，而是一个前缀
+            // 我们列出 projectId 下的内容
+            await deleteFolderRecursively(projectId);
+            console.log('项目存储文件删除流程结束');
+        }
+
+        // 删除本地项目数据（离线模式）
+        function deleteProjectLocalData(projectId) {
+            console.log(`开始清理项目 ${projectId} 的本地数据...`);
+            
+            // 定义需要清理的localStorage键和对应的ID字段（如果是数组）
+            const keysToClean = [
+                { key: 'attendance_records', idField: 'project_id' }, // 假设attendance_records直接存储数组
+                { key: 'construction_logs', idField: 'project_id' },
+                { key: 'employees', idField: 'current_project_id' }, // 注意：员工可能关联多个项目，这里简化处理，或者需要更复杂的逻辑
+                { key: 'project_expenses', idField: 'project_id' },
+                { key: 'project_project_expenses', idField: 'project_id' },
+                { key: 'project_income', idField: 'project_id' },
+                { key: 'project_project_income', idField: 'project_id' },
+                { key: 'settlement_records', idField: 'project_id' },
+                { key: 'settlementRecords', idField: 'project_id' },
+                { key: 'offline_settlement_records', idField: 'project_id' },
+                { key: 'work_records', idField: 'project_id' }
+            ];
+
+            // 1. 清理各个表的记录
+            keysToClean.forEach(item => {
+                try {
+                    const dataStr = localStorage.getItem(item.key);
+                    if (dataStr) {
+                        const data = JSON.parse(dataStr);
+                        if (Array.isArray(data)) {
+                            // 过滤掉该项目的记录
+                            const filteredData = data.filter(record => record[item.idField] !== projectId);
+                            if (filteredData.length !== data.length) {
+                                localStorage.setItem(item.key, JSON.stringify(filteredData));
+                                console.log(`已清理 ${item.key}: 删除 ${data.length - filteredData.length} 条记录`);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error(`清理本地数据 ${item.key} 失败:`, e);
+                }
+            });
+
+            // 2. 清理项目本身
+            // 假设项目列表存储在 'projects' 或 'allProjects'
+            const projectKeys = ['projects', 'allProjects', 'myProjects', 'joinedProjects'];
+            projectKeys.forEach(key => {
+                try {
+                    const dataStr = localStorage.getItem(key);
+                    if (dataStr) {
+                        const data = JSON.parse(dataStr);
+                        if (Array.isArray(data)) {
+                            const filteredData = data.filter(p => p.project_id !== projectId);
+                            if (filteredData.length !== data.length) {
+                                localStorage.setItem(key, JSON.stringify(filteredData));
+                                console.log(`已从 ${key} 中移除项目`);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error(`清理项目列表 ${key} 失败:`, e);
+                }
+            });
+            
+            console.log('本地数据清理完成');
+        }
+
+        // 执行删除项目操作
+        async function executeDeleteProject() {
+            if (!projectToDeleteId) return;
+
+            try {
+                // 获取用户输入的密码
+                const inputPassword = document.getElementById('deleteConfirmationCode').value.trim();
+                
+                if (!inputPassword) {
+                    showNotification('请输入密码！', true);
+                    return;
+                }
+
+                // 获取当前登录用户的密码
+                let currentUser = {};
+                try {
+                    const currentUserStr = localStorage.getItem('currentUser');
+                    if (currentUserStr) {
+                        currentUser = JSON.parse(currentUserStr);
+                    }
+                } catch (e) {
+                    console.error('解析currentUser失败:', e);
+                }
+
+                if (!currentUser.password) {
+                    // 如果本地没有存储密码（异常情况），尝试重新登录或提示
+                    console.error('未找到用户密码信息');
+                    showNotification('用户信息异常，请重新登录', true);
+                    return;
+                }
+
+                // 验证密码
+                if (inputPassword !== currentUser.password) {
+                    showNotification('密码错误，无法删除项目！', true);
+                    return;
+                }
+
+                // 密码验证通过，继续执行删除逻辑
+                
+                // 检查网络状态
+                if (navigator.onLine) {
+                    // 在线模式
+                    showNotification('正在删除项目及关联数据...', false);
+                    
+                    // 1. 删除关联的数据库记录
+                    await deleteProjectRelatedData(projectToDeleteId);
+                    
+                    // 2. 删除关联的存储文件
+                    await deleteProjectStorage(projectToDeleteId);
+
+                    // 3. 删除项目本身
+                    const { error } = await supabase
+                        .from('projects')
+                        .delete()
+                        .eq('project_id', projectToDeleteId);
+
+                    if (error) {
+                        throw error;
+                    }
+                } else {
+                    // 离线模式
+                    showNotification('离线模式：正在本地删除并添加到同步队列...', false);
+                    
+                    // 1. 清理本地数据
+                    deleteProjectLocalData(projectToDeleteId);
+                    
+                    // 2. 添加到同步队列（使用特殊的操作类型 '删除项目关联数据'）
+                    if (window.offlineSyncService) {
+                        window.offlineSyncService.addToSyncQueue('删除项目关联数据', { projectId: projectToDeleteId }, projectToDeleteId, 'project');
+                        console.log('已添加完整删除任务到同步队列');
+                    } else {
+                        console.warn('离线同步服务未初始化，无法添加同步任务');
+                        showNotification('同步服务未启动，离线删除可能无法同步到云端', true);
+                    }
+                }
+
+                // 查找项目 - 使用正确的project_id字段
+                const projectIndex = settledProjects.findIndex(p => p.project_id === projectToDeleteId);
+                
+                // 无论在线还是离线，都在UI上移除项目
+                // ... (后续代码保持不变，更新UI)
+
+                if (projectIndex === -1) {
+                    showNotification('未找到项目', true);
+                    return;
+                }
+                const project = settledProjects[projectIndex];
+
+                // 1. 删除本地存储的项目数据
+                try {
+                    const storageKey = `project_${project.project_id}_data`;
+                    localStorage.removeItem(storageKey);
+                    console.log('✅ 项目记录已从本地删除');
+                } catch (error) {
+                    console.error('删除本地存储的项目数据失败:', error);
+                }
+
+                // 2. 从本地数组中移除项目
+                settledProjects.splice(projectIndex, 1);
+
+                // 3. 更新本地索引
+                await updateLocalProjectIndex();
+
+                // 4. 清除项目相关缓存
+                try {
+                    const stats = getProjectCacheStats(project.project_id);
+                    if (stats.length > 0) {
+                        stats.forEach(key => {
+                            localStorage.removeItem(key);
+                        });
+                    }
+                } catch (error) {
+                    console.error('清除项目缓存失败:', error);
+                }
+
+                // 5. 立即关闭模态框并更新UI，让用户可以立即继续操作
+                closeModal();
+                closeConfirmDeleteModal();
+                renderProjects('settled');
+                updateTabCounts();
+                
+                // 6. 使用离线同步服务处理项目删除（后台异步处理）
+                await handleProjectDeleteToSupabase(project);
+                
+            } catch (error) {
+                // 删除项目失败
+                showNotification('删除项目失败: ' + error.message, true);
+            }
+        }
+
+        // 处理项目状态变更到Supabase的函数（支持离线同步）
+        async function handleProjectStatusChangeToSupabase(projectData, targetProjectId, showNotificationFlag = true) {
+            try {
+                // 显示本地状态变更成功通知（仅在需要时显示）
+                if (showNotificationFlag) {
+                    const isOnline = window.offlineSyncService && window.offlineSyncService.syncStatus.isOnline;
+                    const statusText = projectData.status === '结清' ? '已设为结清' : '已恢复为在建';
+                    showNotification(isOnline ? statusText : `${statusText}（本地保存）`, false);
+                }
+
+                // 然后异步更新云端数据
+                setTimeout(async () => {
+                    try {
+                        // 检查是否在线
+                        if (window.offlineSyncService && window.offlineSyncService.syncStatus.isOnline) {
+                            // 在线时直接更新云端数据
+                    try {
+                        const { error } = await window.supabase
+                            .from('projects')
+                            .update(projectData)
+                            .eq('project_id', targetProjectId);
+                        
+                        if (error) {
+                            console.error('从Supabase更新项目状态失败:', error);
+                            // 如果云端更新失败，添加到同步队列
+                            if (window.offlineSyncService) {
+                                await window.offlineSyncService.addToSyncQueue('update', projectData, targetProjectId, 'project');
+                            }
+                        } else {
+                            console.log('✅ 项目状态已成功更新到Supabase');
+                        }
+                    } catch (supabaseError) {
+                        console.error('Supabase更新项目状态操作异常:', supabaseError);
+                        // 如果云端更新失败，添加到同步队列
+                        if (window.offlineSyncService) {
+                            await window.offlineSyncService.addToSyncQueue('update', projectData, targetProjectId, 'project');
+                        }
+                    }
+                        } else {
+                            // 离线时添加到同步队列
+                            if (window.offlineSyncService) {
+                                await window.offlineSyncService.addToSyncQueue('update', projectData, targetProjectId, 'project');
+                            }
+                        }
+                    } catch (error) {
+                        console.error('更新项目状态到云端失败:', error);
+                        // 如果云端更新失败，尝试添加到同步队列
+                        if (window.offlineSyncService) {
+                            try {
+                                await window.offlineSyncService.addToSyncQueue('update', projectData, targetProjectId, 'project');
+                            } catch (queueError) {
+                                console.error('添加到同步队列失败:', queueError);
+                            }
+                        }
+                    }
+                }, 0);
+            } catch (error) {
+                console.error('处理项目状态变更时出错:', error);
+                showNotification('项目状态变更成功，但数据同步失败', true);
+            }
+        }
+
+        // 处理项目删除到Supabase的函数（支持离线同步）
+        async function handleProjectDeleteToSupabase(project) {
+            try {
+                // 显示本地删除成功通知
+                const isOnline = window.offlineSyncService && window.offlineSyncService.syncStatus.isOnline;
+                showNotification(isOnline ? '项目删除成功' : '项目删除成功，将在网络恢复后同步到云端', false);
+
+                // 然后异步删除云端数据
+                setTimeout(async () => {
+                    try {
+                        // 检查是否在线
+                        if (window.offlineSyncService && window.offlineSyncService.syncStatus.isOnline) {
+                            // 在线时直接删除云端数据
+                            try {
+                                const { error } = await window.supabase
+                                    .from('projects')
+                                    .delete()
+                                    .eq('project_id', project.project_id);
+                                
+                                if (error) {
+                                    console.error('从Supabase删除项目失败:', error);
+                                    // 如果云端删除失败，添加到同步队列
+                                    if (window.offlineSyncService) {
+                                        await window.offlineSyncService.addToSyncQueue('delete', project, project.project_id, 'project');
+                                    }
+                                } else {
+                                    console.log('✅ 项目数据已成功从Supabase删除');
+                                }
+                            } catch (supabaseError) {
+                                console.error('Supabase删除项目操作异常:', supabaseError);
+                                // 如果云端删除失败，添加到同步队列
+                                if (window.offlineSyncService) {
+                                    await window.offlineSyncService.addToSyncQueue('delete', project, project.project_id, 'project');
+                                }
+                            }
+                        } else {
+                            // 离线时添加到同步队列
+                            if (window.offlineSyncService) {
+                                await window.offlineSyncService.addToSyncQueue('delete', project, project.project_id, 'project');
+                            }
+                        }
+                    } catch (error) {
+                        console.error('删除项目数据到云端失败:', error);
+                        // 如果云端删除失败，尝试添加到同步队列
+                        if (window.offlineSyncService) {
+                            try {
+                                await window.offlineSyncService.addToSyncQueue('delete', project, project.project_id, 'project');
+                            } catch (queueError) {
+                                console.error('添加到同步队列失败:', queueError);
+                            }
+                        }
+                    }
+                }, 0);
+            } catch (error) {
+                console.error('处理项目删除时出错:', error);
+                showNotification('项目删除成功，但数据同步失败', true);
+            }
+        }
+
+        // 添加新按钮样式 - 使用唯一变量名避免冲突
+        const buttonStyle = document.createElement('style');
+        buttonStyle.textContent = `
+            /* 
+            .action-btn.restore-btn {
+                background: linear-gradient(135deg, #10b981, #059669);
+                color: white;
+                margin-right: 8px;
+            }
+
+            .action-btn.delete-btn {
+                background: linear-gradient(135deg, #ef4444, #dc2626);
+                color: white;
+            }
+            */
+            
+            /* 新样式覆盖 */
+            .action-btn.restore-btn:hover, .action-btn.delete-btn:hover {
+                background-color: rgba(0,0,0,0.05) !important;
+                transform: translateY(-1px);
+            }
+            
+            .action-btn.restore-btn::before, .action-btn.delete-btn::before {
+                display: none; /* 移除原来的光效 */
+            }
+        `;
+        document.head.appendChild(buttonStyle);
+
+        // 初始化标签页类名
+        document.querySelectorAll('.tab').forEach((tab, index) => {
+            if (index === 0) {
+                tab.classList.add('tab-ongoing');
+            } else if (index === 1) {
+                tab.classList.add('tab-settled');
+            }
+        });
+
+        // 标签页切换
+        document.querySelectorAll('.tab').forEach((tab, index) => {
+            tab.addEventListener('click', function() {
+                // 移除所有标签页的active类
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                // 为当前标签页添加active类
+                this.classList.add('active');
+                // 根据标签页索引渲染对应项目
+                if (index === 0) {
+                    renderProjects('ongoing');
+                } else if (index === 1) {
+                    renderProjects('settled');
+                }
+            });
+        });
+
+        // 等待Supabase初始化完成后再执行页面逻辑
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                // 等待Supabase客户端初始化完成
+                const supabase = await window.waitForSupabase();
+                // console.log('✅ Supabase初始化完成');
+                
+                // 项目列表页面使用全局的离线同步服务，避免重复创建实例
+                if (window.offlineSyncService) {
+                    // console.log('✅ 使用现有的离线同步服务');
+                } else if (typeof OfflineSyncService !== 'undefined') {
+                    window.offlineSyncService = new OfflineSyncService();
+                    // console.log('✅ 初始化离线同步服务');
+                } else {
+                    // console.warn('⚠️ OfflineSyncService 未定义');
+                }
+                
+                // 项目列表页面使用全局的同步状态指示器
+                if (window.syncStatusIndicator) {
+                    // console.log('✅ 使用现有的同步状态指示器');
+                } else if (typeof SyncStatusIndicator !== 'undefined') {
+                    window.syncStatusIndicator = new SyncStatusIndicator();
+                    // console.log('✅ 初始化同步状态指示器');
+                }
+                
+                // 页面加载完成后，主动触发一次同步队列处理
+                if (window.offlineSyncService) {
+                    // 延迟1秒后处理同步队列，确保页面其他资源已加载完成
+                    setTimeout(() => {
+                        // console.log('⏳ 页面加载完成，开始处理同步队列...');
+                        window.offlineSyncService.processSyncQueue();
+                    }, 1000);
+                }
+                
+            } catch (error) {
+                console.error('❌ Supabase初始化失败:', error);
+                showNotification('数据库连接失败，请刷新页面重试', true);
+            }
+        });
+    </script>
+    
+    <!-- 拦截控制台错误，过滤特定的ERR_ABORTED错误 -->
+    <script>
+        // 保存原始的console.error
+        const originalConsoleError = console.error;
+        
+
+        // 完全重写消息处理逻辑，避免异步响应问题
+        (function() {
+            // 保存原始的console.error方法以进行错误过滤
+            const originalConsoleError = console.error;
+            
+            // 重写console.error，过滤特定的错误
+            console.error = function(...args) {
+                // 将参数转换为字符串以检查是否包含特定错误信息
+                const errorMessage = args.join(' ');
+                
+                // 过滤掉网络错误和Chrome扩展错误
+                if (errorMessage.includes('net::ERR_ABORTED') || 
+                    (errorMessage.includes('Unchecked runtime.lastError') && 
+                    errorMessage.includes('listener indicated an asynchronous response'))) {
+                    // 静默处理这些特定错误，不输出到控制台
+                    return;
+                }
+                
+                // 其他错误正常输出
+                originalConsoleError.apply(console, args);
+            };
+            
+            // 保存原始的console.log和warn方法
+            const originalConsoleLog = console.log;
+            const originalConsoleWarn = console.warn;
+            
+            // 重写console.log，过滤掉特定的错误信息
+            console.log = function(...args) {
+                const message = args.join(' ');
+                
+                // 如果是网络错误或Chrome扩展错误，不显示
+                if (message.includes('net::ERR_ABORTED') || 
+                    (message.includes('Unchecked runtime.lastError') && 
+                    message.includes('listener indicated an asynchronous response'))) {
+                    return; // 静默过滤，不显示这个错误
+                }
+                
+                // 其他日志正常显示
+                originalConsoleLog.apply(console, args);
+            };
+            
+            // 重写console.warn，过滤掉特定的错误信息
+            console.warn = function(...args) {
+                const message = args.join(' ');
+                
+                // 如果是网络错误或Chrome扩展错误，不显示
+                if (message.includes('net::ERR_ABORTED') || 
+                    (message.includes('Unchecked runtime.lastError') && 
+                    message.includes('listener indicated an asynchronous response'))) {
+                    return; // 静默过滤，不显示这个错误
+                }
+                
+                // 其他警告正常显示
+                originalConsoleWarn.apply(console, args);
+            };
+            
+            // 优化postMessage处理，避免消息通道关闭问题
+            const originalPostMessage = window.postMessage;
+            window.postMessage = function(message, targetOrigin, transfer) {
+                try {
+                    // 确保targetOrigin安全设置
+                    if (!targetOrigin || targetOrigin === '*') {
+                        console.warn('不安全的postMessage调用，未指定targetOrigin');
+                    }
+                    // 正常执行postMessage
+                    originalPostMessage.apply(window, arguments);
+                } catch (e) {
+                    // 捕获并静默处理错误
+                }
+            };
+            
+            // 首先使用capture选项来确保我们的监听器先执行
+            window.addEventListener('message', handleMessageEvent, { capture: true });
+            
+            // 定义消息处理函数
+            function handleMessageEvent(event) {
+                
+                
+                try {
+                    // 处理消息数据
+                    if (event.data && typeof event.data === 'object') {
+                        // 消息类型处理
+                        switch (event.data.type) {
+                            case 'updateTitle':
+                                if (event.data.project_name) {
+                                    // 处理项目名称更新
+                                    setTimeout(() => {
+                                        const headerTitle = document.getElementById('headerTitle');
+                                        if (headerTitle) {
+                                            headerTitle.textContent = event.data.project_name;
+                                        }
+                                    }, 0);
+                                }
+                                break;
+                            case 'navigate':
+                                if (event.data.page) {
+                                    // 导航处理
+                                    setTimeout(() => {
+                                        window.location.href = event.data.page;
+                                    }, 0);
+                                }
+                                break;
+                            default:
+                                // 忽略其他类型的消息
+                                break;
+                        }
+                    }
+                } catch (e) {
+                    // 静默处理错误，不抛出异常
+                }
+                
+                // 重要：不要在这里返回任何值，特别是不要返回true
+                // 这是防止异步响应错误的关键
+            }
+            
+            // 清理函数，用于在组件卸载时移除监听器
+            window.cleanupMessageListeners = function() {
+                window.removeEventListener('message', handleMessageEvent, { capture: true });
+            };
+        })();
+    </script>
+</body>
+</html>
