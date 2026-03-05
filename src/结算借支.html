@@ -1,0 +1,4653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>结算借支</title>
+    
+    
+    
+    <!-- 本地加载完整的Supabase库 -->
+    <script src="./JavaScript/supabase/supabase.min.js"></script>
+    <!-- 加载浏览器环境的Supabase配置 -->
+    <script src="./JavaScript/supabase/supabase-client.js"></script>
+    <!-- 离线同步服务 -->
+    <script src="./JavaScript/离线同步/offline-sync-service.js"></script>
+    <!-- 同步状态指示器 -->
+    <script src="./JavaScript/离线同步/sync-status-indicator.js"></script>
+    <!-- tus-js-client用于大文件上传 -->
+    <script src="./JavaScript/supabase/tus.min.js"></script>
+    <!-- Compressor.js用于图片压缩 -->
+    <script src="./JavaScript/supabase/compressor.min.js"></script>
+    <!-- pinyin-pro.js用于中文转拼音 -->
+    <script src="./JavaScript/supabase/pinyin-pro.js"></script>
+
+
+    <!-- 修复monitorSelectionState未定义问题的全局脚本 -->
+    <script src="./JavaScript/结算借支/fix-monitor-selection.js"></script>
+    <!-- 结算借支服务脚本 -->
+    <script src="./JavaScript/结算借支/settlement-service.js"></script>
+    <!-- 记账流水服务脚本 -->
+    <script src="./JavaScript/结算借支/accounting-flow-service.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background-color: #f5f5f5;
+            font-family: 'Microsoft YaHei', sans-serif;
+            padding: 10px;
+        }
+        .work-type {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+        }
+        .work-type-option {
+            cursor: pointer;
+            padding: 8px 16px;
+            position: relative;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 8px;
+            backdrop-filter: blur(5px);
+            background: rgba(255, 255, 255, 0.1);
+            margin: 2px;
+        }
+        .work-type-option:hover {
+            transform: translateY(-1px) scale(1.05);
+            background: rgba(114, 46, 209, 0.2);
+            box-shadow: 0 4px 12px rgba(114, 46, 209, 0.3);
+        }
+        .work-type-option.active {
+            color: white;
+            background: linear-gradient(135deg, rgba(114, 46, 209, 0.9), rgba(147, 51, 234, 0.8));
+            box-shadow: 0 4px 15px rgba(114, 46, 209, 0.4);
+            transform: translateY(-1px);
+        }
+        .work-type-option.active:hover {
+            transform: translateY(-2px) scale(1.05);
+            box-shadow: 0 6px 20px rgba(114, 46, 209, 0.5);
+        }
+        .work-type-option.active::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background-color: #722ed1;
+        }
+        .work-type input {
+            display: none;
+        }
+        
+        input[type="text"], select, input[type="date"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f5f5f5;
+        }
+        
+        /* 项目名称输入框特殊样式 */
+        #projectName {
+            background-color: #f8f9fa !important;
+            cursor: not-allowed !important;
+            color: #6c757d !important;
+            border: 1px solid #dee2e6 !important;
+            font-weight: 500;
+            font-size: 16px !important;
+        }
+        
+        #projectName:focus {
+            outline: none !important;
+            box-shadow: none !important;
+            border-color: #dee2e6 !important;
+        }
+        
+        /* 必填项星号样式 */
+        .required-asterisk {
+            color: #ff0000;
+            font-weight: bold;
+            margin-right: 2px;
+        }
+        
+        /* 日期输入框容器样式 */
+        .date-input-container {
+            position: relative;
+            width: 100%;
+        }
+        
+        .date-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f5f5f5;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .date-display {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            padding: 8px;
+            border: 1px solid #1890ff;
+            border-radius: 4px;
+            background-color: #e6f7ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            font-size: 16px;
+            color: #333;
+            z-index: 2;
+        }
+        
+        
+        
+        .date-display .today-text {
+            color: #1890ff;
+            font-weight: bold;
+        }
+        
+        /* 隐藏原始日期输入框 */
+        .date-input-container.active .date-input {
+            opacity: 1;
+            z-index: 3;
+        }
+        
+        .date-input-container.active .date-display {
+            opacity: 0;
+        }
+        
+        /* 日期选择器模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 300px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+
+        /* 添加员工模态框样式 */
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: #333;
+            font-size: 18px;
+        }
+
+        .close {
+            font-size: 24px;
+            font-weight: bold;
+            color: #aaa;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0;
+            background: none;
+            border: none;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        .modal-body {
+            margin-bottom: 20px;
+        }
+
+        .modal-body .form-group {
+            margin-bottom: 15px;
+            padding: 0;
+        }
+
+        .modal-body .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .modal-body .form-group input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .modal-body .form-group input:focus {
+            outline: none;
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+        }
+
+        .modal-footer button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        /* 添加员工模态框按钮样式 */
+        #confirmAddEmployees, #cancelAddEmployees {
+            padding: 10px 24px;
+            font-size: 14px;
+            font-weight: 500;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            outline: none;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        #confirmAddEmployees {
+            background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
+            color: white;
+        }
+
+        #confirmAddEmployees:hover {
+            background: linear-gradient(135deg, #40a9ff 0%, #69c0ff 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(24, 144, 255, 0.4);
+        }
+
+        #cancelAddEmployees {
+            background: linear-gradient(135deg, #f5f5f5 0%, #e6e6e6 100%);
+            color: #666;
+            margin-left: 12px;
+        }
+
+        #cancelAddEmployees:hover {
+            background: linear-gradient(135deg, #e6e6e6 0%, #d9d9d9 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* 确认记账按钮样式 - 紫色主题 */
+        #confirmAccountBtn {
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #722ed1 0%, #531dab 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 8px rgba(114, 46, 209, 0.3);
+        }
+        
+        #confirmAccountBtn:hover {
+            background: linear-gradient(135deg, #9254de 0%, #722ed1 100%);
+            transform: translateY(-1px) scale(1.05);
+            box-shadow: 0 4px 15px rgba(114, 46, 209, 0.4);
+        }
+        
+        /* 日期选择器样式 */
+        .date-picker-content {
+            background-color: white;
+            border-radius: 12px;
+            width: 480px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        }
+        
+        .date-picker-body {
+            padding: 20px;
+        }
+        
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .calendar-header button {
+            background: linear-gradient(135deg, rgba(240, 240, 240, 0.8), rgba(255, 255, 255, 0.6));
+            border: none;
+            border-radius: 8px;
+            width: 36px;
+            height: 36px;
+            cursor: pointer;
+            font-size: 16px;
+            color: #666;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .calendar-header button:hover {
+            background: linear-gradient(135deg, rgba(24, 144, 255, 0.9), rgba(64, 169, 255, 0.8));
+            color: white;
+            transform: translateY(-1px) scale(1.15);
+            box-shadow: 0 4px 15px rgba(24, 144, 255, 0.4);
+        }
+        
+        #currentMonth {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .calendar-grid {
+            margin-bottom: 20px;
+        }
+        
+        .weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+            margin-bottom: 10px;
+        }
+        
+        .weekdays > div {
+            text-align: center;
+            padding: 8px;
+            font-weight: bold;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .calendar-days {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+        }
+        
+        .day-cell {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .day-cell:hover {
+            background: linear-gradient(135deg, rgba(230, 247, 255, 0.8), rgba(240, 250, 255, 0.6));
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
+            backdrop-filter: blur(5px);
+        }
+        
+        .day-cell.other-month {
+            color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .day-cell.disabled-future {
+            color: #d0d0d0;
+            background-color: #f9f9f9;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        
+        .day-cell.disabled-future:hover {
+            background-color: #f9f9f9;
+            transform: none;
+        }
+        
+        .day-cell.today {
+            background: #fff2e6;
+            border: 2px solid #ff7a00;
+            font-weight: bold;
+            color: #ff7a00;
+            position: relative;
+        }
+        
+        .day-cell.today::before {
+            content: '今天';
+            position: absolute;
+            top: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ff7a00;
+            color: white;
+            font-size: 10px;
+            padding: 1px 4px;
+            border-radius: 8px;
+            font-weight: bold;
+            white-space: nowrap;
+            z-index: 1;
+        }
+        
+        .day-cell.selected-single {
+            background: #1890ff;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .date-picker-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fafafa;
+            border-radius: 0 0 12px 12px;
+        }
+        
+        .footer-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn-secondary, .btn-primary {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(5px);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(135deg, rgba(240, 240, 240, 0.9), rgba(255, 255, 255, 0.8));
+            color: #666;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, rgba(217, 217, 217, 0.9), rgba(240, 240, 240, 0.8));
+            transform: translateY(-1px) scale(1.05);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, rgba(24, 144, 255, 0.9), rgba(64, 169, 255, 0.8));
+            color: white;
+            box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
+        }
+        
+        .btn-primary:hover {
+            background: linear-gradient(135deg, rgba(24, 144, 255, 0.8), rgba(64, 169, 255, 0.7));
+            transform: translateY(-1px) scale(1.05);
+            box-shadow: 0 4px 15px rgba(24, 144, 255, 0.4);
+        }
+        
+        .form-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            padding: 0 15px;
+        }
+        
+        .form-row > div {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .form-row label {
+            margin-bottom: 0;
+            white-space: nowrap;
+        }
+        
+        .container {
+            width: 100%;
+            margin: 0;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+            padding: 0 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .employee-selection {
+            margin-top: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .employee-controls {
+            display: flex;
+            gap: 10px;
+            padding: 10px 15px;
+            background-color: #f2f2f2;
+            border-bottom: 1px solid #ddd;
+            flex-wrap: wrap;
+        }
+        .employee-list {
+            min-height: auto;
+            overflow-y: auto;
+            padding: 10px 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .employee-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 5px;
+            border: none;
+            border-radius: 4px;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            font-size: 14px;
+            min-width: 60px;
+            background: none;
+            margin: 0;
+        }
+        .employee-item:hover {
+            transform: scale(1.03);
+            background: none;
+        }
+        .employee-item.selected {
+            border: none;
+            background: none;
+        }
+        .employee-item.selected::after {
+            content: '✓';
+            position: absolute;
+            top: 1px;
+            right: 10px;  
+            width: 18px;
+            height: 18px;
+            background-color: #f5222d;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .employee-item:last-child {
+            border-bottom: none;
+        }
+        .employee-item input[type="checkbox"] {
+            display: none;
+        }
+        .employee-info {
+            text-align: center;
+            width: 100%;
+        }
+        .employee-id {
+            background-color: #f0f0f0;
+            color: #666;
+            width: 45px;
+            height: 45px;
+            border-radius: 3px;
+            font-size: 16px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1px;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
+        }
+        .employee-item.selected .employee-id {
+            background-color: #1890ff;
+            color: white;
+            border: 2px solid #ff7a45;
+        }
+        .employee-item.selected {
+             color: #f5222d;
+        }
+        
+        /* +和-按钮样式 */
+        .add-button {
+            color: #52c41a !important;
+        }
+        
+        .delete-button {
+            color: #f5222d !important;
+        }
+        
+        /* +和-按钮悬停样式 */
+        .add-button:hover {
+            color: #52c41a !important;
+        }
+        
+        .delete-button:hover {
+            color: #f5222d !important;
+        }
+        
+        /* 标签页导航中的标签样式 */
+        .work-type.tab-navigation {
+            background-color: #fff;
+            border-bottom: 1px solid #f0f0f0;
+            padding: 0;
+            gap: 0;
+            display: flex;
+            align-items: center;
+            margin-bottom: 0;
+        }
+        
+        .work-type.tab-navigation .work-type-option {
+            border: none;
+            background-color: #fff;
+            color: #333;
+            margin: 0;
+            flex: none;
+            width: auto;
+            text-align: center;
+            border-radius: 0;
+            font-weight: bold;
+            padding: 8px 30px;
+            position: relative;
+            transition: none;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        /* 禁用悬停效果 */
+        .work-type.tab-navigation .work-type-option:hover {
+            background-color: #fff;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .work-type.tab-navigation .work-type-option.active {
+            border: none;
+            color: white;
+            font-weight: bold;
+            box-shadow: none;
+            z-index: 1;
+        }
+
+        /* 隐藏下划线 */
+        .work-type.tab-navigation .work-type-option.active::after {
+            display: none;
+        }
+        
+        /* 左侧“记账”选中时的背景 - 右上圆角 */
+        .work-type.tab-navigation label[for="tabAccounting"].active {
+            background: linear-gradient(135deg, rgba(114, 46, 209, 0.9), rgba(147, 51, 234, 0.8));
+            border-radius: 0 20px 0 0;
+        }
+
+        /* 右侧“当日流水”选中时的背景 - 左上圆角 */
+        .work-type.tab-navigation label[for="tabDailyFlow"].active {
+            background: linear-gradient(135deg, rgba(114, 46, 209, 0.9), rgba(147, 51, 234, 0.8));
+            border-radius: 20px 0 0 0;
+        }
+        
+        .hidden-status {
+            color: orange;
+        }
+        .resigned-status {
+            color: purple;
+        }
+        .settled-status {
+            color: green;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #ED7D31;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-origin: center;
+        }
+        button:hover {
+            background-color: #8B0000;
+            transform: translateY(-1px) scale(1.05);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .notification {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 15px 20px;
+            border-radius: 5px;
+            background-color: #4CAF50;
+            color: white;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+            display: none;
+            z-index: 2000;
+        }
+        .notification.error {
+            background-color: #f44336;
+        }
+
+        /* 响应式样式，防止界面溢出 */
+        @media screen and (max-width: 768px) {
+            .container {
+                margin: 5px;
+                border-radius: 4px;
+            }
+            .form-row {
+                flex-direction: column;
+                gap: 10px;
+            }
+            .employee-list {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 5px;
+                padding: 5px;
+                align-items: center;
+            }
+            /* 标签页导航在手机界面时保持横向排列 */
+            .work-type.tab-navigation {
+                flex-direction: row;
+                gap: 5px;
+                justify-content: space-between;
+                flex-wrap: nowrap;
+                padding: 0 10px;
+            }
+            /* 标签页导航在手机界面时的标签样式 */
+            .work-type.tab-navigation .work-type-option {
+                text-align: center;
+                padding: 10px 20px;
+                font-size: 16px;
+                font-weight: bold;
+                min-width: 75px;
+            }
+            .header {
+                font-size: 20px;
+                padding: 8px 10px;
+            }
+            .form-group, .form-row {
+                padding: 0 10px;
+            }
+            .employee-controls {
+                padding: 8px 10px;
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .employee-controls button {
+                margin: 2px 0;
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                transform-origin: center;
+            }
+            
+            .employee-controls button:hover {
+                transform: translateY(-1px) scale(1.05);
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            }
+        }
+
+        @media screen and (max-width: 480px) {
+            body {
+                padding: 5px;
+            }
+            .container {
+                margin: 0;
+                border-radius: 0;
+            }
+            .header {
+                font-size: 18px;
+                padding: 10px;
+            }
+            .form-group, .form-row {
+                padding: 0 8px;
+            }
+            .employee-list {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 3px;
+                font-size: 12px;
+                align-items: center;
+            }
+            .work-type {
+                flex-direction: column;
+                gap: 10px;
+            }
+            /* 工作类型选择在手机界面时保持横向排列 */
+            .work-type {
+                flex-direction: row;
+                gap: 25px;
+                justify-content: center;
+                flex-wrap: nowrap;
+            }
+            .work-type-option {
+                text-align: center;
+                padding: 8px;
+            }
+        }
+        
+        /* 编辑模式下隐藏选项卡 */
+        .edit-mode .work-type {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="work-type" id="workTypeSection">
+        <input type="radio" name="workType" id="pointWork" style="display: none;" checked>
+        <label class="work-type-option active" for="pointWork">借支</label>
+        <input type="radio" name="workType" id="contractWork" style="display: none;">
+        <label class="work-type-option" for="contractWork">扣款</label>
+        <input type="radio" name="workType" id="quantityWork" style="display: none;">
+        <label class="work-type-option" for="quantityWork">公司转账</label>
+        <input type="radio" name="workType" id="settleWork" style="display: none;">
+        <label class="work-type-option" for="settleWork">结算</label>
+    </div>
+    <script>
+        // 立即检查URL参数并隐藏选项卡，避免闪烁
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('edit') === 'true') {
+                const workTypeSection = document.getElementById('workTypeSection');
+                if (workTypeSection) {
+                    workTypeSection.style.display = 'none';
+                }
+            }
+        })();
+        
+        // 检查URL参数，如果是编辑模式，则给body添加edit-mode类
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('edit') === 'true') {
+                document.body.classList.add('edit-mode');
+                // 将URL参数中的image_ids存储到window.originalImageIds中，用于编辑模式
+                const imageIds = urlParams.get('image_ids');
+                if (imageIds) {
+                    window.originalImageIds = imageIds;
+                }
+            }
+        });
+        
+        // 重置表单函数
+        function resetForm() {
+            // 在重置前保存输入框的值到记忆
+            try {
+                const amountInput = document.getElementById('amountInput');
+                const paymentInput = document.getElementById('paymentInput');
+                
+                // 保存金额到记忆
+                if (amountInput && amountInput.value.trim()) {
+                    saveAmountToMemory();
+                }
+                
+                // 保存付款人到记忆
+                if (paymentInput && paymentInput.value.trim()) {
+                    savePaymentToMemory();
+                }
+            } catch (error) {
+                console.error('保存输入框记忆时出错:', error);
+            }
+            
+            // 如果是从记工表进入，保存当前选中的员工ID
+            let savedEmployeeId = null;
+            if (isFromTimesheet && timesheetEmployeeId) {
+                savedEmployeeId = timesheetEmployeeId;
+            }
+            
+            // 保存当前的折叠状态
+            const savedCollapsedState = isCollapsed;
+            
+            // 重置员工选择
+            document.querySelectorAll('.employee-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            // 清空selectedEmployees集合
+            selectedEmployees.clear();
+            
+            // 重置输入框
+            document.getElementById('amountInput').value = '';
+            document.getElementById('paymentInput').value = '';
+            document.getElementById('remark').value = '';
+            
+            // 重置图片选择器
+            clearImage();
+            
+            // 如果是从记工表进入，恢复员工选择
+            if (savedEmployeeId) {
+                setTimeout(() => {
+                    // 先清空selectedEmployees集合
+                    selectedEmployees.clear();
+                    
+                    // 添加保存的员工ID
+                    selectedEmployees.add(savedEmployeeId);
+                    
+                    // 重新渲染员工列表
+                    renderEmployeeList();
+                    
+                    // 恢复员工选中状态
+                    const employeeItem = document.querySelector(`.employee-item[data-employee-id="${savedEmployeeId}"]`);
+                    if (employeeItem) {
+                        employeeItem.classList.add('selected');
+                    }
+                    
+                    // 恢复折叠状态
+                    const employeeSelectionContainer = document.getElementById('employeeSelectionContainer');
+                    if (employeeSelectionContainer) {
+                        employeeSelectionContainer.style.display = savedCollapsedState ? 'none' : 'block';
+                    }
+                }, 100);
+            }
+        }
+        
+        document.querySelectorAll('.work-type-option').forEach(option => {
+            option.addEventListener('click', function() {
+                // 移除所有选项的active类
+                document.querySelectorAll('.work-type-option').forEach(opt => {
+                    opt.classList.remove('active');
+                });
+                // 为当前点击的选项添加active类
+                this.classList.add('active');
+                
+                // 重置表单
+                resetForm();
+                
+                // 切换工作类型时取消所有员工的选中状态
+                selectedEmployees.clear();
+                
+                // 重新加载员工数据，确保只显示在职员工和当前日期有记账记录的员工
+                const projectName = document.getElementById('projectName').value;
+                if (projectName) {
+                    loadEmployeeData(projectName);
+                }
+                
+                // 刷新已记员工显示
+                if (window.accountingFlowService) {
+                    window.accountingFlowService.refreshMarkedEmployees();
+                }
+            });
+        });
+
+        // 格式化日期为显示格式
+        function formatDateForDisplay(dateStr) {
+            const [year, month, day] = dateStr.split('-');
+            return `${year}年${parseInt(month)}月${parseInt(day)}日`;
+        }
+
+        // 更新日期显示（在框内显示今天标识）
+        function updateDateDisplay() {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            const formattedToday = `${yyyy}-${mm}-${dd}`;
+            const workDateInput = document.getElementById('workDate');
+            const dateDisplay = document.getElementById('dateDisplay');
+            const container = document.querySelector('.date-input-container');
+            
+            if (workDateInput.value) {
+                // 检查是否有多选日期的显示值
+                let displayText;
+                if (workDateInput.dataset.displayValue) {
+                    // 多选模式，使用格式化后的显示值
+                    displayText = workDateInput.dataset.displayValue;
+                } else {
+                    // 单选模式，格式化单个日期
+                    displayText = formatDateForDisplay(workDateInput.value);
+                    
+                    // 检查是否为今天
+                    if (workDateInput.value === formattedToday) {
+                        displayText += '<span class="today-text">（今天）</span>';
+                    }
+                }
+                
+                dateDisplay.innerHTML = displayText;
+                
+                // 检查是否为今天（只在单选模式下检查）
+                if (!workDateInput.dataset.displayValue && workDateInput.value === formattedToday) {
+                    dateDisplay.classList.add('today');
+                    workDateInput.setAttribute('data-today', 'true');
+                } else {
+                    dateDisplay.classList.remove('today');
+                    workDateInput.removeAttribute('data-today');
+                }
+            } else {
+                dateDisplay.innerHTML = '请选择日期';
+                dateDisplay.classList.remove('today');
+                workDateInput.removeAttribute('data-today');
+                // 清除多选显示值
+                delete workDateInput.dataset.displayValue;
+            }
+        }
+
+        // 设置当前日期到日期输入框并添加"今天"标识
+        function setTodayDate() {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            const formattedToday = `${yyyy}-${mm}-${dd}`;
+            const workDateInput = document.getElementById('workDate');
+            
+            // 设置默认日期为今天
+            workDateInput.value = formattedToday;
+            
+            // 更新显示
+            updateDateDisplay();
+        }
+        
+        // 处理日期输入框交互
+        function setupDateInteraction() {
+            const workDateInput = document.getElementById('workDate');
+            const container = document.querySelector('.date-input-container');
+            
+            // 点击显示区域时激活输入框或打开日期选择器
+            const dateDisplay = document.getElementById('dateDisplay');
+            dateDisplay.addEventListener('click', function() {
+                // 如果日期输入框被禁用，不打开日期选择器
+                if (workDateInput && workDateInput.disabled) {
+                    return;
+                }
+                showDatePicker();
+            });
+            
+            // 输入框点击时打开日期选择器
+            workDateInput.addEventListener('click', function(e) {
+                // 如果日期输入框被禁用，不打开日期选择器
+                if (this.disabled) {
+                    e.preventDefault();
+                    return;
+                }
+                e.preventDefault();
+                showDatePicker();
+            });
+            
+            // 防止原生日期输入框获得焦点
+            workDateInput.addEventListener('focus', function(e) {
+                // 如果日期输入框被禁用，不打开日期选择器
+                if (this.disabled) {
+                    e.preventDefault();
+                    return;
+                }
+                e.preventDefault();
+                this.blur(); // 立即失去焦点
+                showDatePicker();
+            });
+            
+            // 日期改变时更新显示
+            workDateInput.addEventListener('change', function() {
+                updateDateDisplay();
+            });
+        }
+        
+        // 日期选择器状态管理
+        let datePickerState = {
+            currentDate: new Date(),
+            displayDate: new Date(),
+            singleSelectedDate: null // 单选模式下的选中日期
+        };
+        
+        // 显示日期选择器
+        function showDatePicker() {
+            const modal = document.getElementById('datePickerModal');
+            modal.style.display = 'flex';
+            
+            // 初始化选择器状态
+            initializeDatePicker();
+            
+            // 渲染日历
+            renderCalendar();
+        }
+        
+        // 隐藏日期选择器
+        function hideDatePicker() {
+            const modal = document.getElementById('datePickerModal');
+            modal.style.display = 'none';
+        }
+        
+        // 初始化日期选择器
+        function initializeDatePicker() {
+            const workDateInput = document.getElementById('workDate');
+            
+            // 设置当前显示日期
+            if (workDateInput.value) {
+                datePickerState.displayDate = new Date(workDateInput.value + 'T00:00:00');
+                datePickerState.singleSelectedDate = workDateInput.value;
+            } else {
+                datePickerState.displayDate = new Date();
+            }
+            
+            // 绑定事件监听器
+            bindDatePickerEvents();
+        }
+        
+        // 绑定日期选择器事件
+        function bindDatePickerEvents() {
+            // 月份切换
+            document.getElementById('prevMonth').onclick = () => changeMonth(-1);
+            document.getElementById('nextMonth').onclick = () => changeMonth(1);
+            
+            // 点击模态框外部关闭
+            const modal = document.getElementById('datePickerModal');
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    hideDatePicker();
+                }
+            });
+        }
+        
+        // 渲染日历
+        function renderCalendar() {
+            const currentMonthEl = document.getElementById('currentMonth');
+            const calendarDays = document.getElementById('calendarDays');
+            
+            const year = datePickerState.displayDate.getFullYear();
+            const month = datePickerState.displayDate.getMonth();
+            
+            // 更新月份显示
+            currentMonthEl.textContent = `${year}年${month + 1}月`;
+            
+            // 更新月份切换按钮状态
+            updateMonthNavigationButtons(year, month);
+            
+            // 清空日历
+            calendarDays.innerHTML = '';
+            
+            // 获取当月第一天和最后一天
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            // 调整星期计算：0(日)转为6，1-6(一-六)转为0-5
+            const firstDayOfWeek = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
+            const daysInMonth = lastDay.getDate();
+            
+            // 获取上个月的最后几天
+            const prevMonth = new Date(year, month - 1, 0);
+            const daysInPrevMonth = prevMonth.getDate();
+            
+            // 渲染上个月的日期
+            for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+                const day = daysInPrevMonth - i;
+                const dateStr = formatDate(year, month - 1, day);
+                const dayEl = createDayElement(day, true, dateStr);
+                calendarDays.appendChild(dayEl);
+            }
+            
+            // 渲染当月的日期
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = formatDate(year, month, day);
+                const dayEl = createDayElement(day, false, dateStr);
+                calendarDays.appendChild(dayEl);
+            }
+            
+            // 渲染下个月的日期（填满网格）
+            const totalCells = calendarDays.children.length;
+            const remainingCells = 42 - totalCells; // 6周 * 7天
+            for (let day = 1; day <= remainingCells; day++) {
+                const dateStr = formatDate(year, month + 1, day);
+                const dayEl = createDayElement(day, true, dateStr);
+                calendarDays.appendChild(dayEl);
+            }
+        }
+        
+        // 更新月份导航按钮状态
+        function updateMonthNavigationButtons(year, month) {
+            const today = new Date();
+            const currentYear = today.getFullYear();
+            const currentMonth = today.getMonth();
+            const nextMonthBtn = document.getElementById('nextMonth');
+            
+            // 如果下个月大于当前月，禁用下个月按钮
+            if (year > currentYear || (year === currentYear && month >= currentMonth)) {
+                nextMonthBtn.disabled = true;
+                nextMonthBtn.style.opacity = '0.3';
+                nextMonthBtn.style.cursor = 'not-allowed';
+                nextMonthBtn.style.background = '#f0f0f0';
+                nextMonthBtn.style.color = '#ccc';
+            } else {
+                nextMonthBtn.disabled = false;
+                nextMonthBtn.style.opacity = '1';
+                nextMonthBtn.style.cursor = 'pointer';
+                nextMonthBtn.style.background = '#f0f0f0';
+                nextMonthBtn.style.color = '#666';
+            }
+        }
+        
+        // 农历转换函数 - 将公历日期转换为大写农历（只返回日）
+        function getLunarCalendar(dateStr) {
+            const date = new Date(dateStr + 'T00:00:00');
+            const year = date.getFullYear();
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            
+            // 简化的农历转换（实际项目中可以使用更完整的农历库）
+            // 这里使用一个简化的实现，实际应用中应该使用完整的农历算法
+            const lunarDays = ['初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十',
+                              '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十',
+                              '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十'];
+            
+            // 简化的农历计算（实际应用中需要更精确的算法）
+            // 这里使用一个基于年份的简单偏移量计算
+            const offset = (year - 2000) * 12 + month;
+            const lunarDayIndex = (day + offset) % 30;
+            
+            return `${lunarDays[lunarDayIndex]}`;
+        }
+        
+        // 创建日期元素
+        function createDayElement(day, isOtherMonth, dateStr) {
+            const dayEl = document.createElement('div');
+            dayEl.className = 'day-cell';
+            dayEl.dataset.date = dateStr;
+            
+            // 创建日期和农历的容器
+            const dayContent = document.createElement('div');
+            dayContent.style.display = 'flex';
+            dayContent.style.flexDirection = 'column';
+            dayContent.style.alignItems = 'center';
+            dayContent.style.justifyContent = 'center';
+            dayContent.style.height = '100%';
+            dayContent.style.padding = '5px';
+            
+            // 添加日期数字
+            const dayNumber = document.createElement('span');
+            dayNumber.textContent = day;
+            dayNumber.style.fontSize = '14px';
+            dayNumber.style.fontWeight = 'bold';
+            dayContent.appendChild(dayNumber);
+            
+            // 添加农历
+            if (!isOtherMonth) {
+                const lunarCalendar = getLunarCalendar(dateStr);
+                const lunarElement = document.createElement('span');
+                lunarElement.textContent = lunarCalendar;
+                lunarElement.style.fontSize = '10px';
+                lunarElement.style.color = '#999';
+                lunarElement.style.marginTop = '2px';
+                dayContent.appendChild(lunarElement);
+            }
+            
+            dayEl.appendChild(dayContent);
+            
+            if (isOtherMonth) {
+                dayEl.classList.add('other-month');
+                return dayEl;
+            }
+            
+            // 检查是否为今天
+            const today = new Date();
+            const todayStr = formatDate(today.getFullYear(), today.getMonth(), today.getDate());
+            if (dateStr === todayStr) {
+                dayEl.classList.add('today');
+            }
+            
+            // 检查是否大于今天（禁用未来日期）
+            const selectedDate = new Date(dateStr + 'T00:00:00');
+            if (selectedDate > today) {
+                dayEl.classList.add('disabled-future');
+                dayEl.style.cursor = 'not-allowed';
+                return dayEl; // 不添加点击事件
+            }
+            
+            // 检查选中状态（单选模式）
+            if (dateStr === datePickerState.singleSelectedDate) {
+                dayEl.classList.add('selected-single');
+            }
+            
+            // 添加点击事件（只对非禁用日期）
+            dayEl.addEventListener('click', () => selectDate(dateStr));
+            
+            return dayEl;
+        }
+        
+        // 选择日期
+        function selectDate(dateStr) {
+            // 单选模式：直接设置并关闭
+            datePickerState.singleSelectedDate = dateStr;
+            
+            // 更新输入框
+            const workDateInput = document.getElementById('workDate');
+            workDateInput.value = dateStr;
+            // 清除多选显示值
+            delete workDateInput.dataset.displayValue;
+            updateDateDisplay();
+            
+            // 刷新已记标记
+            if (window.accountingFlowService) {
+                window.accountingFlowService.refreshMarkedEmployees();
+            }
+            
+            // 切换日期时取消所有员工的选中状态
+            selectedEmployees.clear();
+            
+            // 重新加载员工数据，确保只显示在职员工和当前日期有记账记录的员工
+            const projectName = document.getElementById('projectName').value;
+            if (projectName) {
+                loadEmployeeData(projectName);
+            }
+            
+            // 关闭模态框
+            hideDatePicker();
+        }
+        
+        // 改变月份
+        function changeMonth(delta) {
+            const newDate = new Date(datePickerState.displayDate);
+            newDate.setMonth(newDate.getMonth() + delta);
+            
+            // 检查是否超过当前月份
+            const today = new Date();
+            const currentYear = today.getFullYear();
+            const currentMonth = today.getMonth();
+            const newYear = newDate.getFullYear();
+            const newMonth = newDate.getMonth();
+            
+            // 如果新日期大于当前年月，则不允许切换
+            if (newYear > currentYear || (newYear === currentYear && newMonth > currentMonth)) {
+                return; // 不执行切换
+            }
+            
+            datePickerState.displayDate = newDate;
+            renderCalendar();
+        }
+        
+        // 格式化日期
+        function formatDate(year, month, day) {
+            const adjustedMonth = month < 0 ? 11 : (month > 11 ? 0 : month);
+            const adjustedYear = month < 0 ? year - 1 : (month > 11 ? year + 1 : year);
+            
+            const yyyy = adjustedYear;
+            const mm = String(adjustedMonth + 1).padStart(2, '0');
+            const dd = String(day).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+
+        // 全局变量：折叠状态
+        let isCollapsed = false;
+        
+        // 页面加载时设置今天日期
+        document.addEventListener('DOMContentLoaded', function() {
+            setTodayDate();
+            setupDateInteraction();
+            
+            // 处理URL参数中的work_type，选中对应的选项卡
+            const urlParams = new URLSearchParams(window.location.search);
+            const workType = urlParams.get('work_type');
+            if (workType) {
+                // 查找对应的radio按钮
+                const radioBtn = document.getElementById(workType);
+                if (radioBtn) {
+                    // 选中对应的radio按钮
+                    radioBtn.checked = true;
+                    // 触发change事件，更新样式
+                    const event = new Event('change');
+                    radioBtn.dispatchEvent(event);
+                    // 调用点击事件，确保样式更新
+                    radioBtn.nextElementSibling.click();
+                }
+            }
+            
+            // 处理URL参数中的employee_ids，选中对应的员工
+            const employeeIds = urlParams.get('employee_ids');
+            if (employeeIds) {
+                // 清空现有选择
+                selectedEmployees.clear();
+                
+                // 直接添加员工ID到选择集合，不依赖DOM元素
+                const empIdArray = employeeIds.split(',');
+                empIdArray.forEach(empId => {
+                    if (empId.trim()) {
+                        selectedEmployees.add(empId.trim());
+                    }
+                });
+            }
+            
+            // 检查是否从项目未结页面的记结算进入
+            // 如果URL中包含employee_ids但不是编辑模式，则标记为从项目未结页面进入
+            const isEditMode = urlParams.get('edit') === 'true';
+            if (employeeIds && !isEditMode) {
+                window.isFromSettlement = true;
+            }
+            
+            // 折叠功能实现
+        const collapseToggle = document.getElementById('collapseToggle');
+        const collapseIcon = document.getElementById('collapseIcon');
+        const employeeSelectionContainer = document.getElementById('employeeSelectionContainer');
+        
+        // 绑定折叠点击事件
+        collapseToggle.addEventListener('click', function() {
+            const currentProjectId = localStorage.getItem('currentProjectId');
+            const workDateInput = document.getElementById('workDate');
+            const currentRecordDate = workDateInput ? workDateInput.value : null;
+            
+            const newUrl = window.location.origin + window.location.pathname;
+            window.history.pushState({}, '', newUrl);
+            
+            if (typeof resetForm === 'function') {
+                resetForm();
+            }
+            
+            if (currentProjectId) {
+                window.pendingProjectId = currentProjectId;
+            }
+            
+            if (currentRecordDate) {
+                window.pendingRecordDate = currentRecordDate;
+            }
+            
+            if (typeof restoreUINormalMode === 'function') {
+                restoreUINormalMode();
+            }
+            
+            isCollapsed = !isCollapsed;
+            
+            collapseIcon.textContent = isCollapsed ? '▶' : '▼';
+            
+            employeeSelectionContainer.style.display = isCollapsed ? 'none' : 'block';
+        });
+        
+        // 页面加载完成后刷新已记标记
+        setTimeout(() => {
+            if (window.accountingFlowService) {
+                window.accountingFlowService.refreshMarkedEmployees();
+            }
+        }, 500);
+        
+        // 监听实时数据更新事件，刷新已记标记
+        window.addEventListener('realtimeDataUpdated', function(event) {
+            console.log('🔄 收到实时数据更新事件:', event.detail);
+            // 如果是结算记录更新，刷新已记标记
+            if (event.detail.table === 'settlement_records') {
+                if (window.accountingFlowService) {
+                    window.accountingFlowService.refreshMarkedEmployees();
+                }
+            }
+        });
+        
+        // 记账和当日流水标签切换功能
+        const tabAccounting = document.getElementById('tabAccounting');
+        const tabDailyFlow = document.getElementById('tabDailyFlow');
+        const paymentSection = document.getElementById('paymentSection');
+        
+        // 获取所有需要隐藏/显示的额外区域
+        const remarkSection = document.querySelector('.form-row textarea#remark').closest('.form-row');
+        const imageUploadSection = document.querySelector('.form-row input#imageUpload').closest('.form-row');
+        const amountSection = document.querySelector('.form-row input#amountInput').closest('.form-row');
+        const workTypeSection = document.getElementById('workTypeSection'); // 工作类型选项卡容器（借支、扣款、公司转账、结算）
+        const bottomButtons = document.querySelector('.bottom-buttons'); // 底部按钮容器，包含确认记账按钮
+        
+        // 绑定记账标签切换事件
+        document.querySelectorAll('input[name="accountingTab"]').forEach(tab => {
+            tab.addEventListener('change', function() {
+                // 更新标签激活样式
+                const accountingLabels = document.querySelectorAll('input[name="accountingTab"] + label');
+                accountingLabels.forEach(label => {
+                    label.classList.remove('active');
+                });
+                this.nextElementSibling.classList.add('active');
+                
+                // 根据选中的标签显示/隐藏内容
+                if (this.id === 'tabDailyFlow') {
+                    // 当日流水标签：只显示指定内容，隐藏金额输入区域、工作类型选项卡和确认记账按钮
+                    if (workTypeSection) {
+                        workTypeSection.style.display = 'none'; // 隐藏借支、扣款、公司转账、结算选项卡
+                    }
+                    if (paymentSection) {
+                        paymentSection.style.display = 'none';
+                    }
+                    if (remarkSection) {
+                        remarkSection.style.display = 'none';
+                    }
+                    if (imageUploadSection) {
+                        imageUploadSection.style.display = 'none';
+                    }
+                    if (amountSection) {
+                        amountSection.style.display = 'none';
+                    }
+                    if (bottomButtons) {
+                        bottomButtons.style.display = 'none'; // 隐藏确认记账按钮
+                    }
+                    
+                    // 当日流水页面：自动折叠员工选择区域
+                    if (!isCollapsed) {
+                        isCollapsed = true;
+                        collapseIcon.textContent = '▶';
+                        employeeSelectionContainer.style.display = 'none';
+                    }
+                    
+                    // 禁止整个页面滚动，只保留记账列表的滚动条
+                    document.body.style.overflow = 'hidden';
+                    
+                    // 显示当日流水数据
+                    if (window.accountingFlowService) {
+                        window.accountingFlowService.handleDailyFlowTabChange(true);
+                    }
+                    
+                    // 通知父页面更新标题为"当日流水"
+                    if (window.parent && window.parent !== window) {
+                        const targetOrigin = window.location.origin || '*';
+                        window.parent.postMessage({
+                            type: 'updateTitle',
+                            page: '当日流水'
+                        }, targetOrigin);
+                    }
+                } else {
+                    const currentProjectId = localStorage.getItem('currentProjectId');
+                    const workDateInput = document.getElementById('workDate');
+                    const currentRecordDate = workDateInput ? workDateInput.value : null;
+                    
+                    const newUrl = window.location.origin + window.location.pathname;
+                    window.history.pushState({}, '', newUrl);
+                    
+                    if (typeof resetForm === 'function') {
+                        resetForm();
+                    }
+                    
+                    if (currentProjectId) {
+                        window.pendingProjectId = currentProjectId;
+                    }
+                    
+                    if (currentRecordDate) {
+                        window.pendingRecordDate = currentRecordDate;
+                    }
+                    
+                    if (typeof restoreUINormalMode === 'function') {
+                        restoreUINormalMode();
+                    }
+                    
+                    if (workTypeSection) {
+                        workTypeSection.style.display = 'flex';
+                    }
+                    
+                    if (isCollapsed) {
+                        isCollapsed = false;
+                        collapseIcon.textContent = '▼';
+                        employeeSelectionContainer.style.display = 'block';
+                    }
+                    const currentWorkType = document.querySelector('input[name="workType"]:checked');
+                    if (currentWorkType && paymentSection) {
+                        if (currentWorkType.id === 'pointWork' || currentWorkType.id === 'settleWork') {
+                            paymentSection.style.display = 'block';
+                        } else {
+                            paymentSection.style.display = 'none';
+                        }
+                    }
+                    if (remarkSection) {
+                        remarkSection.style.display = 'flex';
+                    }
+                    if (imageUploadSection) {
+                        imageUploadSection.style.display = 'flex';
+                    }
+                    if (amountSection) {
+                        amountSection.style.display = 'flex';
+                    }
+                    if (bottomButtons) {
+                        bottomButtons.style.display = 'flex';
+                    }
+                    
+                    // 恢复整个页面的滚动
+                    document.body.style.overflow = '';
+                    
+                    if (window.parent && window.parent !== window) {
+                        const targetOrigin = window.location.origin || '*';
+                        window.parent.postMessage({
+                            type: 'updateTitle',
+                            page: '结算/借支'
+                        }, targetOrigin);
+                    }
+                    
+                    // 刷新已记员工显示
+                    if (window.accountingFlowService) {
+                        window.accountingFlowService.refreshMarkedEmployees();
+                    }
+                }
+            });
+        });
+        });
+
+        
+
+        // 辅助函数：通过project_id从本地存储获取project_name
+        function getProjectNameById(projectId) {
+            try {
+                // 获取当前登录用户信息
+                let currentUser = {};
+                let userId = 'default';
+                const currentUserStr = localStorage.getItem('currentUser');
+                if (currentUserStr) {
+                    currentUser = JSON.parse(currentUserStr);
+                    userId = currentUser.user_id || 'default';
+                }
+                
+                // 从本地存储获取项目数据
+                const projectsData = localStorage.getItem('project_cache_' + userId);
+                if (projectsData) {
+                    const projects = JSON.parse(projectsData);
+                    const project = projects.find(p => p.project_id === projectId);
+                    return project ? project.project_name : null;
+                }
+                return null;
+            } catch (error) {
+                console.error('通过project_id获取project_name失败:', error);
+                return null;
+            }
+        }
+
+        // 更新编辑模式UI
+        function updateUIForEditMode() {
+            const confirmButton = document.getElementById('confirmAccountBtn');
+            
+            if (confirmButton) {
+                // 修改按钮文本为"保存修改"
+                confirmButton.textContent = '保存修改';
+                // 修改按钮样式为绿色，表示保存操作
+                confirmButton.style.background = 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)';
+                confirmButton.style.boxShadow = '0 2px 8px rgba(82, 196, 26, 0.3)';
+                confirmButton.style.marginRight = '40px';
+                
+                // 按钮文本和样式已在全局事件监听器中处理
+                // 这里不需要重复设置onclick事件
+            }
+            
+            // 添加删除按钮
+            const bottomButtonsContainer = document.querySelector('.bottom-buttons');
+            if (bottomButtonsContainer) {
+                // 检查是否已存在删除按钮
+                let deleteButton = bottomButtonsContainer.querySelector('#deleteBtn');
+                if (!deleteButton) {
+                    deleteButton = document.createElement('button');
+                    deleteButton.id = 'deleteBtn';
+                    deleteButton.textContent = '删除记录';
+                    deleteButton.style.padding = '8px 16px';
+                    deleteButton.style.background = 'linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%)';
+                    deleteButton.style.color = 'white';
+                    deleteButton.style.border = 'none';
+                    deleteButton.style.borderRadius = '8px';
+                    deleteButton.style.cursor = 'pointer';
+                    deleteButton.style.fontSize = '16px';
+                    deleteButton.style.fontWeight = 'bold';
+                    deleteButton.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+                    deleteButton.style.boxShadow = '0 2px 8px rgba(255, 77, 79, 0.3)';
+                    deleteButton.style.marginLeft = '0';
+                    deleteButton.onclick = () => {
+                        if (window.settlementService) {
+                            window.settlementService.deleteAccounting();
+                        }
+                    };
+                    
+                    // 将删除按钮添加到保存修改按钮的旁边
+                    bottomButtonsContainer.appendChild(deleteButton);
+                } else {
+                    // 如果已存在，确保显示
+                    deleteButton.style.display = 'inline-block';
+                }
+            }
+        }
+        
+        // 恢复新建模式UI
+        function restoreUINormalMode() {
+            isEditMode = false;
+            isFromEditMode = false;
+            selectedEmployees.clear();
+            
+            const confirmButton = document.getElementById('confirmAccountBtn');
+            
+            if (confirmButton) {
+                confirmButton.textContent = '确认记账';
+                confirmButton.style.background = 'linear-gradient(135deg, #722ed1 0%, #531dab 100%)';
+                confirmButton.style.boxShadow = '0 2px 8px rgba(114, 46, 209, 0.3)';
+                confirmButton.style.marginRight = '0';
+            }
+            
+            const deleteButton = document.getElementById('deleteBtn');
+            if (deleteButton) {
+                deleteButton.style.display = 'none';
+            }
+            
+            document.body.classList.remove('edit-mode');
+            
+            const employeeControls = document.getElementById('employeeControls');
+            const employeeSelectionLabel = document.getElementById('employeeSelectionLabel');
+            const selectAllBtn = document.getElementById('selectAllBtn');
+            const selectInverseBtn = document.getElementById('selectInverseBtn');
+            
+            // 检查当前是否处于当日流水页面
+            const tabDailyFlow = document.getElementById('tabDailyFlow');
+            const isDailyFlowActive = tabDailyFlow && tabDailyFlow.checked;
+            
+            if (employeeSelectionLabel) {
+                employeeSelectionLabel.textContent = '选择员工：';
+            }
+            
+            // 只在非折叠状态或非当日流水页面时显示员工相关元素
+            if (!isCollapsed || !isDailyFlowActive) {
+                if (employeeControls) {
+                    employeeControls.style.display = 'flex';
+                }
+                
+                if (selectAllBtn) {
+                    selectAllBtn.style.display = 'inline-block';
+                }
+                
+                if (selectInverseBtn) {
+                    selectInverseBtn.style.display = 'inline-block';
+                }
+                
+                const employeeSelectionDiv = document.querySelector('.form-group:has(#employeeSelectionLabel)');
+                if (employeeSelectionDiv) {
+                    employeeSelectionDiv.style.display = 'block';
+                    employeeSelectionDiv.style.alignItems = 'normal';
+                    employeeSelectionDiv.style.flexWrap = 'wrap';
+                    
+                    const labelContainer = employeeSelectionDiv.querySelector('div:first-child');
+                    if (labelContainer) {
+                        labelContainer.style.display = 'flex';
+                        labelContainer.style.alignItems = 'center';
+                        labelContainer.style.marginRight = '0';
+                        labelContainer.style.marginBottom = '10px';
+                    }
+                }
+            }
+            
+            const employeeList = document.getElementById('employeeList');
+            if (employeeList) {
+                employeeList.style.maxHeight = 'none';
+                employeeList.style.minHeight = 'auto';
+                employeeList.style.width = '100%';
+                employeeList.style.boxSizing = 'border-box';
+            }
+            
+            renderEmployeeList();
+            
+            // 确保员工选择容器的显示状态与折叠状态一致
+            const employeeSelectionContainer = document.getElementById('employeeSelectionContainer');
+            if (employeeSelectionContainer) {
+                employeeSelectionContainer.style.display = isCollapsed ? 'none' : 'block';
+            }
+        }
+
+        // 初始化函数
+        function init() {
+            // 通知父页面更新标题为"结算/借支"
+            if (window.parent && window.parent !== window) {
+                // 使用当前页面的origin作为targetOrigin，提高安全性
+                const targetOrigin = window.location.origin || '*';
+                window.parent.postMessage({
+                    type: 'updateTitle',
+                    page: '结算借支.html'
+                }, targetOrigin);
+            }
+            
+            // 检查URL参数中是否有项目ID和日期
+            const urlParams = new URLSearchParams(window.location.search);
+            let projectIdFromUrl = urlParams.get('project_id');
+            // 同时支持date和record_date参数，确保从记账列表进入编辑模式时日期能正确填充
+            let dateFromUrl = urlParams.get('record_date') || urlParams.get('date');
+            // 获取员工ID参数
+            const employeeIds = urlParams.get('employee_ids');
+            
+            // 优先使用pendingProjectId（从更新/删除操作后传递的）
+            if (window.pendingProjectId) {
+                projectIdFromUrl = window.pendingProjectId;
+                // 清除临时保存的项目ID
+                delete window.pendingProjectId;
+            }
+            
+            // 优先使用pendingRecordDate（从更新/删除操作后传递的）
+            if (window.pendingRecordDate) {
+                dateFromUrl = window.pendingRecordDate;
+                // 清除临时保存的记账日期
+                delete window.pendingRecordDate;
+            }
+            
+            // 保存项目ID到localStorage - 先保存ID，确保loadEmployeeData能获取到
+            if (projectIdFromUrl) {
+                localStorage.setItem('currentProjectId', projectIdFromUrl);
+            }
+            
+            let projectName = null;
+            
+            if (projectIdFromUrl) {
+                // 从URL获取到project_id，查询对应的project_name
+                projectName = getProjectNameById(projectIdFromUrl);
+                
+                if (projectName) {
+                    // 直接设置项目名称到输入框
+                    document.getElementById('projectName').value = projectName;
+                    
+                    // 保存项目名称到localStorage
+                    localStorage.setItem('currentProjectName', projectName);
+                } else {
+                    showNotification('未找到对应的项目信息，无法加载员工数据', true);
+                }
+            } else {
+                showNotification('未找到项目ID，无法加载员工数据', true);
+            }
+            
+            // 检查是否是编辑模式 - 移到loadEmployeeData之前
+            isEditMode = urlParams.get('edit') === 'true';
+            
+            // 初始化编辑模式展开标志
+            isFromEditMode = false;
+            
+            // 如果是编辑模式，更新UI
+            if (isEditMode) {
+                updateUIForEditMode();
+            } else {
+                restoreUINormalMode();
+            }
+            
+            // 在编辑模式下隐藏借支、扣款、公司转账、结算选项卡
+            if (isEditMode) {
+                const workTypeSection = document.querySelector('.work-type');
+                if (workTypeSection) {
+                    workTypeSection.style.display = 'none';
+                }
+                
+                // 在编辑模式下员工列表容器高度根据内容自动调整
+                const employeeList = document.getElementById('employeeList');
+                if (employeeList) {
+                    employeeList.style.maxHeight = 'none';
+                    employeeList.style.minHeight = 'auto';
+                    employeeList.style.width = '100%';
+                    employeeList.style.boxSizing = 'border-box';
+                }
+            } else {
+                // 非编辑模式下，员工列表高度根据内容自动调整
+                const employeeList = document.getElementById('employeeList');
+                if (employeeList) {
+                    employeeList.style.maxHeight = 'none';
+                    employeeList.style.minHeight = 'auto';
+                }
+            }
+            
+            // 处理员工ID参数，无论是否为编辑模式
+            if (employeeIds) {
+                // 检查是否从记工表进入（非编辑模式且有employee_ids参数）
+                if (!isEditMode && employeeIds) {
+                    isFromTimesheet = true;
+                    // 保存从记工表进入时的员工ID（只取第一个，因为记工表只传一个员工）
+                    const empIdArray = employeeIds.split(',');
+                    timesheetEmployeeId = empIdArray[0] ? empIdArray[0].trim() : null;
+                }
+                
+                // 设置员工选择
+                const empIdArray = employeeIds.split(',');
+                // 清空现有选择
+                selectedEmployees.clear();
+
+                // 重置编辑模式展开标志
+                isFromEditMode = false;
+
+                // 直接添加员工ID到选择集合，不依赖DOM元素
+                empIdArray.forEach(empId => {
+                    if (empId.trim()) {
+                        selectedEmployees.add(empId.trim());
+                    }
+                });
+            }
+
+            // 保存员工ID到全局变量，供loadEmployeeData使用
+            if (employeeIds) {
+                window.employeeIdsFromUrl = employeeIds.split(',').map(id => id.trim()).filter(id => id);
+            } else {
+                window.employeeIdsFromUrl = null;
+            }
+            
+            // 加载员工数据
+            loadEmployeeData(projectName);
+            
+            // 在编辑模式下隐藏员工控制按钮并修改标签文本
+            const employeeControls = document.getElementById('employeeControls');
+            const employeeSelectionLabel = document.getElementById('employeeSelectionLabel');
+            const selectAllBtn = document.getElementById('selectAllBtn');
+            const selectInverseBtn = document.getElementById('selectInverseBtn');
+            
+            // 只在编辑模式下隐藏全选和反选按钮，新建模式下显示
+            // 如果是从记工表进入，也隐藏全选和反选按钮
+            if (isEditMode || isFromTimesheet) {
+                if (selectAllBtn) selectAllBtn.style.display = 'none';
+                if (selectInverseBtn) selectInverseBtn.style.display = 'none';
+                if (employeeSelectionLabel) employeeSelectionLabel.textContent = '员工：';
+            } else {
+                if (selectAllBtn) selectAllBtn.style.display = 'inline-block';
+                if (selectInverseBtn) selectInverseBtn.style.display = 'inline-block';
+                if (employeeSelectionLabel) employeeSelectionLabel.textContent = '选择员工：';
+            }
+            
+            if (employeeControls) {
+                employeeControls.style.display = (isEditMode || isFromTimesheet) ? 'none' : 'flex';
+            }
+            
+            // 在编辑模式下，将"员工："与员工列表水平排列
+            if (isEditMode) {
+                const employeeSelectionDiv = document.querySelector('.form-group:has(#employeeSelectionLabel)');
+                if (employeeSelectionDiv) {
+                    // 将整个.form-group容器设置为flex布局
+                    employeeSelectionDiv.style.display = 'flex';
+                    employeeSelectionDiv.style.alignItems = 'center';
+                    employeeSelectionDiv.style.flexWrap = 'nowrap';
+                    
+                    // 获取包含员工选择标签的div
+                    const labelContainer = employeeSelectionDiv.querySelector('div:first-child');
+                    if (labelContainer) {
+                        labelContainer.style.display = 'inline-flex'; // 水平排列
+                        labelContainer.style.alignItems = 'center'; // 垂直居中
+                        labelContainer.style.marginRight = '10px'; // 与员工列表的间距
+                        labelContainer.style.marginBottom = '0'; // 移除下边距
+                    }
+                }
+            }
+            
+            if (isEditMode) {
+                // 编辑模式：从URL获取记录数据
+                const settlementId = urlParams.get('settlement_id'); // 获取settlement_id
+                const recordType = urlParams.get('record_type');
+                const amount = urlParams.get('amount');
+                const payer = urlParams.get('payer');
+                const remark = urlParams.get('remark');
+                let imageIds = urlParams.get('image_ids');
+                const employeeIds = urlParams.get('employee_ids');
+                
+                // 保存settlement_id到全局变量，以便后续使用
+                if (settlementId) {
+                    window.currentSettlementId = settlementId;
+                }
+                
+                // 从本地存储获取最新的image_ids，因为同步后本地存储中的image_ids会被更新为云端URL
+                if (settlementId) {
+                    const storageSources = ['settlementRecords', 'settlement_records_cache', 'offline_settlement_records'];
+                    for (const source of storageSources) {
+                        try {
+                            const storedData = localStorage.getItem(source);
+                            if (storedData) {
+                                const parsedData = JSON.parse(storedData);
+                                if (Array.isArray(parsedData)) {
+                                    const record = parsedData.find(r => r.settlement_id === settlementId);
+                                    if (record && record.image_ids) {
+                                        imageIds = Array.isArray(record.image_ids) ? record.image_ids.join(',') : record.image_ids;
+                                        break;
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.error('从本地存储获取image_ids失败:', e);
+                        }
+                    }
+                }
+                
+                // 设置记账日期
+                if (dateFromUrl) {
+                    document.getElementById('workDate').value = dateFromUrl;
+                    updateDateDisplay();
+                }
+                
+                // 设置金额
+                if (amount) {
+                    document.getElementById('amountInput').value = amount;
+                }
+                
+                // 设置付款人
+                if (payer) {
+                    document.getElementById('paymentInput').value = payer;
+                }
+                
+                // 设置备注
+                if (remark) {
+                    document.getElementById('remark').value = remark;
+                }
+                
+                // 设置工作类型标签
+                if (recordType) {
+                    let radioId = '';
+                    switch (recordType) {
+                        case '借支':
+                            radioId = 'pointWork';
+                            break;
+                        case '扣款':
+                            radioId = 'contractWork';
+                            break;
+                        case '公司转账':
+                            radioId = 'quantityWork';
+                            break;
+                        case '结算':
+                            radioId = 'settleWork';
+                            break;
+                    }
+                    
+                    if (radioId) {
+                        // 选中对应的radio按钮
+                        const radio = document.getElementById(radioId);
+                        if (radio) {
+                            radio.checked = true;
+                            // 更新标签的active状态
+                            document.querySelectorAll('.work-type-option').forEach(option => {
+                                option.classList.remove('active');
+                            });
+                            radio.nextElementSibling.classList.add('active');
+                            
+                            // 更新付款区域显示
+                            const paymentSection = document.getElementById('paymentSection');
+                            if (paymentSection) {
+                                if (radioId === 'pointWork' || radioId === 'settleWork') {
+                                    paymentSection.style.display = 'block';
+                                } else {
+                                    paymentSection.style.display = 'none';
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 更新标题为"修改借支"/"修改扣款"/"修改公司转账"/"修改结算"
+                    if (window.parent && window.parent !== window) {
+                        const targetOrigin = window.location.origin || '*';
+                        let titleText = '';
+                        switch (recordType) {
+                            case '借支':
+                                titleText = '修改借支';
+                                break;
+                            case '扣款':
+                                titleText = '修改扣款';
+                                break;
+                            case '公司转账':
+                                titleText = '修改公司转账';
+                                break;
+                            case '结算':
+                                titleText = '修改结算';
+                                break;
+                        }
+                        if (titleText) {
+                            window.parent.postMessage({
+                                type: 'updateTitle',
+                                page: titleText
+                            }, targetOrigin);
+                        }
+                    }
+                }
+                
+                // 员工选择已在init函数中处理
+                
+                // 设置图片
+                if (imageIds) {
+                    // 保存原始image_ids到全局变量，用于后续比较哪些图片被删除
+                    window.originalImageIds = imageIds;
+                    const imageUrls = imageIds.split(',');
+                    // 确保图片上传功能已初始化
+                    initImageUpload();
+                    
+                    // 下载并显示图片
+                    imageUrls.forEach((url, index) => {
+                        if (url.trim()) {
+                            // 检查URL有效性，过滤掉无效的blob URL
+                            if (url.startsWith('blob:')) {
+                                // 验证blob URL是否有效
+                                try {
+                                    // 尝试创建URL对象来验证有效性
+                                    const testUrl = new URL(url);
+                                    if (!testUrl.pathname || url.includes('null/') || url.includes('undefined/')) {
+                                        // 静默跳过无效的blob URL，不输出日志
+                                        return; // 跳过无效的blob URL
+                                    }
+                                } catch (e) {
+                                    // 静默跳过格式错误的blob URL，不输出日志
+                                    return; // 跳过格式错误的blob URL
+                                }
+                            }
+                            
+                            // 处理不同类型的URL
+                            if (url.startsWith('data:')) {
+                                // 直接处理data URL（base64图片）
+                                try {
+                                    // 从data URL创建Blob对象
+                                    const [header, data] = url.split(',');
+                                    const mime = header.match(/:(.*?);/)[1];
+                                    const bstr = atob(data);
+                                    let n = bstr.length;
+                                    const u8arr = new Uint8Array(n);
+                                    while (n--) {
+                                        u8arr[n] = bstr.charCodeAt(n);
+                                    }
+                                    const blob = new Blob([u8arr], { type: mime });
+                                    
+                                    // 生成文件名
+                                    const fileName = `image_${Date.now()}_${index}.${mime.split('/')[1] || 'jpg'}`;
+                                    
+                                    // 创建File对象
+                                    const file = new File([blob], fileName, { type: mime });
+                                    
+                                    // 添加到全局图片数组
+                                    window.selectedImages.push(file);
+                                    
+                                    // 创建图片预览
+                                    renderImagePreview(file, window.selectedImages.length - 1);
+                                    return; // 直接跳过后续处理，因为已经完成了图片处理
+                                } catch (error) {
+                                    console.error('处理base64图片失败:', error);
+                                }
+                            }
+                            
+                            // 处理普通HTTP/HTTPS URL - 优先从本地获取，失败后再尝试在线获取
+                            loadImageWithFallback(url, index);
+                        }
+                    });
+                }
+            } else {
+                // 非编辑模式：设置记账日期
+                if (dateFromUrl) {
+                    document.getElementById('workDate').value = dateFromUrl;
+                    updateDateDisplay();
+                    
+                    // 如果是从记工表进入，禁用日期选择框
+                    if (isFromTimesheet) {
+                        const workDateInput = document.getElementById('workDate');
+                        const dateDisplay = document.getElementById('dateDisplay');
+                        const container = document.querySelector('.date-input-container');
+                        
+                        if (workDateInput) {
+                            workDateInput.disabled = true;
+                            workDateInput.style.cursor = 'not-allowed';
+                        }
+                        if (dateDisplay) {
+                            dateDisplay.style.cursor = 'not-allowed';
+                        }
+                        if (container) {
+                            container.style.cursor = 'not-allowed';
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 下载图片失败时的备选处理函数
+
+        // 检查URL参数中是否有项目名称和日期
+        window.onload = function() {
+            init();
+            
+            // 添加选项卡切换事件监听
+            document.querySelectorAll('input[name="workType"]').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    // 更新选中样式
+                    document.querySelectorAll('.work-type-option').forEach(option => {
+                        option.classList.remove('active');
+                    });
+                    this.nextElementSibling.classList.add('active');
+                    
+                    // 根据选中的选项卡显示/隐藏付款区域
+                    const paymentSection = document.getElementById('paymentSection');
+                    if (this.id === 'pointWork' || this.id === 'settleWork') {
+                        paymentSection.style.display = 'block';
+                    } else {
+                        paymentSection.style.display = 'none';
+                    }
+                    
+                    // 重置表单
+                    resetForm();
+                    
+                    // 选中记账标签
+                    const tabAccounting = document.getElementById('tabAccounting');
+                    const tabDailyFlow = document.getElementById('tabDailyFlow');
+                    
+                    // 确保记账标签被选中
+                    tabAccounting.checked = true;
+                    tabDailyFlow.checked = false;
+                    
+                    // 更新记账标签的激活样式
+                    const accountingLabels = document.querySelectorAll('input[name="accountingTab"] + label');
+                    accountingLabels.forEach(label => {
+                        label.classList.remove('active');
+                    });
+                    tabAccounting.nextElementSibling.classList.add('active');
+                });
+            });
+            
+            // 根据当前选中的工作类型显示/隐藏付款区域
+            const currentWorkType = document.querySelector('input[name="workType"]:checked');
+            const paymentSection = document.getElementById('paymentSection');
+            if (currentWorkType && paymentSection) {
+                if (currentWorkType.id === 'pointWork' || currentWorkType.id === 'settleWork') {
+                    paymentSection.style.display = 'block';
+                } else {
+                    paymentSection.style.display = 'none';
+                }
+            }
+        };
+
+    </script>
+        <div class="container">
+            <div class="form-row">
+                <div>
+                    <label for="projectName">*项目名称：</label>
+                    <input type="text" id="projectName" readonly disabled style="background-color: #f8f9fa; cursor: not-allowed; color: #6c757d;">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div>
+                    <label for="workDate"><span class="required-asterisk">*</span>记账日期：</label>
+                    <div class="date-input-container">
+                        <input type="date" id="workDate" class="date-input">
+                        <div id="dateDisplay" class="date-display"></div>
+                    </div>
+                </div>
+            </div>
+
+        <!-- 记账标签页导航 -->
+        <div class="form-group">
+            <div class="work-type tab-navigation" style="margin-bottom: 0; border-bottom: 2px solid #ddd; display: flex; align-items: center;">
+                <input type="radio" id="tabAccounting" name="accountingTab" value="记账" checked>
+                <label for="tabAccounting" class="work-type-option active">记账</label>
+                
+                <!-- 折叠图标按钮 -->
+                <div id="collapseToggle" style="display: flex; align-items: center; justify-content: center; padding: 8px; cursor: pointer; background-color: transparent; border: none; margin: 0 10px; font-size: 16px;">
+                    <span id="collapseIcon" style="font-size: 16px;">▼</span>
+                </div>
+                
+                <input type="radio" id="tabDailyFlow" name="accountingTab" value="当日流水">
+                <label for="tabDailyFlow" class="work-type-option">当日流水</label>
+            </div>
+        </div>
+
+            <div class="form-group" id="employeeSelectionContainer">
+                <div id="employeeControls" style="display: flex; align-items: center; gap: 15px; margin-bottom: 10px;">
+                    <label id="employeeSelectionLabel">选择员工：</label>
+                    <button id="selectAllBtn" style="padding: 5px 10px; background-color: #ED7D31; color: white; border: none; border-radius: 4px; cursor: pointer;">全选</button>
+                    <button id="selectInverseBtn" style="padding: 5px 10px; background-color: #1890ff; color: white; border: none; border-radius: 4px; cursor: pointer;">反选</button>
+                </div>
+                <div class="employee-selection">
+                    <div class="employee-list" id="employeeList">
+                        <!-- 员工列表将通过JavaScript动态添加 -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 记账列表容器 -->
+            <div id="accountingFlowList" style="margin-top: 20px; display: none; max-height: calc(100vh - 170px); overflow-y: auto;">
+                <!-- 记账流水记录将通过JavaScript动态渲染 -->
+            </div>
+        </div>
+    <script>
+        // 日期选择器模态框
+        const datePickerModalHTML = `
+            <div id="datePickerModal" class="modal" style="display: none;">
+                <div class="date-picker-content">
+                    <div class="date-picker-body">
+                        <div class="calendar-header">
+                            <button id="prevMonth" class="month-btn">&lt;</button>
+                            <span id="currentMonth"></span>
+                            <button id="nextMonth" class="month-btn">&gt;</button>
+                        </div>
+                        <div class="calendar-grid">
+                            <div class="weekdays">
+                                <div>一</div>
+                                <div>二</div>
+                                <div>三</div>
+                                <div>四</div>
+                                <div>五</div>
+                                <div>六</div>
+                                <div>日</div>
+                            </div>
+                            <div class="calendar-days" id="calendarDays"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // 在body末尾添加日期选择器模态框
+        document.body.insertAdjacentHTML('beforeend', datePickerModalHTML);
+
+        // 员工数据存储
+        let employees = []; // 所有员工
+        let activeEmployees = []; // 在职员工
+        let inactiveEmployees = []; // 非在职员工
+        let selectedEmployees = new Set();
+        let isAllSelected = false; // 全选状态标记
+        let isEditMode = false; // 是否为编辑模式标记
+        let isFromEditMode = false; // 是否从编辑模式展开
+        let isFromTimesheet = false; // 是否从记工表进入
+        let timesheetEmployeeId = null; // 从记工表进入时的员工ID
+        let isFromTimesheetExpanded = false; // 是否从记工表进入后展开
+
+        // 加载员工数据函数 - 与记工.html保持一致
+        async function loadEmployeeData(projectName) {
+            // 获取用户信息
+            let phone = localStorage.getItem('loggedInPhone');
+            if (!phone && window.location.hostname === 'localhost') {
+                phone = '13800138000';
+            }
+            
+            if (!phone) {
+                showNotification('未找到用户信息，无法加载员工数据', true);
+                return;
+            }
+            
+            if (!projectName) {
+                showNotification('未找到项目名称，无法加载员工数据', true);
+                return;
+            }
+            
+            // 获取项目ID
+            const projectId = localStorage.getItem('currentProjectId') || '';
+            
+            try {
+                // 直接从localStorage加载数据 - 使用项目ID作为键名以确保一致性
+                const localKey = `employees_${projectId}`;
+                const savedData = localStorage.getItem(localKey);
+                
+                if (savedData) {
+                    const parsedData = JSON.parse(savedData);
+                    if (parsedData.employees && Array.isArray(parsedData.employees)) {
+                        // 将localStorage返回的数据格式转换为应用需要的格式
+                    employees = parsedData.employees.map(localEmp => ({
+                        ID: localEmp.employee_id || '', // 员工ID（UUID）
+                        工号: localEmp.emp_code || '', // 工号
+                        姓名: localEmp.emp_name || '', // 姓名
+                        状态: localEmp.status || '在职', // 状态，默认为在职
+                        工价: localEmp.labor_cost || 0, // 工价
+                        // 其他需要的字段
+                        电话: localEmp.phone || '',
+                        身份证: localEmp.id_card || '',
+                        进场日期: localEmp.hire_date || '',
+                        离场日期: localEmp.leave_date || '',
+                        备注: localEmp.remarks || '',
+                        银行: localEmp.bank_name || '',
+                        银行卡: localEmp.bank_card_number || '',
+                        开户行: localEmp.bank_address || ''
+                    })).sort((a, b) => {
+                        // 按工号升序排序，确保工号为数字类型进行比较
+                        const idA = parseInt(a.工号) || 0;
+                        const idB = parseInt(b.工号) || 0;
+                        return idA - idB;
+                    });
+                        
+
+                    
+                    // 在编辑模式下，activeEmployees包含所有员工，以便编辑时能选中任何状态的员工
+                    // 如果是从项目未结页面的记结算进入，也显示所有员工
+                    if (isEditMode || window.isFromSettlement) {
+                        activeEmployees = employees; // 编辑模式或从项目未结页面进入时显示所有员工
+                        inactiveEmployees = []; // 不需要非活跃员工列表
+                    } else {
+                        // 非编辑模式下，显示在职员工和有记账记录的非在职员工
+                        let markedEmployeeIds = [];
+                        // 尝试获取已记员工ID，即使在非编辑模式下
+                        if (window.accountingFlowService) {
+                            try {
+                                // 获取当前记录类型
+                                const recordType = window.accountingFlowService.getCurrentRecordType();
+                                // 同步获取已记员工ID，使用空缓存键确保获取最新数据
+                                markedEmployeeIds = window.accountingFlowService.fetchMarkedEmployees(recordType) || [];
+                                // 如果是Promise，等待其完成
+                                if (markedEmployeeIds instanceof Promise) {
+                                    markedEmployeeIds = await markedEmployeeIds;
+                                }
+                            } catch (error) {
+                                console.error('获取已记员工ID失败:', error);
+                            }
+                        }
+                        
+                        // 非编辑模式下，显示在职员工和有记账记录的非在职员工
+                        activeEmployees = employees.filter(emp =>
+                            emp.状态 === '在职' || markedEmployeeIds.includes(emp.ID)
+                        );
+                        
+                        // 如果URL中指定了员工ID，确保这些员工也显示在列表中
+                        if (window.employeeIdsFromUrl && window.employeeIdsFromUrl.length > 0) {
+                            // 添加URL中指定的员工（即使他们不是在职状态或没有记账记录）
+                            window.employeeIdsFromUrl.forEach(empId => {
+                                if (!activeEmployees.some(emp => emp.ID === empId)) {
+                                    const employeeToAdd = employees.find(emp => emp.ID === empId);
+                                    if (employeeToAdd && !activeEmployees.includes(employeeToAdd)) {
+                                        activeEmployees.push(employeeToAdd);
+                                    }
+                                }
+                            });
+                        }
+                        // 将状态不为在职且没有记账记录的员工加载到添加模体框
+                        inactiveEmployees = employees.filter(emp => 
+                            emp.状态 !== '在职' && 
+                            emp.状态 !== '结清' &&
+                            !markedEmployeeIds.includes(emp.ID)
+                        );
+                    }
+
+                    // 总是渲染员工列表，与记工.html保持一致
+                    renderEmployeeList();
+                    
+                    // 预加载非在职员工到添加按钮的模态框中
+                    const inactiveList = document.getElementById('inactiveEmployeesList');
+                    if(inactiveList) {
+                        inactiveList.innerHTML = '';
+                        inactiveEmployees.forEach(emp => {
+                            const employeeItem = document.createElement('div');
+                            employeeItem.className = 'employee-item';
+                            employeeItem.innerHTML = `
+                                <input type="checkbox" value="${emp.ID}" data-name="${emp.姓名}" data-status="${emp.状态}"> 
+                                <div class="employee-info">
+                                    <div class="employee-id">${emp.工号}</div>
+                                    <div><span style="color: #000000;">${emp.姓名}</span> (${emp.状态})</div>
+                                </div>
+                            `;
+                            inactiveList.appendChild(employeeItem);
+                        });
+                    }
+                    
+                } else {
+                    employees = [];
+                    activeEmployees = [];
+                    inactiveEmployees = [];
+                    if (!isEditMode) {
+                        renderEmployeeList();
+                    }
+                    showNotification(`员工数据格式不正确，无法加载`, true);
+                }
+            } else {
+                employees = [];
+                activeEmployees = [];
+                inactiveEmployees = [];
+                if (!isEditMode) {
+                    renderEmployeeList();
+                }
+                showNotification(`未找到员工数据，可能该项目下还没有员工信息`, true);
+            }
+        } catch (error) {
+
+            employees = [];
+            activeEmployees = [];
+            inactiveEmployees = [];
+            renderEmployeeList();
+            showNotification(`加载员工数据失败: ${error.message}`, true);
+        }
+        }
+
+        // 渲染员工列表
+        function renderEmployeeList() {
+            const employeeList = document.getElementById('employeeList');
+            employeeList.innerHTML = '';
+
+            let employeesToDisplay = activeEmployees;
+            let showAddButton = false;
+
+            // 编辑模式或非编辑模式下有选中员工且未展开：只显示选中的员工，并添加+按钮
+            // 但如果是从编辑模式/折叠状态展开的，则显示所有员工
+            if ((isEditMode || selectedEmployees.size > 0) && !isFromEditMode) {
+                employeesToDisplay = activeEmployees.filter(emp => selectedEmployees.has(emp.ID));
+                showAddButton = true;
+            } else if (isEditMode && isFromEditMode || (!isEditMode && isFromEditMode)) {
+                // 从编辑模式/折叠状态展开，显示所有员工
+                employeesToDisplay = activeEmployees;
+                showAddButton = false;
+            } else {
+                // 非编辑模式且无选中员工：显示所有员工
+            }
+            
+            // 如果是从记工表进入且有选中的员工，只显示选中的员工
+            if (isFromTimesheet && selectedEmployees.size > 0 && !isFromTimesheetExpanded) {
+                employeesToDisplay = activeEmployees.filter(emp => selectedEmployees.has(emp.ID));
+                // 不显示展开按钮
+            }
+
+            employeesToDisplay.forEach(emp => {
+                const employeeItem = document.createElement('div');
+                employeeItem.className = 'employee-item';
+                employeeItem.dataset.employeeId = emp.ID;
+                
+                if (selectedEmployees.has(emp.ID)) {
+                    employeeItem.classList.add('selected');
+                }
+
+                employeeItem.innerHTML = `
+                    <input type="checkbox" value="${emp.ID}" id="emp_${emp.ID}"> 
+                    <label for="emp_${emp.ID}" style="display: none;">${emp.姓名}</label>
+                    <div class="employee-info">
+                        <div class="employee-id">${emp.工号}</div>
+                        <div style="color: #000000; width: 45px;">${emp.姓名}</div>
+                    </div>
+                `;
+                
+                // 如果是从记工表进入且处于折叠状态，禁用复选框
+                if (isFromTimesheet && !isFromTimesheetExpanded) {
+                    const checkbox = employeeItem.querySelector('input[type="checkbox"]');
+                    if (checkbox) {
+                        checkbox.disabled = true;
+                    }
+                    employeeItem.style.cursor = 'not-allowed';
+                }
+
+                // 绑定点击事件到整个员工项
+                employeeItem.addEventListener('click', function(e) {
+                    // 如果是从记工表进入且处于折叠状态，阻止点击
+                    if (isFromTimesheet && !isFromTimesheetExpanded) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return;
+                    }
+                    
+                    e.stopPropagation();
+                    const checkbox = this.querySelector('input[type="checkbox"]');
+                    checkbox.checked = !checkbox.checked;
+                    const event = new Event('change');
+                    checkbox.dispatchEvent(event);
+                });
+
+                // 绑定复选框事件
+                const checkbox = employeeItem.querySelector('input[type="checkbox"]');
+                checkbox.addEventListener('change', function(e) {
+                    // 如果是从记工表进入且处于折叠状态，阻止change事件
+                    if (isFromTimesheet && !isFromTimesheetExpanded) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return;
+                    }
+                    
+                    e.stopPropagation();
+                    const employeeItem = this.closest('.employee-item');
+                    if (this.checked) {
+                        selectedEmployees.add(this.value);
+                        employeeItem.classList.add('selected');
+
+                    } else {
+                        selectedEmployees.delete(this.value);
+                        employeeItem.classList.remove('selected');
+
+                    }
+
+                    
+                    // 检查并更新全选按钮状态
+                    updateSelectAllButtonState();
+                });
+
+                employeeList.appendChild(employeeItem);
+            });
+
+            // 编辑模式下显示+按钮
+            // 但如果是从记工表进入且处于折叠状态，不显示展开按钮
+            if (showAddButton && !(isFromTimesheet && !isFromTimesheetExpanded)) {
+                const addEmployeeItem = document.createElement('div');
+                addEmployeeItem.className = 'employee-item';
+                addEmployeeItem.innerHTML = `
+                    <div class="employee-info">
+                        <div class="employee-id" style="cursor: pointer; color: #1890ff; font-size: 36px; font-weight: bold;">+</div>
+                        <div style="width: 45px; color: #000000;">展开</div>
+                    </div>
+                `;
+                employeeList.appendChild(addEmployeeItem);
+                
+                // 绑定+按钮点击事件
+                addEmployeeItem.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    console.log('点击展开按钮，显示所有员工');
+                    // 标记为展开状态，显示所有员工
+                    isFromEditMode = true;
+                    isFromTimesheetExpanded = true; // 标记是从记工表进入后展开的
+                    // 刷新员工列表
+                    renderEmployeeList();
+                });
+            }
+            
+            // 刷新已记标记
+            if (window.accountingFlowService) {
+                window.accountingFlowService.refreshMarkedEmployees();
+            }
+            
+            // 只有在展开状态下才显示折叠按钮（-按钮）
+            // 展开状态是指：显示所有员工，且有选中员工
+            // 但如果是从记工表进入且处于折叠状态，不显示折叠按钮
+            if (employeesToDisplay.length === activeEmployees.length && selectedEmployees.size > 0 && (isFromEditMode || (!isEditMode && employeesToDisplay.length > selectedEmployees.size)) && !(isFromTimesheet && !isFromTimesheetExpanded)) {
+                const subtractEmployeeItem = document.createElement('div');
+                subtractEmployeeItem.className = 'employee-item';
+                subtractEmployeeItem.innerHTML = `
+                    <div class="employee-info">
+                        <div class="employee-id" style="cursor: pointer; color: #1890ff; font-size: 36px; font-weight: bold;">-</div>
+                        <div style="width: 45px; color: #000000;">折叠</div>
+                    </div>
+                `;
+                employeeList.appendChild(subtractEmployeeItem);
+                
+                // 绑定-按钮点击事件
+                subtractEmployeeItem.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    // 切换回折叠状态，只显示选中员工
+                    isFromEditMode = false;
+                    isFromTimesheetExpanded = false; // 重置记工表展开状态标记
+                    // 刷新员工列表
+                    renderEmployeeList();
+                });
+            }
+            
+            // 非编辑模式且展开状态下显示添加员工按钮
+            // 折叠状态：employeesToDisplay.length === selectedEmployees.size && !isFromEditMode
+            // 展开状态：employeesToDisplay.length > selectedEmployees.size || isFromEditMode
+            if (!isEditMode && (employeesToDisplay.length > selectedEmployees.size || isFromEditMode)) {
+                // 添加添加按钮
+                const addButtonItem = document.createElement('div');
+                addButtonItem.className = 'employee-item';
+                addButtonItem.innerHTML = `
+                    <input type="checkbox" value="add" id="emp_add" style="display: none;">
+                    <label for="emp_add" style="display: none;">添加</label>
+                    <div class="employee-info">
+                        <div class="employee-id add-button" style="cursor: pointer; color: #52c41a; font-size: 36px; font-weight: bold;">+</div>
+                        <div class="add-button" style="color: #000000; width: 45px;">添加</div>
+                    </div>
+                `;
+                
+                // 绑定添加按钮点击事件 - 实现添加功能
+                addButtonItem.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    // 直接调用显示添加员工模态框函数
+                    showAddEmployeeModal();
+                });
+                
+                employeeList.appendChild(addButtonItem);
+            }
+            
+            // 添加删除按钮 - 只在非编辑模式且展开状态下显示
+            if (!isEditMode && (employeesToDisplay.length > selectedEmployees.size || isFromEditMode)) {
+                const deleteButtonItem = document.createElement('div');
+                deleteButtonItem.className = 'employee-item';
+                deleteButtonItem.innerHTML = `
+                    <input type="checkbox" value="delete" id="emp_delete" style="display: none;">
+                    <label for="emp_delete" style="display: none;">删除</label>
+                    <div class="employee-info">
+                        <div class="employee-id delete-button" style="cursor: pointer; color: #f5222d; font-size: 36px; font-weight: bold;">-</div>
+                        <div class="delete-button" style="color: #000000; width: 45px;">删除</div>
+                    </div>
+                `;
+                
+                // 绑定删除按钮点击事件 - 实现删除功能
+                deleteButtonItem.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    // 直接调用删除选中员工函数
+                    deleteSelectedEmployees();
+                });
+                
+                employeeList.appendChild(deleteButtonItem);
+            }
+        }
+
+
+
+        // 获取可见员工复选框函数
+        function getVisibleEmployeeCheckboxes() {
+            const listContainer = document.getElementById('employeeList');
+            if (!listContainer) return [];
+            
+            // 获取员工列表容器中的所有员工项
+            const employeeItems = listContainer.querySelectorAll('.employee-item');
+            
+            // 筛选出可见的员工项并获取其复选框，排除添加和删除按钮以及已记员工
+            const visibleCheckboxes = [];
+            
+            employeeItems.forEach(item => {
+                // 检查员工项是否可见
+                const isVisible = item.offsetParent !== null && 
+                                 getComputedStyle(item).visibility !== 'hidden' &&
+                                 getComputedStyle(item).display !== 'none';
+                
+                if (isVisible) {
+                    const checkbox = item.querySelector('input[type="checkbox"]');
+                    if (checkbox) {
+                        // 排除添加和删除按钮的复选框
+                        const value = checkbox.value;
+                        if (value !== 'add' && value !== 'delete') {
+                            // 排除已禁用的复选框（已记员工）
+                            if (!checkbox.disabled) {
+                                visibleCheckboxes.push(checkbox);
+                            }
+                        }
+                    }
+                }
+            });
+            
+            return visibleCheckboxes;
+        }
+
+        // 更新全选按钮状态（基于可见项）
+        function updateSelectAllButtonState() {
+            const selectAllBtn = document.getElementById('selectAllBtn');
+            const visibleCheckboxes = getVisibleEmployeeCheckboxes();
+            const checkedVisibleBoxes = visibleCheckboxes.filter(cb => cb.checked);
+            
+            // 检查是否全部可见项都已选中
+            const allVisibleSelected = visibleCheckboxes.length > 0 && checkedVisibleBoxes.length === visibleCheckboxes.length;
+            
+            if (allVisibleSelected && !isAllSelected) {
+                isAllSelected = true;
+                selectAllBtn.textContent = '取消全选';
+            } else if (!allVisibleSelected && isAllSelected) {
+                isAllSelected = false;
+                selectAllBtn.textContent = '全选';
+            }
+        }
+
+        // 全选/取消全选功能（基于可见项）
+        function toggleSelectAllEmployees() {
+            const selectAllBtn = document.getElementById('selectAllBtn');
+            // 使用修复的可见性检查函数
+            const visibleCheckboxes = getVisibleEmployeeCheckboxes();
+            
+            if (visibleCheckboxes.length === 0) {
+                return;
+            }
+            
+            // 检查当前是否全部可见项都已选中
+            const allVisibleSelected = visibleCheckboxes.every(cb => cb.checked);
+            
+            // 切换全选状态
+            isAllSelected = !allVisibleSelected;
+            
+            // 更新按钮文本
+            selectAllBtn.textContent = isAllSelected ? '取消全选' : '全选';
+            
+            // 仅操作可见的复选框
+            visibleCheckboxes.forEach(checkbox => {
+                try {
+                    checkbox.checked = isAllSelected;
+                    const employeeItem = checkbox.closest('.employee-item');
+                    if (employeeItem) {
+                        if (checkbox.checked) {
+                            selectedEmployees.add(checkbox.value);
+                            employeeItem.classList.add('selected');
+                        } else {
+                            selectedEmployees.delete(checkbox.value);
+                            employeeItem.classList.remove('selected');
+                        }
+                    }
+                } catch (error) {
+
+                }
+            });
+            
+
+        }
+
+        // 反选功能（基于可见项）
+        function selectInverseEmployees() {
+            const visibleCheckboxes = getVisibleEmployeeCheckboxes();
+            
+            if (visibleCheckboxes.length === 0) {
+
+                return;
+            }
+            
+            // 仅对可见的复选框进行反选操作
+            visibleCheckboxes.forEach(checkbox => {
+                checkbox.checked = !checkbox.checked;
+                const employeeItem = checkbox.closest('.employee-item');
+                if (checkbox.checked) {
+                    selectedEmployees.add(checkbox.value);
+                    employeeItem.classList.add('selected');
+                } else {
+                    selectedEmployees.delete(checkbox.value);
+                    employeeItem.classList.remove('selected');
+                }
+                
+                // 触发change事件确保其他监听器正常工作
+                const event = new Event('change', { bubbles: true });
+                checkbox.dispatchEvent(event);
+            });
+            
+            // 检查并更新全选按钮状态
+            updateSelectAllButtonState();
+            
+
+        }
+
+        // 播放成功提示音
+        function playSuccessSound() {
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                function playTone(frequency, startTime, duration, type = 'sine') {
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+
+                    oscillator.frequency.value = frequency;
+                    oscillator.type = type;
+
+                    gainNode.gain.setValueAtTime(0, startTime);
+                    gainNode.gain.linearRampToValueAtTime(0.3, startTime + 0.02);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+
+                    oscillator.start(startTime);
+                    oscillator.stop(startTime + duration);
+                }
+
+                const now = audioContext.currentTime;
+                playTone(523.25, now, 0.15);
+                playTone(750, now + 0.15, 0.3);
+                
+                console.log('成功提示音已播放');
+            } catch (e) {
+                console.log('音频播放失败:', e);
+            }
+        }
+
+        // 显示通知
+        function showNotification(message, isError = false) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = isError ? 'notification error' : 'notification';
+            notification.style.display = 'block';
+            
+            if (message === '记账成功！') {
+                playSuccessSound();
+            }
+            
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
+        }
+
+        // 显示添加员工模态框
+        function showAddEmployeeModal() {
+            const modal = document.getElementById('addEmployeeModal');
+            const inactiveList = document.getElementById('inactiveEmployeesList');
+            inactiveList.innerHTML = '';
+            
+            // 设置容器样式，限制高度并添加滚动
+            inactiveList.style.height = '320px';
+            inactiveList.style.overflowY = 'auto';
+            inactiveList.style.overflowX = 'hidden';
+
+            // 创建表格结构
+            inactiveList.innerHTML = `
+                <table class="employee-table" style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th style="width: 30px; background-color: #f2f2f2; color: #ED7D31; padding: 5px; border: 1px solid #ddd;"></th>
+                            <th style="background-color: #f2f2f2; color: #ED7D31; padding: 5px; border: 1px solid #ddd;">工号</th>
+                            <th style="background-color: #f2f2f2; color: #ED7D31; padding: 5px; border: 1px solid #ddd;">姓名</th>
+                            <th style="background-color: #f2f2f2; color: #ED7D31; padding: 5px; border: 1px solid #ddd;">状态</th>
+                        </tr>
+                    </thead>
+                    <tbody id="employeeTableBody"></tbody>
+                </table>
+            `;
+            
+            const tableBody = document.getElementById('employeeTableBody');
+            
+            inactiveEmployees.forEach((emp, index) => {
+                const row = document.createElement('tr');
+                // 设置交替行颜色
+                row.style.backgroundColor = index % 2 === 0 ? '#DDEBF7' : 'white';
+                row.style.border = '1px solid #ddd';
+                
+                row.innerHTML = `
+                    <td style="padding: 5px; border: 1px solid #ddd; text-align: center;">
+                        <input type="checkbox" value="${emp.ID}" data-name="${emp.姓名}" data-status="${emp.状态}" data-emp-code="${emp.工号}">
+                    </td>
+                    <td style="padding: 5px; border: 1px solid #ddd; text-align: center;">${emp.工号}</td>
+                    <td style="color: #000000; padding: 5px; border: 1px solid #ddd; text-align: center;">${emp.姓名}</td>
+                    <td style="padding: 5px; border: 1px solid #ddd; text-align: center;">
+                        <span class="${getStatusClass(emp.状态)}">${emp.状态}</span>
+                    </td>
+                `;
+                
+                // 保存原始背景色
+                const originalBgColor = index % 2 === 0 ? '#DDEBF7' : 'white';
+                
+                // 绑定行点击事件
+                row.addEventListener('click', function(e) {
+                    // 如果点击的不是复选框，则切换复选框状态
+                    if (e.target.type !== 'checkbox') {
+                        const checkbox = this.querySelector('input[type="checkbox"]');
+                        checkbox.checked = !checkbox.checked;
+                        // 根据复选框状态设置行背景色
+                        if (checkbox.checked) {
+                            this.style.backgroundColor = '#E74C3C'; // 选中时的深红色背景
+                        } else {
+                            this.style.backgroundColor = originalBgColor; // 恢复原始背景色
+                        }
+                        // 触发change事件
+                        const event = new Event('change');
+                        checkbox.dispatchEvent(event);
+                    }
+                });
+                
+                tableBody.appendChild(row);
+            });
+            
+            // 添加状态样式函数
+            function getStatusClass(status) {
+                if (status.includes('隐藏')) return 'hidden-status';
+                if (status.includes('离职')) return 'resigned-status';
+                if (status.includes('结清')) return 'settled-status';
+                return '';
+            }
+
+            modal.style.display = 'flex';
+            
+            // 绑定添加员工模态框关闭事件
+            const addEmployeeModal = document.getElementById('addEmployeeModal');
+            if (addEmployeeModal) {
+                // 点击模态框外部关闭
+                addEmployeeModal.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        hideAddEmployeeModal();
+                    }
+                });
+                
+                // 确保关闭按钮事件绑定
+                const closeBtn = addEmployeeModal.querySelector('.modal-close');
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        hideAddEmployeeModal();
+                    });
+                }
+            }
+        }
+
+        // 隐藏添加员工模态框
+        function hideAddEmployeeModal() {
+            const modal = document.getElementById('addEmployeeModal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // 添加选中的员工
+        function addSelectedEmployees() {
+            const checkboxes = document.querySelectorAll('#inactiveEmployeesList input[type="checkbox"]:checked');
+            if (checkboxes.length === 0) {
+                showNotification('请选择要添加的员工', true);
+                return;
+            }
+
+            checkboxes.forEach(checkbox => {
+                const empId = checkbox.value;
+                const empName = checkbox.dataset.name;
+                const empStatus = checkbox.dataset.status;
+                const empCode = checkbox.dataset.empCode;
+
+                // 添加到员工列表，插入到添加按钮之前
+                const employeeList = document.getElementById('employeeList');
+                const employeeItem = document.createElement('div');
+                employeeItem.className = 'employee-item';
+                employeeItem.dataset.employeeId = empId;
+                employeeItem.innerHTML = `
+                    <input type="checkbox" value="${empId}"> 
+                    <div class="employee-info">
+                        <div class="employee-id" style="color: #FAAD14;">${empCode}</div>
+                        <div style="color: #FAAD14; width: 45px;">${empName}</div>
+                    </div>
+                `;
+                
+                // 找到添加按钮元素，将新员工插入到添加按钮之前
+                const addButtonElement = employeeList.querySelector('.add-button').closest('.employee-item');
+                if (addButtonElement) {
+                    employeeList.insertBefore(employeeItem, addButtonElement);
+                } else {
+                    // 如果找不到添加按钮，就添加到列表末尾
+                    employeeList.appendChild(employeeItem);
+                }
+
+                // 绑定点击事件到整个员工项
+                employeeItem.addEventListener('click', function(e) {
+                    // 如果点击的不是复选框，则切换复选框状态
+                    if (e.target.type !== 'checkbox') {
+                        const checkbox = this.querySelector('input[type="checkbox"]');
+                        checkbox.checked = !checkbox.checked;
+                        // 触发change事件
+                        const event = new Event('change');
+                        checkbox.dispatchEvent(event);
+                    }
+                });
+
+                // 绑定复选框事件
+                const newCheckbox = employeeItem.querySelector('input[type="checkbox"]');
+                newCheckbox.addEventListener('change', function() {
+                    const employeeItem = this.closest('.employee-item');
+                    if (this.checked) {
+                        selectedEmployees.add(this.value);
+                        employeeItem.classList.add('selected');
+                    } else {
+                        selectedEmployees.delete(this.value);
+                        employeeItem.classList.remove('selected');
+                    }
+                });
+            });
+
+            hideAddEmployeeModal();
+            // 静默执行，不显示添加成功的提示信息
+        }
+
+        // 删除选中的员工
+        function showConfirmModal(title, message, confirmCallback) {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h3 style="color: #ED7D31;">${title}</h3>
+                    <p>${message}</p>
+                    <div class="form-buttons" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-top: 20px;">
+                        <button id="confirmAction" style="background-color: #52c41a; margin-left: 0;">确认</button>
+                        <button id="cancelAction" style="background-color: #f5222d; margin-right: 0;">取消</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            document.getElementById('confirmAction').addEventListener('click', function() {
+                confirmCallback();
+                modal.remove();
+            });
+            
+            document.getElementById('cancelAction').addEventListener('click', function() {
+                modal.remove();
+            });
+        }
+
+        function deleteSelectedEmployees() {
+            const selectedItems = document.querySelectorAll('.employee-item.selected');
+            if(selectedItems.length === 0) {
+                showNotification('请先选中要删除的员工！', true);
+                return;
+            }
+            
+            // 显示确认模态框
+            showConfirmModal(
+                '确认删除', 
+                `确定要删除选中的${selectedItems.length}名员工吗？`, 
+                function() {
+                    // 确认删除
+                    selectedItems.forEach(item => {
+                        item.remove();
+                    });
+                    selectedEmployees.clear();
+                    
+                    // 重置全选按钮状态
+                    isAllSelected = false;
+                    const selectAllBtn = document.getElementById('selectAllBtn');
+                    selectAllBtn.textContent = '全选';
+                    
+                    showNotification('员工删除成功！', true);
+                }
+            );
+        }
+
+        // 绑定事件监听器
+        document.addEventListener('DOMContentLoaded', function() {
+            // 员工相关按钮事件
+            document.getElementById('selectAllBtn').addEventListener('click', toggleSelectAllEmployees);
+            document.getElementById('selectInverseBtn').addEventListener('click', selectInverseEmployees);
+
+            // 模态框事件
+            document.getElementById('confirmAddEmployees').addEventListener('click', addSelectedEmployees);
+            document.getElementById('cancelAddEmployees').addEventListener('click', hideAddEmployeeModal);
+
+            // 模态框关闭按钮
+            document.querySelector('#addEmployeeModal .close').addEventListener('click', hideAddEmployeeModal);
+
+            // 点击模态框外部关闭
+            document.getElementById('addEmployeeModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    hideAddEmployeeModal();
+                }
+            });
+
+            // 员工数据获取已移至init()函数中处理
+        });
+    </script>
+
+    <!-- 添加员工模态框 -->
+    <div id="addEmployeeModal" class="modal">
+        <div class="modal-content">
+            <h3 style="color: #ED7D31;">添加员工</h3>
+            <span class="close" style="position: absolute; top: 10px; right: 10px; font-size: 20px; cursor: pointer;">&times;</span>
+            <div id="inactiveEmployeesList">
+                <!-- 非在职员工列表将通过JavaScript动态添加 -->
+            </div>
+            <div class="form-buttons" style="display: flex; justify-content: space-between;">
+                <button id="confirmAddEmployees" style="order: 1;">确认添加</button>
+                <button id="cancelAddEmployees" style="order: 2;">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <!-- 金额输入区域 -->
+    <div class="form-row" style="margin-top: 20px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+                <label style="color: black; font-weight: bold; margin: 0; white-space: nowrap;">金额：</label>
+                <input type="text" id="amountInput" placeholder="*请输入金额" 
+                       style="width: 175px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px; font-weight: bold; flex-shrink: 0; background-color: white;"
+                       list="amountMemoryList" autocomplete="on"
+                       onfocus="this.setAttribute('placeholder', ''); this.style.fontWeight = 'bold'; loadAmountMemory();"
+                       onblur="saveAmountToMemory(); this.setAttribute('placeholder', '*请输入金额'); this.style.fontWeight = 'bold';"
+                       oninput="setTimeout(() => filterAmountMemory(), 100);" 
+                       pattern="^\d+(\.\d{1,2})?$" title="请输入有效的金额，最多两位小数">
+                <span style="font-size: 16px; color: #666; white-space: nowrap;">元</span>
+                <datalist id="amountMemoryList"></datalist>
+            </div>
+        <style>
+            #amountInput::placeholder {
+                color: red;
+                opacity: 1;
+                font-weight: normal;
+            }
+            #amountInput:-webkit-autofill,
+            #amountInput:-webkit-autofill:hover,
+            #amountInput:-webkit-autofill:focus,
+            #amountInput:-webkit-autofill:active {
+                background-color: white !important;
+                -webkit-box-shadow: 0 0 0 30px white inset !important;
+                -webkit-text-fill-color: black !important;
+            }
+            #amountInput:autofill,
+            #amountInput:autofill:hover,
+            #amountInput:autofill:focus,
+            #amountInput:autofill:active {
+                background-color: white !important;
+                box-shadow: 0 0 0 30px white inset !important;
+                -webkit-text-fill-color: black !important;
+            }
+            datalist {
+                max-height: 200px;
+                overflow-y: auto;
+            }
+            option {
+                padding: 8px;
+                cursor: pointer;
+                background-color: white;
+            }
+            option:hover {
+                background-color: #f0f0f0;
+            }
+        </style>
+    </div>
+
+    <!-- 付款输入区域 (动态显示) -->
+    <div id="paymentSection" style="display: none;">
+        <div class="form-row" style="margin-top: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label style="color: black; font-weight: bold; margin: 0; white-space: nowrap;">付款：</label>
+                <input type="text" id="paymentInput" placeholder="*请输入付款人姓名"
+                       style="width: 175px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px; font-weight: bold; flex-shrink: 0; background-color: white;"
+                       onfocus="this.setAttribute('placeholder', ''); this.style.fontWeight = 'bold'; loadPaymentMemory();"
+                       onblur="this.setAttribute('placeholder', '*请输入付款人姓名'); this.style.fontWeight = 'bold'; savePaymentToMemory();"
+                       oninput="setTimeout(() => filterPaymentMemory(), 100);"
+                       list="paymentMemoryList" autocomplete="on">
+                <datalist id="paymentMemoryList"></datalist>
+            </div>
+            <style>
+                #paymentInput::placeholder {
+                    color: red;
+                    opacity: 1;
+                    font-weight: normal;
+                }
+                #paymentInput:-webkit-autofill,
+                #paymentInput:-webkit-autofill:hover,
+                #paymentInput:-webkit-autofill:focus,
+                #paymentInput:-webkit-autofill:active {
+                    background-color: white !important;
+                    -webkit-box-shadow: 0 0 0 30px white inset !important;
+                    -webkit-text-fill-color: black !important;
+                }
+                #paymentInput:autofill,
+                #paymentInput:autofill:hover,
+                #paymentInput:autofill:focus,
+                #paymentInput:autofill:active {
+                    background-color: white !important;
+                    box-shadow: 0 0 0 30px white inset !important;
+                    -webkit-text-fill-color: black !important;
+                }
+            </style>
+        </div>
+    </div>
+
+    <!-- 备注输入区域 -->
+    <div class="form-row">
+        <div>
+            <label for="remark" style="margin-bottom: 0; white-space: nowrap; font-weight: bold;">备注：</label>
+            <textarea id="remark" style="width: 40%; min-height: 55px; height: 55px; border: 1px solid #ddd; border-radius: 4px; padding: 8px; font-size: 16px; font-weight: bold;" 
+                      placeholder="请输入备注"></textarea>
+        </div>
+    </div>
+
+    <style>
+        @media (max-width: 768px) {
+            #remark {
+                width: 100% !important;
+            }
+        }
+    </style>
+
+    <!-- 图片上传区域 -->
+    <div class="form-row">
+        <div>
+            <label style="font-weight: bold;">图片：</label>
+            <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+        </div>
+    </div>
+
+    <script>
+        
+        // 初始化全局图片数组
+        window.selectedImages = [];
+        // 初始化全局图片URL数组，用于存储原始URL
+        window.selectedImageUrls = [];
+        
+        // 压缩图片函数
+        function processImage(file) {
+            return new Promise((resolve, reject) => {
+                try {
+                    // 检查file是否为有效的File或Blob对象
+                    if (!file || typeof file !== 'object' || !(file instanceof File || file instanceof Blob)) {
+                        reject(new Error('无效的图片文件对象'));
+                        return;
+                    }
+                    
+                    // 检查文件类型是否为图片
+                    if (!file.type || !file.type.startsWith('image/')) {
+                        reject(new Error('不是有效的图片类型'));
+                        return;
+                    }
+                    
+                    new Compressor(file, {
+                        quality: 0.7,
+                        maxWidth: 1920,
+                        maxHeight: 1080,
+                        success(result) {
+                            const reader = new FileReader();
+                            reader.readAsDataURL(result);
+                            reader.onload = function(e) {
+                                resolve({
+                                    dataURL: e.target.result,
+                                    blob: result,
+                                    width: 0,
+                                    height: 0
+                                });
+                            };
+                            reader.onerror = function() {
+                                reject(new Error('文件读取失败'));
+                            };
+                        },
+                        error(err) {
+                            reject(err);
+                        }
+                    });
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        }
+        
+        // 清除图片函数（清除所有微缩框图片）
+        window.clearImage = function() {
+            // 清空全局图片数组
+            window.selectedImages = [];
+            window.selectedImageUrls = [];
+            
+            const container = document.getElementById('imageUploadContainer');
+            if (container) {
+                // 保留添加按钮，删除所有预览图片
+                const items = container.querySelectorAll('.image-preview-item');
+                items.forEach(item => item.remove());
+            }
+            document.getElementById('imageUpload').value = '';
+            document.getElementById('imageModal').style.display = 'none';
+        }
+        
+        // 下载图片链接到File对象 - 优化版，处理跨域问题
+        // 图片加载函数，根据网络状态决定加载方式
+        function loadImageWithFallback(url, index) {
+            const isOnline = navigator.onLine;
+            
+            if (isOnline) {
+                // 在线模式：只从在线获取图片
+                tryGetImageFromOnline(url, index)
+                    .then(onlineFile => {
+                        // 在线获取成功，不需要处理，因为tryGetImageFromOnline已经添加到selectedImages
+                    })
+                    .catch(error => {
+                        console.log('在线获取图片失败:', error);
+                        // 在线模式下获取失败，创建错误占位图
+                        createErrorPlaceholder(url, index);
+                    });
+            } else {
+                // 离线模式：只从本地获取图片
+                tryGetImageFromLocal(url, index)
+                    .then(localFile => {
+                        if (localFile) {
+                            // 成功从本地获取
+                            window.selectedImages.push(localFile);
+                            renderImagePreview(localFile, window.selectedImages.length - 1);
+                        } else {
+                            // 本地也没有，创建错误占位图
+                            createErrorPlaceholder(url, index);
+                        }
+                    })
+                    .catch(localError => {
+                        console.error('本地获取图片失败:', localError);
+                        // 创建错误占位图
+                        createErrorPlaceholder(url, index);
+                    });
+            }
+        }
+        
+        // 从本地缓存获取图片
+        function tryGetImageFromLocal(url, index) {
+            return new Promise((resolve, reject) => {
+                try {
+                    // 检查URL是否以local://开头
+                    if (url.startsWith('local://')) {
+                        // 从local://URL中提取imageId
+                        const imageId = url.replace('local://', '');
+                        
+                        // 从localStorage获取图片数据
+                        const imageDataStr = localStorage.getItem(imageId);
+                        if (imageDataStr) {
+                            try {
+                                const imageData = JSON.parse(imageDataStr);
+                                if (imageData && imageData.dataUrl) {
+                                    // 使用dataUrl创建Blob和File对象
+                                    const byteString = atob(imageData.dataUrl.split(',')[1]);
+                                    const mimeString = imageData.dataUrl.split(',')[0].split(':')[1].split(';')[0];
+                                    const ab = new ArrayBuffer(byteString.length);
+                                    const ia = new Uint8Array(ab);
+                                    for (let i = 0; i < byteString.length; i++) {
+                                        ia[i] = byteString.charCodeAt(i);
+                                    }
+                                    const blob = new Blob([ab], { type: mimeString });
+                                    const file = new File([blob], imageData.originalName || `local_image_${index}`, { type: mimeString });
+                                    resolve(file);
+                                    return;
+                                }
+                            } catch (parseError) {
+                                console.error('解析local://图片数据失败:', parseError);
+                            }
+                        }
+                    }
+                    
+                    // 尝试从localStorage获取本地缓存的图片
+                    const settlementId = window.currentSettlementId;
+                    if (!settlementId) {
+                        resolve(null);
+                        return;
+                    }
+                    
+                    // 构建本地存储键名
+                    const localImageKey = `local_image_${settlementId}_${index}`;
+                    const cachedImageData = localStorage.getItem(localImageKey);
+                    
+                    if (cachedImageData) {
+                        try {
+                            const cachedImage = JSON.parse(cachedImageData);
+                            if (cachedImage && cachedImage.data && cachedImage.name) {
+                                // 将base64数据转换为File对象
+                                const base64Data = cachedImage.data.split(',')[1];
+                                const byteCharacters = atob(base64Data);
+                                const byteNumbers = new Array(byteCharacters.length);
+                                for (let i = 0; i < byteCharacters.length; i++) {
+                                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                                }
+                                const byteArray = new Uint8Array(byteNumbers);
+                                const blob = new Blob([byteArray], { type: cachedImage.type || 'image/jpeg' });
+                                const file = new File([blob], cachedImage.name, { type: cachedImage.type || 'image/jpeg' });
+                                resolve(file);
+                                return;
+                            }
+                        } catch (parseError) {
+                            console.error('解析本地缓存图片失败:', parseError);
+                        }
+                    }
+                    
+                    // 尝试从离线同步队列中获取图片
+                    const syncQueue = localStorage.getItem('offlineSyncQueue');
+                    if (syncQueue) {
+                        try {
+                            const queue = JSON.parse(syncQueue);
+                            const imageItem = queue.find(item => 
+                                item.type === 'upload_image' && 
+                                item.data && 
+                                item.data.localPath === url
+                            );
+                            
+                            if (imageItem && imageItem.imageData) {
+                                // 从同步队列中获取图片数据
+                                const imageData = imageItem.imageData;
+                                const byteCharacters = atob(imageData.split(',')[1]);
+                                const byteNumbers = new Array(byteCharacters.length);
+                                for (let i = 0; i < byteCharacters.length; i++) {
+                                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                                }
+                                const byteArray = new Uint8Array(byteNumbers);
+                                const blob = new Blob([byteArray], { type: 'image/jpeg' });
+                                const file = new File([blob], imageItem.fileName || `image_${index}.jpg`, { type: 'image/jpeg' });
+                                resolve(file);
+                                return;
+                            }
+                        } catch (queueError) {
+                            console.error('从同步队列获取图片失败:', queueError);
+                        }
+                    }
+                    
+                    resolve(null);
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        }
+        
+        // 从在线获取图片
+        function tryGetImageFromOnline(url, index) {
+            return new Promise((resolve, reject) => {
+                // 先添加一个空的占位符，确保数组索引正确
+                window.selectedImages.push(null);
+                window.selectedImageUrls.push(null);
+            
+            // 检查URL协议，如果是local://协议，直接调用downloadImageToDataURL处理
+            if (url.startsWith('local://')) {
+                // 直接使用downloadImageToDataURL处理本地图片
+                downloadImageToDataURL(url).then(file => {
+                    // 移除占位符
+                    window.selectedImages.pop();
+                    window.selectedImageUrls.pop();
+                    
+                    if (file) {
+                        // 添加到全局图片数组
+                        window.selectedImages.push(file);
+                        // 添加原始URL到URL数组
+                        window.selectedImageUrls.push(url);
+                        
+                        // 创建图片预览
+                        renderImagePreview(file, window.selectedImages.length - 1);
+                        
+                        // 缓存图片到本地，以备下次使用
+                        cacheImageToLocal(url, file, index);
+                        
+                        resolve(file);
+                    } else {
+                        reject(new Error('本地图片处理失败：文件为空'));
+                    }
+                }).catch(error => {
+                    console.error('本地图片处理失败:', error);
+                    // 移除占位符
+                    window.selectedImages.pop();
+                    window.selectedImageUrls.pop();
+                    // 尝试创建一个错误占位图
+                    createErrorPlaceholder(url, index);
+                    reject(error);
+                });
+            } else {
+                // 正常URL，使用fetch处理
+                fetch(url)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.blob();
+                    })
+                    .then(blob => {
+                        // 移除占位符
+                        window.selectedImages.pop();
+                        window.selectedImageUrls.pop();
+                        
+                        // 使用优化后的图片下载函数
+                        downloadImageToDataURL(url).then(file => {
+                            if (file) {
+                                // 添加到全局图片数组
+                                window.selectedImages.push(file);
+                                // 添加原始URL到URL数组
+                                window.selectedImageUrls.push(url);
+                                
+                                // 创建图片预览
+                                renderImagePreview(file, window.selectedImages.length - 1);
+                                
+                                // 缓存图片到本地，以备下次使用
+                                cacheImageToLocal(url, file, index);
+                                
+                                resolve(file);
+                            } else {
+                                reject(new Error('在线图片处理失败：文件为空'));
+                            }
+                        }).catch(error => {
+                            console.error('在线图片处理失败:', error);
+                            // 在线获取也失败，移除占位符
+                            window.selectedImages.pop();
+                            window.selectedImageUrls.pop();
+                            // 尝试创建一个错误占位图
+                            createErrorPlaceholder(url, index);
+                            reject(error);
+                        });
+                    }).catch(error => {
+                    console.error('在线获取图片失败:', error);
+                    // 移除占位符
+                    window.selectedImages.pop();
+                    window.selectedImageUrls.pop();
+                    // 尝试创建一个错误占位图
+                    createErrorPlaceholder(url, index);
+                    reject(error);
+                });
+            }
+        });
+        }
+        
+        // 缓存图片到本地
+        function cacheImageToLocal(url, file, index) {
+            try {
+                const settlementId = window.currentSettlementId;
+                if (!settlementId) {
+                    console.warn('没有settlementId，跳过图片缓存');
+                    return;
+                }
+                
+                // 检查URL是否已经是本地缓存（避免重复缓存）
+                if (url.startsWith('data:') || url.startsWith('blob:')) {
+                    console.log('本地图片URL，跳过缓存:', url);
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const localImageKey = `local_image_${settlementId}_${index}`;
+                        const imageData = {
+                            name: file.name,
+                            type: file.type,
+                            data: e.target.result,
+                            originalUrl: url,
+                            timestamp: Date.now()
+                        };
+                        
+                        localStorage.setItem(localImageKey, JSON.stringify(imageData));
+                    } catch (cacheError) {
+                        console.error('缓存图片到本地失败:', cacheError);
+                    }
+                };
+                reader.readAsDataURL(file);
+            } catch (error) {
+                console.error('缓存图片失败:', error);
+            }
+        }
+        
+        // 创建错误占位图
+        function createErrorPlaceholder(url, index) {
+            try {
+                // 创建一个简单的错误占位图
+                const canvas = document.createElement('canvas');
+                canvas.width = 200;
+                canvas.height = 200;
+                const ctx = canvas.getContext('2d');
+                
+                // 绘制背景
+                ctx.fillStyle = '#f5f5f5';
+                ctx.fillRect(0, 0, 200, 200);
+                
+                // 绘制错误图标
+                ctx.fillStyle = '#ff4d4f';
+                ctx.font = '60px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('🖼️', 100, 80);
+                
+                // 绘制错误文本
+                ctx.fillStyle = '#666';
+                ctx.font = '14px Arial';
+                ctx.fillText('图片加载失败', 100, 120);
+                ctx.font = '12px Arial';
+                ctx.fillText('请检查网络连接', 100, 140);
+                
+                // 转换为File对象
+                canvas.toBlob(blob => {
+                    if (blob) {
+                        const file = new File([blob], `error_placeholder_${index}.png`, { type: 'image/png' });
+                        window.selectedImages.push(file);
+                        renderImagePreview(file, window.selectedImages.length - 1);
+                    }
+                }, 'image/png');
+            } catch (error) {
+                console.error('创建错误占位图失败:', error);
+            }
+        }
+        
+        function downloadImageToDataURL(imageUrl) {
+            return new Promise((resolve, reject) => {
+                try {
+                    // 从URL中解析图片名称
+                    let originalName = '';
+                    
+                    // 首先尝试从URL的最后一部分获取文件名
+                    const urlParts = imageUrl.split('/');
+                    let lastPart = urlParts[urlParts.length - 1];
+                    
+                    // 去除URL参数和哈希值
+                    lastPart = lastPart.split('?')[0].split('#')[0];
+                    
+                    // 解码URL编码的字符
+                    lastPart = decodeURIComponent(lastPart);
+                    
+                    // 提取实际的文件名（不包含路径）
+                    originalName = lastPart.split('/').pop();
+                    
+                    // 检查URL协议，如果是local://协议，从localStorage获取图片数据
+                    if (imageUrl.startsWith('local://')) {
+                        try {
+                            // 从local://URL中提取imageId
+                            const imageId = imageUrl.replace('local://', '');
+                            
+                            // 从localStorage获取图片数据
+                            const imageDataStr = localStorage.getItem(imageId);
+                            if (imageDataStr) {
+                                const imageData = JSON.parse(imageDataStr);
+                                
+                                // 使用dataUrl创建Blob
+                                fetch(imageData.dataUrl)
+                                    .then(response => response.blob())
+                                    .then(blob => {
+                                        // 创建File对象
+                                        const file = new File([blob], imageData.originalName || originalName, { type: blob.type });
+                                        resolve(file);
+                                    })
+                                    .catch(error => {
+                                        console.error('处理本地图片数据失败:', error);
+                                        reject(error);
+                                    });
+                            } else {
+                                reject(new Error('本地图片数据不存在'));
+                            }
+                        } catch (error) {
+                            console.error('处理local://URL失败:', error);
+                            reject(error);
+                        }
+                    } else if (imageUrl.startsWith('blob://')) {
+                        try {
+                            // 创建图片对象
+                            const img = new Image();
+                            img.crossOrigin = 'anonymous';
+                            
+                            img.onload = function() {
+                                // 创建canvas
+                                const canvas = document.createElement('canvas');
+                                canvas.width = img.width;
+                                canvas.height = img.height;
+                                const ctx = canvas.getContext('2d');
+                                ctx.drawImage(img, 0, 0);
+                                
+                                // 转换为Blob
+                                canvas.toBlob((blob) => {
+                                    if (blob) {
+                                        // 创建File对象
+                                        const file = new File([blob], originalName, { type: blob.type });
+                                        resolve(file);
+                                    } else {
+                                        reject(new Error('Failed to create blob from canvas'));
+                                    }
+                                }, img.src.split(';')[0].split(':')[1] || 'image/png');
+                            };
+                            
+                            img.onerror = function(error) {
+                                console.error('加载blob图片失败:', error);
+                                reject(new Error('Failed to load blob image'));
+                            };
+                            
+                            // 设置图片源
+                            img.src = imageUrl;
+                        } catch (error) {
+                            console.error('处理blob图片失败:', error);
+                            reject(error);
+                        }
+                    } else {
+                        // 正常URL，使用fetch处理
+                        fetch(imageUrl)
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error(`HTTP error! status: ${response.status}`);
+                                }
+                                return response.blob();
+                            })
+                            .then(blob => {
+                                // 创建File对象
+                                const file = new File([blob], originalName, { type: blob.type });
+                                resolve(file);
+                            })
+                            .catch(error => {
+                                console.error('下载图片失败:', error);
+                                // 如果下载失败，尝试使用canvas方式
+                                fallbackImageLoad(imageUrl, originalName, resolve, reject);
+                            });
+                    }
+                } catch (error) {
+                    console.error('图片处理失败:', error);
+                    reject(error);
+                }
+            });
+        }
+        
+        // 传统图片加载方式作为备选方案
+        function fallbackImageLoad(imageUrl, originalName, resolve, reject) {
+            try {
+                // 创建图片对象
+                const img = new Image();
+                img.crossOrigin = 'anonymous'; // 处理跨域问题
+                
+                img.onload = function() {
+                    try {
+                        // 创建 canvas 来转换图片为 DataURL
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        // 设置 canvas 尺寸
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        
+                        // 绘制图片
+                        ctx.drawImage(img, 0, 0);
+                        
+                        // 转换为 DataURL
+                        const dataURL = canvas.toDataURL('image/jpeg', 0.8);
+                        
+                        // 从DataURL创建Blob对象
+                        fetch(dataURL) // 使用fetch获取Blob
+                            .then(response => response.blob())
+                            .then(blob => {
+                                // 创建带有原始文件名的File对象
+                                const file = new File([blob], originalName, {
+                                    type: blob.type,
+                                    lastModified: Date.now()
+                                });
+                                resolve(file);
+                            })
+                            .catch(error => {
+                                console.error('从DataURL创建Blob失败:', error);
+                                reject(error);
+                            });
+                    } catch (error) {
+                        console.error('转换图片为 DataURL 失败:', error);
+                        reject(error);
+                    }
+                };
+                
+                img.onerror = function(error) {
+                    console.error('备选方案加载图片失败:', imageUrl, error);
+                    reject(new Error('图片加载失败'));
+                };
+                
+                // 开始加载图片
+                img.src = imageUrl;
+                
+            } catch (error) {
+                console.error('备选方案下载图片失败:', error);
+                reject(error);
+            }
+        }
+        
+        // 渲染单个图片预览 - 参考记工流水实现
+        function renderImagePreview(file, index) {
+            const container = document.getElementById('imageUploadContainer');
+            if (!container) return;
+            
+            const initialItem = container.querySelector('.image-upload-item');
+            
+            const previewItem = document.createElement('div');
+            previewItem.className = 'image-preview-item';
+            previewItem.style.position = 'relative';
+            previewItem.style.width = '100px';
+            previewItem.style.height = '100px';
+            previewItem.style.borderRadius = '4px';
+            previewItem.style.overflow = 'hidden';
+            previewItem.style.border = '1px solid #ddd';
+            
+            // 保存文件索引
+            previewItem.dataset.fileIndex = index;
+            
+            // 创建临时URL，支持File/Blob对象和URL字符串
+            let tempUrl;
+            let isUrl = false;
+            
+            if (file instanceof File || file instanceof Blob) {
+                // 如果是File或Blob对象，创建本地URL
+                tempUrl = URL.createObjectURL(file);
+            } else if (typeof file === 'string' && (file.startsWith('http') || file.startsWith('blob:'))) {
+                // 如果是URL字符串，直接使用
+                tempUrl = file;
+                isUrl = true;
+            } else if (file && file.url && typeof file.url === 'string') {
+                // 如果是包含url属性的对象，使用url属性
+                tempUrl = file.url;
+                isUrl = true;
+            } else {
+                console.error('无效的图片对象:', file);
+                return;
+            }
+            
+            // 创建图片预览
+            const previewImg = document.createElement('img');
+            previewImg.src = tempUrl;
+            previewImg.style.width = '100%';
+            previewImg.style.height = '100%';
+            previewImg.style.objectFit = 'cover';
+            previewImg.style.cursor = 'pointer';
+            
+            // 设置alt属性为文件名，用于图片对比
+            if (file instanceof File || file instanceof Blob) {
+                previewImg.alt = file.name;
+            } else if (typeof file === 'string') {
+                const parts = file.split('/');
+                previewImg.alt = decodeURIComponent(parts[parts.length - 1]);
+            } else if (file && file.name) {
+                previewImg.alt = file.name;
+            }
+            
+            // 查看大图功能
+            previewImg.addEventListener('click', function() {
+                const modal = document.getElementById('imageModal');
+                modal.innerHTML = `
+                    <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2001;" 
+                         onclick="if(event.target === this) document.getElementById('imageModal').style.display='none'">
+                        <img id="draggableImage" src="${tempUrl}" 
+                             style="max-width: 90%; max-height: 90%; position: absolute; cursor: move; top: 50%; left: 50%; transform: translate(-50%, -50%);"
+                             ondragstart="return false;">
+                        <button onclick="document.getElementById('imageModal').style.display='none'" 
+                                style="position: fixed; top: 20px; right: 20px; background: #f5222d; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; z-index: 2002;">×</button>
+                    </div>
+                `;
+                modal.style.display = 'block';
+                
+                // 图片拖动功能
+                const img = document.getElementById('draggableImage');
+                let isDragging = false;
+                let offsetX, offsetY;
+                let scale = 1; // 初始缩放比例
+
+                img.addEventListener('mousedown', function(e) {
+                    isDragging = true;
+                    offsetX = e.clientX - img.getBoundingClientRect().left;
+                    offsetY = e.clientY - img.getBoundingClientRect().top;
+                    img.style.cursor = 'grabbing';
+                });
+
+                document.addEventListener('mousemove', function(e) {
+                    if (!isDragging) return;
+                    img.style.left = (e.clientX - offsetX) + 'px';
+                    img.style.top = (e.clientY - offsetY) + 'px';
+                    img.style.transform = `scale(${scale})`;
+                });
+
+                document.addEventListener('mouseup', function() {
+                    isDragging = false;
+                    img.style.cursor = 'move';
+                });
+                
+                // 鼠标滚轮缩放功能
+                img.addEventListener('wheel', function(e) {
+                    e.preventDefault(); // 阻止页面滚动
+                    
+                    // 获取当前缩放值
+                    const delta = e.deltaY > 0 ? 0.9 : 1.1; // 向下滚动缩小，向上滚动放大
+                    const oldScale = scale;
+                    scale *= delta;
+                    
+                    // 限制缩放范围
+                    scale = Math.min(Math.max(0.5, scale), 3); // 最小0.5倍，最大3倍
+                    
+                    // 计算缩放后的位置，保持图片中心点在窗口中心
+                    const modalRect = img.parentElement.getBoundingClientRect();
+                    const centerX = modalRect.width / 2;
+                    const centerY = modalRect.height / 2;
+                    
+                    // 如果图片没有拖动过，则居中显示
+                    if (!img.style.left && !img.style.top) {
+                        img.style.left = centerX + 'px';
+                        img.style.top = centerY + 'px';
+                    }
+                    
+                    // 调整位置以保持中心点不变
+                    const currentLeft = parseFloat(img.style.left) || centerX;
+                    const currentTop = parseFloat(img.style.top) || centerY;
+                    
+                    img.style.left = currentLeft - (currentLeft - centerX) * (scale - oldScale) + 'px';
+                    img.style.top = currentTop - (currentTop - centerY) * (scale - oldScale) + 'px';
+                    
+                    // 应用缩放，并设置变换原点为图片中心
+                    img.style.transformOrigin = 'center';
+                    img.style.transform = `scale(${scale})`;
+                });
+            });
+            
+            // 删除按钮
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = '×';
+            deleteBtn.style.position = 'absolute';
+            deleteBtn.style.top = '5px';
+            deleteBtn.style.right = '5px';
+            deleteBtn.style.background = 'rgba(245, 34, 45, 0.9)';
+            deleteBtn.style.color = 'white';
+            deleteBtn.style.border = 'none';
+            deleteBtn.style.borderRadius = '50%';
+            deleteBtn.style.width = '24px';
+            deleteBtn.style.height = '24px';
+            deleteBtn.style.fontSize = '16px';
+            deleteBtn.style.cursor = 'pointer';
+            deleteBtn.style.display = 'flex';
+            deleteBtn.style.alignItems = 'center';
+            deleteBtn.style.justifyContent = 'center';
+            deleteBtn.style.padding = '0';
+            
+            // 删除图片功能
+            deleteBtn.addEventListener('click', function() {
+                // 获取文件索引
+                const fileIndex = parseInt(previewItem.dataset.fileIndex);
+                
+                // 从全局数组中移除
+                    if (!isNaN(fileIndex) && fileIndex >= 0 && fileIndex < window.selectedImages.length) {
+                        window.selectedImages.splice(fileIndex, 1);
+                        window.selectedImageUrls.splice(fileIndex, 1);
+                        
+                        // 只有在创建了对象URL时才释放它
+                        if (!isUrl) {
+                            URL.revokeObjectURL(tempUrl);
+                        }
+                        
+                        // 更新后续图片的索引
+                        const container = document.getElementById('imageUploadContainer');
+                        const previewItems = container.querySelectorAll('.image-preview-item');
+                        previewItems.forEach((item, idx) => {
+                            const itemIndex = parseInt(item.dataset.fileIndex);
+                            if (itemIndex > fileIndex) {
+                                item.dataset.fileIndex = itemIndex - 1;
+                            }
+                        });
+                    }
+                
+                // 移除预览元素
+                previewItem.remove();
+            });
+            
+            // 添加到预览微缩框
+            previewItem.appendChild(previewImg);
+            previewItem.appendChild(deleteBtn);
+            
+            // 插入到添加按钮之前
+            container.insertBefore(previewItem, initialItem);
+        }
+        
+        // 中文转英文的辅助函数 - 使用pinyin-pro库将中文转为拼音
+        function convertChineseToEnglish(str) {
+            if (!str) {
+                return 'image';
+            }
+            
+            let result = str;
+            
+            try {
+                // 检查pinyin-pro库是否可用
+                // 修复：pinyin-pro库的正确调用方式是pinyinPro.pinyin()
+                if (typeof window.pinyinPro !== 'undefined' && typeof window.pinyinPro.pinyin === 'function') {
+                    // 使用正确的调用方式：pinyinPro.pinyin()
+                    result = window.pinyinPro.pinyin(result, {
+                        tone: false,  // 不带声调
+                        type: 'string',  // 返回字符串
+                        separator: ''  // 空分隔符，生成连续的拼音
+                    });
+                    // 手动移除声调符号（库参数tone:false可能不生效）
+                    result = result
+                        .replace(/[āáǎà]/g, 'a')
+                        .replace(/[ōóǒò]/g, 'o')
+                        .replace(/[ēéěè]/g, 'e')
+                        .replace(/[īíǐì]/g, 'i')
+                        .replace(/[ūúǔù]/g, 'u')
+                        .replace(/[ǖǘǚǜü]/g, 'v')
+                        .replace(/[^a-zA-Z0-9_.-]/g, '_');
+                } else {
+                    // 如果pinyinPro库不可用，使用简单的中文转拼音映射
+                    const pinyinMap = {
+                        '你': 'ni', '好': 'hao',
+                        '图': 'tu', '片': 'pian',
+                        '考': 'kao', '勤': 'qin',
+                        '记': 'ji', '工': 'gong',
+                        '一': 'yi', '二': 'er', '三': 'san',
+                        '四': 'si', '五': 'wu',
+                        '六': 'liu', '七': 'qi',
+                        '八': 'ba', '九': 'jiu', '十': 'shi',
+                        '多': 'duo', 'QQ': 'QQ', '多多': 'duoduo', 'QQ多多': 'QQduoduo'
+                    };
+                    
+                    // 替换中文汉字为拼音
+                    let pinyinResult = '';
+                    for (let char of result) {
+                        if (pinyinMap[char]) {
+                            pinyinResult += pinyinMap[char] + '_';
+                        } else {
+                            pinyinResult += char;
+                        }
+                    }
+                    // 移除末尾的下划线
+                    result = pinyinResult.replace(/_$/, '');
+                }
+            } catch (error) {
+                console.error('中文转拼音失败:', error);
+            }
+            
+            // 移除连续的下划线
+            result = result.replace(/_+/g, '_');
+            
+            // 移除开头和结尾的下划线
+            result = result.replace(/^_|_$/g, '');
+            
+            // 确保生成的文件名不为空
+            if (!result || result.trim() === '') {
+                result = 'image';
+            }
+            
+            return result;
+        }
+        
+        // 初始化图片上传功能
+        function initImageUpload() {
+            // 检查是否已经初始化过图片上传功能
+            if (window.imageUploadInitialized) {
+                return;
+            }
+            
+            // 检查是否已经初始化过图片上传容器
+            if (document.getElementById('imageUploadContainer')) {
+                window.imageUploadInitialized = true;
+                return;
+            }
+            
+            // 获取图片表单组 - 通过查找包含图片标签的div
+            const labels = document.querySelectorAll('label');
+            let formGroup = null;
+            for (let label of labels) {
+                if (label.textContent.includes('图片')) {
+                    formGroup = label.closest('div');
+                    break;
+                }
+            }
+            if (!formGroup) return;
+            
+            // 创建图片上传微缩框容器
+            const container = document.createElement('div');
+            container.id = 'imageUploadContainer';
+            container.style.display = 'flex';
+            container.style.gap = '10px';
+            container.style.flexWrap = 'wrap';
+            container.style.marginTop = '10px';
+            
+            // 创建初始添加图片微缩框
+            const initialItem = document.createElement('div');
+            initialItem.className = 'image-upload-item';
+            initialItem.innerHTML = `
+                <label for="imageUpload" style="display: block; width: 100px; height: 100px; border: 1px dashed #ddd; border-radius: 4px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                    <span style="font-size: 24px; color: #999;">+</span>
+                </label>
+            `;
+            
+            container.appendChild(initialItem);
+            
+            // 插入到表单组中
+            formGroup.appendChild(container);
+            
+            // 获取图片上传元素
+            const imageUpload = document.getElementById('imageUpload');
+            if (!imageUpload) {
+                console.error('未找到imageUpload元素');
+                return;
+            }
+            
+            // 新的图片上传事件处理
+            imageUpload.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    // 直接使用原始文件名，不进行转换
+                const originalName = file.name;
+                    
+                    // 获取原始文件名，将中文转为拼音
+                    const nameWithoutExt = originalName.substring(0, originalName.lastIndexOf('.'));
+                    const ext = originalName.substring(originalName.lastIndexOf('.'));
+                    const pinyinName = convertChineseToEnglish(nameWithoutExt) + ext;
+                    
+                    // 创建一个新的File对象，使用拼音文件名
+                    const fileWithPinyinName = new File([file], pinyinName, {
+                        type: file.type,
+                        lastModified: file.lastModified
+                    });
+                    
+                    // 添加到全局图片数组
+                    window.selectedImages.push(fileWithPinyinName);
+                    
+                    // 压缩图片
+                    processImage(fileWithPinyinName).then(compressed => {
+                        // 给压缩后的blob添加拼音文件名
+                        const blobWithPinyinName = new File([compressed.blob], pinyinName, {
+                            type: compressed.blob.type
+                        });
+                        
+                        // 替换全局数组中的原始文件为压缩后的带拼音文件名的blob
+                        window.selectedImages[window.selectedImages.length - 1] = blobWithPinyinName;
+                        
+                        // 创建图片预览微缩框
+                        const previewItem = document.createElement('div');
+                        previewItem.className = 'image-preview-item';
+                        previewItem.style.position = 'relative';
+                        previewItem.style.width = '100px';
+                        previewItem.style.height = '100px';
+                        previewItem.style.borderRadius = '4px';
+                        previewItem.style.overflow = 'hidden';
+                        previewItem.style.border = '1px solid #ddd';
+                        
+                        // 保存文件索引，用于删除
+                        previewItem.dataset.fileIndex = window.selectedImages.length - 1;
+                        
+                        // 预览图片
+                        const previewImg = document.createElement('img');
+                        previewImg.src = compressed.dataURL;
+                        previewImg.style.width = '100%';
+                        previewImg.style.height = '100%';
+                        previewImg.style.objectFit = 'cover';
+                        previewImg.style.cursor = 'pointer';
+                        
+                        // 设置alt属性为文件名，用于图片对比
+                        previewImg.alt = pinyinName;
+                        
+                        // 查看大图功能
+                        previewImg.addEventListener('click', function() {
+                            const modal = document.getElementById('imageModal');
+                            modal.innerHTML = `
+                                <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2001;" 
+                                     onclick="if(event.target === this) document.getElementById('imageModal').style.display='none'">
+                                    <img id="draggableImage" src="${compressed.dataURL}" 
+                                         style="max-width: 90%; max-height: 90%; position: absolute; cursor: move; top: 50%; left: 50%; transform: translate(-50%, -50%);"
+                                         ondragstart="return false;">
+                                    <button onclick="document.getElementById('imageModal').style.display='none'" 
+                                            style="position: fixed; top: 20px; right: 20px; background: #f5222d; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; z-index: 2002;">×</button>
+                                </div>
+                            `;
+                            modal.style.display = 'block';
+                            
+                            // 图片拖动功能
+                            const img = document.getElementById('draggableImage');
+                            let isDragging = false;
+                            let offsetX, offsetY;
+                            let scale = 1; // 初始缩放比例
+
+                            img.addEventListener('mousedown', function(e) {
+                                isDragging = true;
+                                offsetX = e.clientX - img.getBoundingClientRect().left;
+                                offsetY = e.clientY - img.getBoundingClientRect().top;
+                                img.style.cursor = 'grabbing';
+                            });
+
+                            document.addEventListener('mousemove', function(e) {
+                                if (!isDragging) return;
+                                img.style.left = (e.clientX - offsetX) + 'px';
+                                img.style.top = (e.clientY - offsetY) + 'px';
+                                img.style.transform = `scale(${scale})`;
+                            });
+
+                            document.addEventListener('mouseup', function() {
+                                isDragging = false;
+                                img.style.cursor = 'move';
+                            });
+                            
+                            // 鼠标滚轮缩放功能
+                            img.addEventListener('wheel', function(e) {
+                                e.preventDefault(); // 阻止页面滚动
+                                
+                                // 获取当前缩放值
+                                const delta = e.deltaY > 0 ? 0.9 : 1.1; // 向下滚动缩小，向上滚动放大
+                                const oldScale = scale;
+                                scale *= delta;
+                                
+                                // 限制缩放范围
+                                scale = Math.min(Math.max(0.5, scale), 3); // 最小0.5倍，最大3倍
+                                
+                                // 计算缩放后的位置，保持图片中心点在窗口中心
+                                const modalRect = img.parentElement.getBoundingClientRect();
+                                const centerX = modalRect.width / 2;
+                                const centerY = modalRect.height / 2;
+                                
+                                // 如果图片没有拖动过，则居中显示
+                                if (!img.style.left && !img.style.top) {
+                                    img.style.left = centerX + 'px';
+                                    img.style.top = centerY + 'px';
+                                }
+                                
+                                // 调整位置以保持中心点不变
+                                const currentLeft = parseFloat(img.style.left) || centerX;
+                                const currentTop = parseFloat(img.style.top) || centerY;
+                                
+                                img.style.left = currentLeft - (currentLeft - centerX) * (scale - oldScale) + 'px';
+                                img.style.top = currentTop - (currentTop - centerY) * (scale - oldScale) + 'px';
+                                
+                                // 应用缩放，并设置变换原点为图片中心
+                                img.style.transformOrigin = 'center';
+                                img.style.transform = `scale(${scale})`;
+                            });
+                        });
+                        
+                        // 删除按钮
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.textContent = '×';
+                        deleteBtn.style.position = 'absolute';
+                        deleteBtn.style.top = '5px';
+                        deleteBtn.style.right = '5px';
+                        deleteBtn.style.background = 'rgba(245, 34, 45, 0.9)';
+                        deleteBtn.style.color = 'white';
+                        deleteBtn.style.border = 'none';
+                        deleteBtn.style.borderRadius = '50%';
+                        deleteBtn.style.width = '24px';
+                        deleteBtn.style.height = '24px';
+                        deleteBtn.style.fontSize = '16px';
+                        deleteBtn.style.cursor = 'pointer';
+                        deleteBtn.style.display = 'flex';
+                        deleteBtn.style.alignItems = 'center';
+                        deleteBtn.style.justifyContent = 'center';
+                        deleteBtn.style.padding = '0';
+                        
+                        // 删除图片功能
+                        deleteBtn.addEventListener('click', function() {
+                            // 获取文件索引
+                            const fileIndex = parseInt(previewItem.dataset.fileIndex);
+                            
+                            // 从全局数组中移除
+                            if (!isNaN(fileIndex) && fileIndex >= 0 && fileIndex < window.selectedImages.length) {
+                                window.selectedImages.splice(fileIndex, 1);
+                                
+                                // 更新后续图片的索引
+                                const previewItems = container.querySelectorAll('.image-preview-item');
+                                previewItems.forEach((item, index) => {
+                                    const itemIndex = parseInt(item.dataset.fileIndex);
+                                    if (itemIndex > fileIndex) {
+                                        item.dataset.fileIndex = itemIndex - 1;
+                                    }
+                                });
+                            }
+                            
+                            // 移除预览元素
+                            previewItem.remove();
+                        });
+                        
+                        // 添加到预览微缩框
+                        previewItem.appendChild(previewImg);
+                        previewItem.appendChild(deleteBtn);
+                        
+                        // 插入到添加按钮之前
+                        container.insertBefore(previewItem, initialItem);
+                        
+                        // 重置文件输入，以便可以再次选择同一文件
+                        imageUpload.value = '';
+                    }).catch(error => {
+                        console.error('图片处理失败:', error);
+                        // 移除失败的文件
+                        window.selectedImages.pop();
+                    });
+                }
+            });
+            
+            // 标记图片上传功能已初始化
+            window.imageUploadInitialized = true;
+        }
+        
+        // 初始化图片上传功能
+        initImageUpload();
+
+        // 创建图片模态框容器
+        const modalContainer = document.createElement('div');
+        modalContainer.id = 'imageModal';
+        modalContainer.style.display = 'none';
+        document.body.appendChild(modalContainer);
+    </script>
+    
+    <!-- 为底部按钮预留空间，防止遮挡图片 -->
+    <div style="height: 70px;"></div>
+    
+    <!-- 底部按钮容器 -->
+    <div class="bottom-buttons" style="position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: flex-start; background-color: transparent; padding: 15px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 1000;">
+        <button id="confirmAccountBtn">确认记账</button>
+    </div>
+
+    <script>
+        // 确认记账按钮事件
+        document.getElementById('confirmAccountBtn').addEventListener('click', function() {
+            // 检查是否处于编辑模式
+            const urlParams = new URLSearchParams(window.location.search);
+            const settlementId = urlParams.get('settlement_id') || window.currentSettlementId;
+            
+            if (settlementId) {
+                // 编辑模式：调用更新功能
+                window.settlementService.updateAccounting();
+            } else {
+                // 新建模式：调用确认记账功能
+                window.settlementService.confirmAccounting();
+            }
+        });
+        
+        // 付款人记忆功能相关函数
+        function savePaymentToMemory() {
+            const payment = document.getElementById('paymentInput').value.trim();
+            if (payment) {
+                // 获取现有记忆
+                let paymentMemory = JSON.parse(localStorage.getItem('paymentMemory') || '[]');
+                
+                // 移除重复项
+                paymentMemory = paymentMemory.filter(item => item !== payment);
+                
+                // 添加新付款人到开头
+                paymentMemory.unshift(payment);
+                
+                // 限制记忆数量为5个
+                if (paymentMemory.length > 5) {
+                    paymentMemory = paymentMemory.slice(0, 5);
+                }
+                
+                // 保存到本地存储
+                localStorage.setItem('paymentMemory', JSON.stringify(paymentMemory));
+            }
+        }
+        
+        function saveAmountToMemory() {
+            const amount = document.getElementById('amountInput').value.trim();
+            if (amount) {
+                let amountMemory = [];
+                try {
+                    // 安全解析localStorage数据
+                    const stored = localStorage.getItem('amountMemory');
+                    if (stored) {
+                        amountMemory = JSON.parse(stored);
+                        // 确保是数组
+                        if (!Array.isArray(amountMemory)) {
+                            amountMemory = [];
+                        }
+                    }
+                } catch (e) {
+                    // 解析错误时初始化为空数组
+                    amountMemory = [];
+                    console.error('解析金额记忆出错，初始化为空数组:', e);
+                }
+                
+                // 移除重复项，只保留不同的金额
+                amountMemory = amountMemory.filter(item => item !== amount);
+                
+                // 添加新金额到开头
+                amountMemory.unshift(amount);
+                
+                // 限制记忆数量为5个，保持去重后有5条记忆
+                if (amountMemory.length > 5) {
+                    amountMemory = amountMemory.slice(0, 5);
+                }
+                
+                // 保存到本地存储
+                localStorage.setItem('amountMemory', JSON.stringify(amountMemory));
+
+            }
+        }
+        
+        function loadPaymentMemory() {
+            const paymentMemory = JSON.parse(localStorage.getItem('paymentMemory') || '[]');
+            const datalist = document.getElementById('paymentMemoryList');
+            const paymentInput = document.getElementById('paymentInput');
+            
+            if (!paymentInput || !datalist) return;
+            
+            const inputValue = paymentInput.value;
+            
+            // 清空现有选项
+            datalist.innerHTML = '';
+            
+            // 添加过滤后的选项
+            let filteredMemory = paymentMemory;
+            if (inputValue && inputValue.trim()) {
+                // 只有当输入框有内容时才进行过滤
+                filteredMemory = paymentMemory.filter(payment => 
+                    payment.toLowerCase().includes(inputValue.toLowerCase())
+                );
+            }
+            
+            // 如果有记忆数据，添加到datalist
+            if (filteredMemory.length > 0) {
+                filteredMemory.forEach(payment => {
+                    const option = document.createElement('option');
+                    option.value = payment;
+                    datalist.appendChild(option);
+                });
+
+            } else if (paymentMemory.length > 0) {
+                // 如果过滤后为空但原记忆不为空，显示所有记忆
+                paymentMemory.forEach(payment => {
+                    const option = document.createElement('option');
+                    option.value = payment;
+                    datalist.appendChild(option);
+                });
+
+            } else {
+
+            }
+        }
+        
+        function loadAmountMemory() {
+            let amountMemory = [];
+            try {
+                // 安全解析localStorage数据
+                const stored = localStorage.getItem('amountMemory');
+                if (stored) {
+                    amountMemory = JSON.parse(stored);
+                    // 确保是数组
+                    if (!Array.isArray(amountMemory)) {
+                        amountMemory = [];
+                    }
+                }
+            } catch (e) {
+                // 解析错误时初始化为空数组
+                amountMemory = [];
+                console.error('解析金额记忆出错，初始化为空数组:', e);
+            }
+            
+            const datalist = document.getElementById('amountMemoryList');
+            const amountInput = document.getElementById('amountInput');
+            
+            if (!amountInput || !datalist) return;
+            
+            const inputValue = amountInput.value;
+            
+            // 清空现有选项
+            datalist.innerHTML = '';
+            
+            // 添加过滤后的选项
+            let filteredMemory = amountMemory;
+            if (inputValue && inputValue.trim()) {
+                // 只有当输入框有内容时才进行过滤
+                filteredMemory = amountMemory.filter(amount => 
+                    amount.includes(inputValue)
+                );
+            }
+            
+            // 对金额记忆进行升序排序（按数值大小）
+            const sortedMemory = [...filteredMemory].sort((a, b) => parseFloat(a) - parseFloat(b));
+            
+            // 如果有记忆数据，添加到datalist
+            if (sortedMemory.length > 0) {
+                sortedMemory.forEach(amount => {
+                    const option = document.createElement('option');
+                    option.value = amount;
+                    datalist.appendChild(option);
+                });
+
+            } else if (amountMemory.length > 0) {
+                // 如果过滤后为空但原记忆不为空，显示所有记忆（升序）
+                const allSortedMemory = [...amountMemory].sort((a, b) => parseFloat(a) - parseFloat(b));
+                allSortedMemory.forEach(amount => {
+                    const option = document.createElement('option');
+                    option.value = amount;
+                    datalist.appendChild(option);
+                });
+
+            } else {
+
+            }
+        }
+        
+        function filterPaymentMemory() {
+            setTimeout(() => {
+                loadPaymentMemory();
+            }, 50);
+        }
+        
+        function filterAmountMemory() {
+            setTimeout(() => {
+                loadAmountMemory();
+            }, 50);
+        }
+        
+        // 移除有问题的初始化函数，使用与付款人记忆相同的简洁实现
+        
+        // 页面加载时初始化
+        window.addEventListener('load', function() {
+            // 延迟初始化以确保所有元素都已完全加载
+            setTimeout(() => {
+                // 初始化付款人记忆
+                loadPaymentMemory();
+                // 初始化金额记忆
+                loadAmountMemory();
+            }, 200);
+        });
+        
+        // DOM就绪时也初始化一次（确保元素已存在）
+        document.addEventListener('DOMContentLoaded', function() {
+            // 延迟初始化以确保所有元素都已完全加载
+            setTimeout(() => {
+                // 初始化付款人记忆
+                loadPaymentMemory();
+                // 初始化金额记忆
+                loadAmountMemory();
+                // 为付款人输入框添加额外的监听器
+                const paymentInput = document.getElementById('paymentInput');
+                if (paymentInput) {
+                    paymentInput.addEventListener('change', function() {
+                        if (this.value.trim()) {
+                            savePaymentToMemory();
+                        }
+                    });
+                }
+                
+                // 为金额输入框添加额外的监听器
+                const amountInput = document.getElementById('amountInput');
+                if (amountInput) {
+                    amountInput.addEventListener('change', function() {
+                        if (this.value.trim()) {
+                            saveAmountToMemory();
+                        }
+                    });
+                }
+                
+            }, 100);
+        });
+    </script>
+    
+    <!-- 金额记忆功能已通过主脚本实现，移除重复加载脚本 -->
+    
+    <script>
+        // 监听来自父页面的消息，用于实时更新
+        window.addEventListener('message', function(event) {
+            // 验证消息来源（在本地开发环境中可能无法验证）
+            // 在生产环境中应使用具体的域名验证
+            
+            try {
+                if (event.data && typeof event.data === 'object') {
+                    switch (event.data.type) {
+                        case 'refreshSettlementData':
+                            console.log('🔄 收到结算数据刷新指令');
+                            // 触发日期选择器刷新
+                            const workDateInput = document.getElementById('workDate');
+                            if (workDateInput) {
+                                // 直接触发change事件，确保日期显示和数据加载都能被触发
+                                const event = new Event('change', { bubbles: true });
+                                workDateInput.dispatchEvent(event);
+                                console.log('✅ 已触发日期选择器刷新');
+                            }
+                            break;
+                        case 'refreshData':
+                            console.log('🔄 收到通用数据刷新指令');
+                            // 触发日期选择器刷新
+                            const workDateInput2 = document.getElementById('workDate');
+                            if (workDateInput2) {
+                                // 直接触发change事件，确保日期显示和数据加载都能被触发
+                                const event = new Event('change', { bubbles: true });
+                                workDateInput2.dispatchEvent(event);
+                                console.log('✅ 已触发日期选择器刷新');
+                            }
+                            break;
+                        default:
+                            // 忽略其他类型的消息
+                            break;
+                    }
+                }
+            } catch (error) {
+                console.error('处理消息时发生错误:', error);
+            }
+        });
+        
+        // 页面加载完成后初始化实时订阅
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            // 延迟初始化，确保所有资源都已加载
+            setTimeout(initRealtimeSubscription, 1000);
+        });
+        
+        // 初始化实时订阅 - 子页面不需要重复订阅，由首页统一管理
+        function initRealtimeSubscription() {
+            // 子页面不需要重复订阅，由首页统一管理实时订阅
+            // 仅需监听来自父页面的消息即可
+        }
+    </script>
+    </body>
+</html>
