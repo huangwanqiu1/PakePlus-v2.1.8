@@ -1,0 +1,4437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>点工单</title>
+    <!-- 本地加载完整的Supabase库 -->
+    <script src="./JavaScript/supabase/supabase.min.js"></script>
+    <!-- 加载浏览器环境的Supabase配置 -->
+    <script src="./JavaScript/supabase/supabase-client.js"></script>
+    <!-- 离线同步服务 -->
+    <script src="./JavaScript/离线同步/offline-sync-service.js"></script>
+    <!-- 同步状态指示器 -->
+    <script src="./JavaScript/离线同步/sync-status-indicator.js"></script>
+    <!-- 引入Compressor.js用于图片压缩 -->
+    <script src="./JavaScript/supabase/compressor.min.js"></script>
+    <!-- 中文转拼音库 -->
+    <script src="./JavaScript/supabase/pinyin-pro.js"></script>
+    <!-- PDF生成库 -->
+    <script src="./JavaScript/pdf/html2canvas.min.js"></script>
+    <script src="./JavaScript/pdf/jspdf.umd.min.js"></script>
+    <script src="./JavaScript/pdf/jspdf.plugin.autotable.min.js"></script>
+    <!-- 点工单API -->
+    <script src="./JavaScript/supabase/tus.min.js"></script>
+    <!-- 点工单API -->
+    <script src="./JavaScript/点工单/work_record_api.js"></script>
+    <!-- PDF生成功能 -->
+    <script src="./JavaScript/点工单/pdf_generator.js"></script>
+    <!-- 点工单PDF生成 -->
+    <script src="./JavaScript/点工单/work_order_pdf.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background-color: #f5f5f5;
+            font-family: 'Microsoft YaHei', sans-serif;
+            padding: 10px;
+        }
+        .container {
+            width: 100%;
+            margin: 0;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            padding: 20px;
+        }
+        .form-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .form-row > div {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .form-row label {
+            margin-bottom: 0;
+            white-space: nowrap;
+            font-weight: bold;
+        }
+        
+        input[type="text"], select {
+            width: 335px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f5f5f5;
+        }
+
+        input[type="date"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f5f5f5;
+        }
+        
+        /* 项目名称输入框特殊样式 */
+        #projectName {
+            background-color: #f8f9fa !important;
+            cursor: not-allowed !important;
+            color: #6c757d !important;
+            border: 1px solid #dee2e6 !important;
+            font-weight: 500;
+            font-size: 16px !important;
+        }
+        
+        #projectName:focus {
+            outline: none !important;
+            box-shadow: none !important;
+            border-color: #dee2e6 !important;
+        }
+        
+        /* 必填项星号样式 */
+        .required-asterisk {
+            display: none;
+            color: #ff0000;
+            font-weight: bold;
+            margin-right: 2px;
+        }
+        
+        /* 日期输入框容器样式 */
+        .date-input-container {
+            position: relative;
+            width: 335px;
+        }
+        
+        .date-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f5f5f5;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .date-display {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            padding: 8px 8px 8px 30px;
+            border: 1px solid #1890ff;
+            border-radius: 4px;
+            background-color: #e6f7ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            font-size: 16px;
+            color: #333;
+            z-index: 2;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%231890ff'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: 8px center;
+            background-size: 16px 16px;
+        }
+        
+        .today-text {
+            color: #1890ff;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+        
+        /* 日期选择器模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .date-picker-content {
+            background-color: white;
+            border-radius: 12px;
+            width: 480px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        }
+        
+        .date-picker-body {
+            padding: 20px;
+        }
+        
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .calendar-header button {
+            background: linear-gradient(135deg, rgba(240, 240, 240, 0.8), rgba(255, 255, 255, 0.6));
+            border: none;
+            border-radius: 8px;
+            width: auto;
+            height: 36px;
+            padding: 0 12px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #666;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+        
+        #prevMonth,
+        #nextMonth {
+            width: 36px;
+            padding: 0;
+        }
+        
+        .calendar-header button:hover {
+            background: linear-gradient(135deg, rgba(24, 144, 255, 0.9), rgba(64, 169, 255, 0.8));
+            color: white;
+            transform: translateY(-1px) scale(1.15);
+            box-shadow: 0 4px 15px rgba(24, 144, 255, 0.4);
+        }
+        
+        #currentMonth {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            min-width: 100px;
+            text-align: center;
+        }
+        
+        /* 月份选择器样式 */
+        .month-picker-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2001;
+        }
+        
+        .month-picker {
+            background-color: white;
+            border-radius: 12px;
+            width: 320px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+        
+        .picker-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .picker-year-btn {
+            background: transparent;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #6c757d;
+            transition: all 0.3s ease;
+        }
+        
+        .picker-year-btn:hover {
+            background-color: #e9ecef;
+            border-color: #adb5bd;
+        }
+        
+        #pickerYear {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: #343a40;
+        }
+        
+        .month-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            padding: 20px;
+        }
+        
+        .month-item {
+            padding: 12px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            color: #495057;
+            background-color: #ffffff;
+        }
+        
+        .month-item:hover {
+            background-color: #e7f5ff;
+            border-color: #91d5ff;
+            color: #1890ff;
+        }
+        
+        .month-item.selected {
+            background-color: #1890ff;
+            color: white;
+            border-color: #1890ff;
+        }
+
+        /* 禁用状态的月份样式 */
+        .month-item.disabled {
+            background-color: #f5f5f5;
+            color: #999;
+            border-color: #e0e0e0;
+            cursor: not-allowed !important;
+            opacity: 0.5 !important;
+            pointer-events: none !important;
+        }
+        
+        /* 月份标题样式 */
+        .month-title {
+            cursor: pointer;
+            background: transparent;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #475569;
+            transition: all 0.3s ease;
+            appearance: none;
+            -webkit-appearance: none;
+            position: relative;
+        }
+        
+        .month-title:hover {
+            border-color: #667eea;
+            color: #667eea;
+            background-color: #f8fafc;
+        }
+        
+        .calendar-grid {
+            margin-bottom: 20px;
+        }
+        
+        .weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+            margin-bottom: 10px;
+        }
+        
+        .weekdays > div {
+            text-align: center;
+            padding: 8px;
+            font-weight: bold;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .calendar-days {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+        }
+        
+        .day-cell {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .day-cell:hover {
+            background: linear-gradient(135deg, rgba(230, 247, 255, 0.8), rgba(240, 250, 255, 0.6));
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
+            backdrop-filter: blur(5px);
+        }
+        
+        .day-cell.other-month {
+            color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .day-cell.disabled-future {
+            color: #d0d0d0;
+            background-color: #f9f9f9;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        
+        .day-cell.disabled-future:hover {
+            background-color: #f9f9f9;
+            transform: none;
+        }
+        
+        .day-cell.today {
+            background: #fff2e6;
+            border: 2px solid #ff7a00;
+            font-weight: bold;
+            color: #ff7a00;
+            position: relative;
+        }
+        
+        .day-cell.today::before {
+            content: '今天';
+            position: absolute;
+            top: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ff7a00;
+            color: white;
+            font-size: 10px;
+            padding: 1px 4px;
+            border-radius: 8px;
+            font-weight: bold;
+            white-space: nowrap;
+            z-index: 1;
+        }
+        
+        .day-cell.selected-single {
+            background: #1890ff;
+            color: white;
+            font-weight: bold;
+        }
+        
+        /* 多选模式选中日期样式 */
+        .day-cell.selected-multi {
+            background: linear-gradient(135deg, #52c41a, #389e0d);
+            color: white;
+            border-radius: 50%;
+            box-shadow: 0 4px 12px rgba(82, 196, 26, 0.3);
+            transform: scale(1.05);
+        }
+        
+        /* 多选模式日期范围样式 */
+        .day-cell.selected-range {
+            background: linear-gradient(135deg, #95de64, #73d13d);
+            color: white;
+            border-radius: 50%;
+            box-shadow: 0 2px 6px rgba(149, 222, 100, 0.2);
+        }
+
+        /* 班组输入框样式 */
+        #teamName {
+            font-size: 16px;
+            width: 120px;
+            transition: all 0.3s;
+            text-align: center;
+        }
+        
+        /* 班组输入框有值时的样式 */
+        #teamName.has-value {
+            background-color: #e6f7ff;
+            border: 1px solid #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+            color: #333;
+        }
+        
+        /* 班组长输入框样式 */
+        #teamLeader {
+            font-size: 16px;
+            width: 120px;
+            transition: all 0.3s;
+            text-align: center;
+        }
+        
+        /* 班组长输入框有值时的样式 */
+        #teamLeader.has-value {
+            background-color: #e6f7ff;
+            border: 1px solid #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+            color: #333;
+        }
+
+        /* 工日/单价/金额输入框样式 */
+        #workDays,
+        #unitPrice,
+        #amount {
+            font-size: 16px;
+            width: 120px;
+            height: 35px; /* 显式设置高度，确保与文本输入框一致 */
+            padding: 8px 40px 8px 8px; /* 右侧留出空间给单位 */
+            box-sizing: border-box; /* 确保高度包含内边距和边框 */
+            border: 1px solid #ddd; /* 统一边框 */
+            border-radius: 4px; /* 统一圆角 */
+            background-color: #f5f5f5; /* 统一背景色 */
+            transition: all 0.3s;
+            text-align: center; /* 数字水平居中 */
+        }
+
+        /* 隐藏单价和金额输入框的上下箭头 */
+        #unitPrice::-webkit-outer-spin-button,
+        #unitPrice::-webkit-inner-spin-button,
+        #amount::-webkit-outer-spin-button,
+        #amount::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        #unitPrice,
+        #amount {
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+
+
+        #workDays::placeholder,
+        #unitPrice::placeholder,
+        #amount::placeholder {
+            font-size: 14px;
+        }
+        
+        /* 工日单位容器 */
+        .work-days-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        
+        /* 工日/单价/金额单位样式 */
+        #workDaysUnit,
+        #unitPriceUnit,
+        #amountUnit {
+            position: absolute;
+            right: 8px; /* 距离输入框右侧边距 */
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 14px; /* 稍微调小字体以适应内部 */
+            color: #666;
+            pointer-events: none; /* 防止遮挡输入点击 */
+            z-index: 1; /* 确保显示在输入框内容之上 */
+        }
+
+        /* 工日/单价/金额输入框有值时的样式 */
+        #workDays.has-value,
+        #unitPrice.has-value,
+        #amount.has-value {
+            background-color: #e6f7ff;
+            border: 1px solid #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+            color: #333;
+        }
+
+        /* 说明输入区域样式 */
+        #description {
+            width: 100%;
+            max-width: 60%;
+            min-height: 80px; /* 增加高度以容纳约3行文字 */
+            height: 80px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        /* 说明输入框有值时的样式 */
+        #description.has-value {
+            background-color: #e6f7ff;
+            border: 1px solid #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+            color: #333;
+        }
+        
+        #description::placeholder { color: #999; }
+        #description::-webkit-input-placeholder { color: #999; }
+        #description::-moz-placeholder { color: #999; }
+        #description:-ms-input-placeholder { color: #999; }
+
+        /* 图片预览项样式 */
+        .image-upload-item {
+            width: 100px;
+            height: 100px;
+        }
+
+        /* 顶部隐藏/折叠开关样式 - iOS风格 */
+        .checkbox-item {
+            position: relative;
+            width: 80px; /* 加大宽度 */
+            height: 34px; /* 加大高度 */
+            border-radius: 17px; /* 调整圆角 */
+            padding: 0;
+            background: transparent;
+            overflow: hidden;
+            margin-right: 5px;
+            border: none;
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        .checkbox-item:hover {
+            background: transparent;
+        }
+
+        /* 隐藏默认复选框但保持可点击 */
+        .checkbox-item input[type="checkbox"] {
+            position: absolute;
+            opacity: 0;
+            cursor: pointer;
+            height: 100%;
+            width: 100%;
+            z-index: 3;
+        }
+
+        /* 轨道 */
+        .checkbox-item .custom-checkbox {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 17px; /* 调整圆角 */
+            background-color: #10b981; /* 绿色背景 */
+            background-image: linear-gradient(135deg, #10b981, #059669);
+            border: none;
+            z-index: 1;
+            transition: all 0.3s ease;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        /* 选中状态轨道 */
+        .checkbox-item input:checked + .custom-checkbox {
+            background: #3b82f6;
+            background-image: linear-gradient(135deg, #3b82f6, #2563eb);
+            box-shadow: none;
+            border: none;
+        }
+
+        /* 滑块 */
+        .checkbox-item .custom-checkbox::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 28px; /* 加大滑块 */
+            height: 28px; /* 加大滑块 */
+            background: white;
+            border-radius: 50%;
+            border: none;
+            transform: none;
+            transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        /* 选中状态滑块位置 */
+        .checkbox-item input:checked + .custom-checkbox::after {
+            transform: translateX(46px); /* 调整移动距离 (80 - 28 - 3 - 3 = 46) */
+            background: white;
+            border: none;
+            border-width: 0;
+            
+            /* 强制重置被全局样式覆盖的属性，防止圆点消失 */
+            width: 28px; /* 加大滑块 */
+            height: 28px; /* 加大滑块 */
+            left: 3px;
+            top: 3px;
+            border-radius: 50%;
+        }
+
+        /* 文字 span */
+        .checkbox-item span:last-child {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            font-size: 16px; /* 加大字体 */
+            font-weight: 600;
+            transition: all 0.3s;
+            pointer-events: none;
+            
+            /* 未选中状态：文字在右 */
+            justify-content: flex-end;
+            padding-right: 10px; /* 调整内边距 */
+            color: white;
+        }
+        
+        /* 技工/普工切换文字逻辑 */
+        .checkbox-item input:not(:checked) ~ span:last-child::after {
+            content: "普工";
+        }
+
+        .checkbox-item input:checked ~ span:last-child::after {
+            content: "技工";
+        }
+
+        /* 选中状态文字 */
+        .checkbox-item input:checked ~ span:last-child {
+            /* 选中状态：文字在左 */
+            justify-content: flex-start;
+            padding-left: 10px; /* 调整内边距 */
+            color: white;
+        }
+
+        /* 工作类型标签样式 */
+        .work-type-option {
+            cursor: pointer;
+            padding: 8px 16px;
+            position: relative;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 8px;
+            margin: 2px;
+        }
+        .work-type-option:hover {
+            transform: translateY(-1px) scale(1.05);
+            background: rgba(0, 102, 204, 0.2);
+            box-shadow: 0 4px 12px rgba(0, 102, 204, 0.3);
+        }
+        .work-type-option.active {
+            color: white;
+            background: linear-gradient(135deg, rgba(0, 102, 204, 0.9), rgba(30, 144, 255, 0.8));
+            box-shadow: 0 2px 8px rgba(0, 102, 204, 0.4);
+            transform: translateY(-0.5px);
+        }
+        .work-type-option.active:hover {
+            transform: translateY(-1px) scale(1.05);
+            box-shadow: 0 3px 12px rgba(0, 102, 204, 0.5);
+        }
+
+        /* 标签页导航中的标签样式 */
+        .work-type.tab-navigation {
+            background-color: #fff;
+            border-bottom: 1px solid #f0f0f0;
+            padding: 0;
+            gap: 0;
+            overflow: visible;
+            position: relative;
+        }
+
+        .work-type.tab-navigation .work-type-option {
+            border: none;
+            background-color: #fff;
+            color: #333; /* 未选中字体黑色 */
+            margin: 0;
+            flex: none; /* 取消自动填充 */
+            width: auto; /* 恢复自动宽度 */
+            text-align: center;
+            border-radius: 0;
+            font-weight: bold; /* 未选中字体加粗 */
+            padding: 10px 35px; /* 增加内边距 */
+            position: relative;
+            cursor: pointer; /* 确保显示指针 */
+            display: inline-block; /* 确保为块级元素 */
+            pointer-events: auto; /* 确保可以接收点击事件 */
+        }
+
+        /* 第二个标签（明细）左边添加间距 */
+        .work-type.tab-navigation label[for="tabWorkFlow"] {
+            margin-left: 20px;
+        }
+
+        /* 禁用悬停效果 */
+        .work-type.tab-navigation .work-type-option:hover {
+            background-color: #fff;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .work-type.tab-navigation .work-type-option.active {
+            border: none;
+            color: white; /* 选中字体白色 */
+            font-weight: bold;
+            box-shadow: none;
+            z-index: 1;
+        }
+
+        /* 左侧"记工"选中时的背景 - 右上圆角 */
+        .work-type.tab-navigation label[for="tabWorkRecord"].active {
+            background: linear-gradient(135deg, rgba(0, 102, 204, 0.9), rgba(30, 144, 255, 0.8));
+            border-radius: 0 20px 0 0;
+            transition: none !important;
+        }
+
+        /* 右侧"记工流水"选中时的背景 - 左上圆角 */
+        .work-type.tab-navigation label[for="tabWorkFlow"].active {
+            background: linear-gradient(135deg, rgba(0, 102, 204, 0.9), rgba(30, 144, 255, 0.8));
+            border-radius: 20px 0 0 0;
+            transition: none !important;
+        }
+
+        /* Restore global active underline */
+        .work-type-option.active::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background-color: #0066cc;
+        }
+
+        /* Hide underline for tab navigation */
+        .work-type.tab-navigation .work-type-option.active::after {
+            display: none;
+        }
+
+        /* 隐藏工作类型选项的input */
+        .work-type input[type="radio"] {
+            display: none !important;
+        }
+
+        /* 确保标签页导航中的label可以点击 */
+        .work-type.tab-navigation label {
+            position: relative;
+            z-index: 100;
+        }
+
+        /* 现代化表格样式 */
+        .modern-table {
+            width: auto;
+            border-collapse: separate;
+            border-spacing: 0;
+            background: white;
+            border-radius: 12px;
+            overflow: visible;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            margin: 5px 0 15px 0;
+            border: 2px solid #e0e0e0;
+            table-layout: fixed;
+            border-spacing: 0;
+        }
+
+        .modern-table tbody {
+            line-height: 20px;
+        }
+
+        .modern-table tbody tr {
+            height: auto !important;
+            max-height: none !important;
+        }
+
+        .modern-table thead {
+            background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
+            color: white;
+        }
+
+        .modern-table th {
+            padding: 8px 12px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 13px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            border: 1px solid #1890ff;
+            border-right: 1px solid #40a9ff;
+            position: relative;
+            white-space: nowrap;
+            width: auto;
+            min-width: min-content;
+            max-width: none;
+            height: auto;
+            max-height: none;
+            line-height: 16px;
+            vertical-align: middle;
+            overflow: hidden;
+            background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
+            color: white;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .modern-table th:first-child {
+            border-top-left-radius: 12px;
+        }
+
+        .modern-table th:last-child {
+            border-top-right-radius: 12px;
+        }
+
+        /* 工作内容列样式 */
+        .work-content-header {
+            max-width: 150px;
+            width: 150px;
+            white-space: normal !important;
+            text-align: left;
+            word-wrap: break-word;
+        }
+
+        .work-content-cell {
+            max-width: 150px;
+            width: 150px;
+            white-space: normal !important;
+            text-align: left;
+            word-wrap: break-word;
+            overflow: visible;
+        }
+
+        .modern-table th:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 20%;
+            height: 60%;
+            width: 1px;
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .modern-table td {
+            padding: 6px 12px;
+            text-align: center;
+            font-size: 13px;
+            color: #333;
+            border: 1px solid #e0e0e0;
+            border-right: 1px solid #d0d0d0;
+            border-bottom: 1px solid #f0f0f0;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            width: auto;
+            min-width: min-content;
+            max-width: none;
+            height: auto;
+            max-height: none;
+            line-height: 20px;
+            vertical-align: middle;
+            overflow: hidden;
+        }
+
+        .modern-table tbody tr {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-left: 3px solid transparent;
+            height: auto;
+            max-height: none;
+            overflow: hidden;
+        }
+
+        .modern-table tbody tr:hover {
+            background: linear-gradient(135deg, rgba(255, 193, 7, 0.15), rgba(255, 213, 79, 0.1));
+            box-shadow: 0 6px 16px rgba(255, 193, 7, 0.3);
+            border-left: 3px solid #ffc107;
+            position: relative;
+            z-index: 10;
+        }
+
+        .modern-table tbody tr:hover td {
+            color: #d48806;
+            font-weight: 500;
+            border-color: #ffd54f;
+            border-top: 1px solid #ffd54f !important;
+            border-bottom: 1px solid #ffd54f !important;
+            box-shadow: inset 0 0 0 1px rgba(255, 193, 7, 0.1);
+        }
+
+        .modern-table tbody tr:hover td:first-child {
+            border-left: 2px solid #ffc107;
+        }
+
+        .modern-table tbody tr:hover td:last-child {
+            border-right: 2px solid #ffc107;
+        }
+
+        .modern-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .modern-table tbody tr:nth-child(even) {
+            background: rgba(240, 247, 255, 0.8);
+        }
+
+        .modern-table tbody tr:nth-child(odd) {
+            background: rgba(255, 255, 255, 0.95);
+        }
+
+        .modern-table tbody tr:nth-child(even):hover {
+            background: linear-gradient(135deg, rgba(255, 193, 7, 0.2), rgba(255, 213, 79, 0.15));
+            box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
+        }
+
+        .modern-table tbody tr:nth-child(odd):hover {
+            background: linear-gradient(135deg, rgba(255, 193, 7, 0.25), rgba(255, 213, 79, 0.2));
+            box-shadow: 0 4px 12px rgba(255, 193, 7, 0.35);
+        }
+
+        /* 表格行选中状态 */
+        .modern-table tbody tr.selected {
+            background: linear-gradient(135deg, rgba(24, 144, 255, 0.2), rgba(64, 169, 255, 0.1));
+            border-left: 3px solid #1890ff;
+            box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
+        }
+
+        .modern-table tbody tr.selected td {
+            color: #1890ff;
+            font-weight: 500;
+            border-color: #40a9ff;
+        }
+
+        /* 删除图标样式 */
+        .delete-icon {
+            display: none;
+            position: absolute;
+            right: -30px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #ff4d4f;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            background-color: transparent;
+            box-shadow: none;
+            z-index: 10;
+        }
+
+        .modern-table tbody tr:hover .delete-icon {
+            display: block;
+        }
+
+        .delete-icon:hover {
+            background-color: #ff4d4f;
+            color: white;
+        }
+
+        /* 为表格行添加相对定位，以便正确定位删除图标 */
+        .modern-table tbody tr {
+            position: relative;
+        }
+
+        /* 为表格容器添加右侧空间，以容纳删除图标 */
+        .table-scroll {
+            padding-right: 40px;
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 12px;
+            padding: 2px 5px 15px 5px;
+            margin: 2px 0;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e8e8e8;
+        }
+
+        .table-scroll {
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 70vh;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            width: 100%;
+        }
+
+        /* 明细表格区域 */
+        #detailTableSection {
+            display: none;
+        }
+
+        /* 移动端响应式优化 */
+        @media (max-width: 768px) {
+            /* 标签页导航在移动端占据容器左右两侧 */
+            .work-type.tab-navigation {
+                justify-content: space-between;
+                width: 100%;
+            }
+
+            .work-type.tab-navigation .work-type-option {
+                flex: 1;
+                padding: 12px 10px;
+                text-align: center;
+                width: 50%;
+                margin: 0;
+            }
+
+            /* 第二个标签（明细）左边添加间距 - 移动端取消 */
+            .work-type.tab-navigation label[for="tabWorkFlow"] {
+                margin-left: 0;
+            }
+
+            /* 左侧"记工"选中时的背景 - 移动端右上圆角 */
+            .work-type.tab-navigation label[for="tabWorkRecord"].active {
+                border-radius: 0 15px 0 0;
+            }
+
+            /* 右侧"明细"选中时的背景 - 移动端左上圆角 */
+            .work-type.tab-navigation label[for="tabWorkFlow"].active {
+                border-radius: 15px 0 0 0;
+            }
+
+            /* 项目名称输入框和日期输入框根据容器大小自动调整 */
+            input[type="text"], 
+            select {
+                width: 100%;
+                max-width: none;
+                flex: 1;
+            }
+
+            /* 项目名称输入框特殊样式 - 移动端 */
+            #projectName {
+                width: 100%;
+                max-width: none;
+                font-size: 14px;
+            }
+
+            /* 日期输入框容器 - 移动端 */
+            .date-input-container {
+                width: 100%;
+                max-width: none;
+                flex: 1;
+            }
+
+            /* 日期显示 - 移动端 */
+            .date-display {
+                font-size: 14px;
+                padding: 8px 8px 8px 30px;
+            }
+
+            /* 表单行在移动端的布局 */
+            .form-row {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .form-row > div {
+                width: 100%;
+                flex-direction: row;
+                justify-content: flex-start;
+                gap: 0;
+            }
+
+            .form-row > div label {
+                min-width: 60px;
+                font-size: 14px;
+                margin-right: 0;
+                padding-right: 0;
+            }
+
+            /* 班组输入框 - 移动端 */
+            #teamName,
+            #teamLeader {
+                width: 100%;
+                max-width: none;
+                flex: 1;
+                font-size: 14px;
+                padding-left: 0;
+                text-align: center;
+            }
+
+            /* 工日/单价/金额输入框 - 移动端 */
+            #unitPrice,
+            #amount {
+                width: 100%;
+                max-width: none;
+                flex: 1;
+                font-size: 14px;
+                padding-left: 0;
+            }
+
+            /* 工日输入框 - 移动端减短 */
+            #workDays {
+                width: 120px;
+                max-width: 120px;
+                flex: none;
+                font-size: 14px;
+                padding-left: 0;
+            }
+
+            /* 技工/普工按钮容器 - 移动端靠近工日输入框 */
+            .worker-type-wrapper {
+                margin-left: 5px !important;
+            }
+
+            /* 工日单位容器 - 移动端 */
+            .work-days-wrapper {
+                display: inline-block;
+                width: auto;
+            }
+
+            /* 说明输入区域 - 移动端 */
+            #description {
+                width: 100%;
+                max-width: none;
+                font-size: 14px;
+                min-height: 60px;
+                height: 60px;
+            }
+
+            /* 容器内边距 - 移动端减小 */
+            .container {
+                padding: 10px;
+            }
+
+            /* 表格容器 - 移动端 */
+            .table-container {
+                overflow-x: auto;
+            }
+
+            .modern-table {
+                font-size: 12px;
+                min-width: 800px;
+            }
+
+            .modern-table th,
+            .modern-table td {
+                padding: 4px 6px;
+                font-size: 11px;
+            }
+
+            /* 工作内容列 - 移动端 */
+            .work-content-header,
+            .work-content-cell {
+                max-width: 100px;
+                width: 100px;
+            }
+
+            /* 技工/普工复选框 - 移动端减短并靠右 */
+            .checkbox-item {
+                width: 70px;
+                height: 28px;
+                margin-left: auto;
+            }
+
+            .checkbox-item .custom-checkbox::after {
+                width: 22px;
+                height: 22px;
+                top: 3px;
+                left: 3px;
+            }
+
+            .checkbox-item input:checked + .custom-checkbox::after {
+                transform: translateX(44px);
+            }
+        }
+
+        /* 超小屏幕优化 */
+        @media (max-width: 480px) {
+            .work-type.tab-navigation .work-type-option {
+                padding: 10px 5px;
+                font-size: 14px;
+            }
+
+            .form-row > div {
+                gap: 0;
+            }
+
+            .form-row > div label {
+                min-width: 50px;
+                font-size: 13px;
+                margin-right: 0;
+                padding-right: 0;
+            }
+
+            #projectName,
+            #teamName,
+            #teamLeader,
+            #unitPrice,
+            #amount {
+                font-size: 13px;
+            }
+
+            /* 工日输入框 - 超小屏幕保持减短 */
+            #workDays {
+                width: 110px;
+                max-width: 110px;
+                font-size: 13px;
+            }
+
+            .date-display {
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 辅助元素：用于兼容原有JS代码中的引用 -->
+        <input type="checkbox" id="projectDetail" style="display: none;">
+        <input type="radio" name="workType" id="projectExpense" style="display: none;">
+
+        <!-- 标签页导航 -->
+        <div class="form-row" style="margin-bottom: 15px;">
+            <div class="work-type tab-navigation" style="margin-bottom: 0; border-bottom: 2px solid #ddd; display: flex; align-items: center; width: 100%;">
+                <input type="radio" id="tabWorkRecord" name="workTab" value="记工" checked>
+                <label for="tabWorkRecord" class="work-type-option active">记工</label>
+                <input type="radio" id="tabWorkFlow" name="workTab" value="明细">
+                <label for="tabWorkFlow" class="work-type-option">明细</label>
+            </div>
+        </div>
+
+        <div class="form-row tab-work-content">
+            <div>
+                <label for="projectName">项目：</label>
+                <input type="text" id="projectName" readonly disabled style="background-color: #f8f9fa; cursor: not-allowed; color: #6c757d;">
+            </div>
+        </div>
+
+        <div class="form-row" id="dateInputSection">
+            <div>
+                <label for="workDate"><span class="required-asterisk">*</span>日期：</label>
+                <div class="date-input-container">
+                    <input type="date" id="workDate" class="date-input">
+                    <div id="dateDisplay" class="date-display"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 明细表格区域 -->
+        <div id="detailTableSection" class="table-container">
+            <div class="table-scroll">
+                <table class="modern-table">
+                    <thead>
+                        <tr>
+                            <th>序号</th>
+                            <th>
+                                日期 <span id="dateFilterArrow" style="cursor: pointer; margin-left: 4px;">▼</span>
+                                <select id="dateFilter" style="margin-left: 8px; padding: 2px 5px; font-size: 14px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.9); color: #333; opacity: 0; position: absolute; pointer-events: none; transition: all 0.3s ease; width: 80px;">
+                                    <option value="">全部</option>
+                                </select>
+                            </th>
+                            <th>
+                                班组 <span id="teamFilterArrow" style="cursor: pointer; margin-left: 4px;">▼</span>
+                                <select id="teamFilter" style="margin-left: 8px; padding: 2px 5px; font-size: 14px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.9); color: #333; opacity: 0; position: absolute; pointer-events: none; transition: all 0.3s ease; width: 80px;">
+                                    <option value="">全部</option>
+                                </select>
+                            </th>
+                            <th>班组长</th>
+                            <th>工日</th>
+                            <th>类型</th>
+                            <th>单价</th>
+                            <th>金额</th>
+                            <th class="work-content-header" style="max-width: 150px; width: 150px; white-space: normal; text-align: left; word-wrap: break-word;">工作内容</th>
+                            <th>图片</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detailTableBody">
+                        <!-- 表格内容将通过JavaScript动态生成 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="form-row tab-work-content">
+            <div>
+                <label for="teamName">班组：</label>
+                <input type="text" id="teamName" list="teamList" placeholder="选择或输入">
+                <datalist id="teamList">
+                    <option value="钢筋班">
+                    <option value="木工班">
+                    <option value="砼工班">
+                    <option value="泥水班">
+                    <option value="外架班">
+                </datalist>
+
+                <label for="teamLeader" style="margin-left: 10px;">班组长：</label>
+                <input type="text" id="teamLeader" list="teamLeaderMemoryList" placeholder="输入班组长"
+                       onfocus="this.setAttribute('placeholder', ''); loadTeamLeaderMemory();"
+                       onblur="this.setAttribute('placeholder', '输入班组长'); saveTeamLeaderToMemory();"
+                       oninput="setTimeout(() => filterTeamLeaderMemory(), 100);"
+                       autocomplete="on">
+                <datalist id="teamLeaderMemoryList"></datalist>
+            </div>
+        </div>
+
+        <!-- 工日输入区域 -->
+        <div class="form-row tab-work-content">
+            <div>
+                <label for="workDays">工日：</label>
+                <div class="work-days-wrapper">
+                    <input type="number" id="workDays" placeholder="输入工日" step="0.5" min="0" oninput="if(value<0)value=0">
+                    <span id="workDaysUnit">个工</span>
+                </div>
+
+                <!-- 技工/普工切换按钮 -->
+                <div class="worker-type-wrapper" style="display: inline-block; vertical-align: middle; margin-left: 10px;">
+                    <label class="checkbox-item" for="workerType" style="margin-right: 0;">
+                        <input type="checkbox" id="workerType" checked>
+                        <span class="custom-checkbox"></span>
+                        <span></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- 单价/金额输入区域 -->
+        <div class="form-row tab-work-content">
+            <div>
+                <label for="unitPrice">单价：</label>
+                <div class="work-days-wrapper">
+                    <input type="number" id="unitPrice" placeholder="输入单价" step="0.5" min="0" oninput="if(value<0)value=0">
+                    <span id="unitPriceUnit">元/工</span>
+                </div>
+
+                <label for="amount" style="margin-left: 10px;">金额：</label>
+                <div class="work-days-wrapper">
+                    <input type="number" id="amount" placeholder="输入金额" step="0.5" min="0" oninput="if(value<0)value=0">
+                    <span id="amountUnit">元</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 说明输入区域 -->
+        <div id="descriptionSection" class="form-row tab-work-content">
+            <div>
+                <label for="description" style="margin-bottom: 0; white-space: nowrap; font-weight: bold;">工作<br>内容：</label>
+                <textarea id="description" placeholder="请输入工作内容"></textarea>
+            </div>
+        </div>
+
+        <!-- 图片上传区域 -->
+        <div id="imageSection" class="form-row tab-work-content">
+            <div>
+                <label style="font-weight: bold;">图片：</label>
+                <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+            </div>
+        </div>
+        
+        <!-- 图片放大模态框 -->
+        <div id="imageModal" style="display: none;"></div>
+    </div>
+
+    <script>
+        // 日期选择器模态框HTML
+        const datePickerModalHTML = `
+            <div id="datePickerModal" class="modal" style="display: none;">
+                <div class="date-picker-content">
+                    <div class="date-picker-body">
+                        <div class="calendar-header">
+                            <button id="prevMonth" class="month-btn">&lt;</button>
+                            <div style="display: flex; align-items: center; gap: 15px; flex: 1; justify-content: center;">
+                                <button id="selectAllDates" class="month-btn" title="选择全部日期" style="display: none;">📋 全部</button>
+                                <span id="currentMonth" class="month-title"></span>
+                                <button id="toggleMultiSelect" class="month-btn" title="切换多选模式">📅</button>
+                            </div>
+                            <button id="nextMonth" class="month-btn">&gt;</button>
+                        </div>
+                        <div class="calendar-grid">
+                            <div class="weekdays">
+                                <div>一</div>
+                                <div>二</div>
+                                <div>三</div>
+                                <div>四</div>
+                                <div>五</div>
+                                <div>六</div>
+                                <div>日</div>
+                            </div>
+                            <div class="calendar-days" id="calendarDays"></div>
+                        </div>
+                        <div id="multiSelectInfo" style="margin-top: 10px; padding: 10px; background-color: #f0f8ff; border-radius: 6px; display: none;">
+                            <span style="color: #1890ff; font-size: 12px;">多选模式：可选择两个日期作为起止日期</span>
+                        </div>
+                    </div>
+
+                    <!-- 月份选择器 -->
+                    <div class="month-picker-overlay" id="monthPickerOverlay">
+                        <div class="month-picker">
+                            <div class="picker-header">
+                                <button class="picker-year-btn" id="prevYear">&lt;</button>
+                                <h3 id="pickerYear">2025</h3>
+                                <button class="picker-year-btn" id="nextYear">&gt;</button>
+                            </div>
+                            <div class="month-grid" id="monthGrid">
+                                <div class="month-item" data-month="0">1月</div>
+                                <div class="month-item" data-month="1">2月</div>
+                                <div class="month-item" data-month="2">3月</div>
+                                <div class="month-item" data-month="3">4月</div>
+                                <div class="month-item" data-month="4">5月</div>
+                                <div class="month-item" data-month="5">6月</div>
+                                <div class="month-item" data-month="6">7月</div>
+                                <div class="month-item" data-month="7">8月</div>
+                                <div class="month-item" data-month="8">9月</div>
+                                <div class="month-item" data-month="9">10月</div>
+                                <div class="month-item" data-month="10">11月</div>
+                                <div class="month-item" data-month="11">12月</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // 在body末尾添加日期选择器模态框
+        document.body.insertAdjacentHTML('beforeend', datePickerModalHTML);
+
+        // 格式化日期为显示格式
+        function formatDateForDisplay(dateStr) {
+            const [year, month, day] = dateStr.split('-');
+            return `${year}年${parseInt(month)}月${parseInt(day)}日`;
+        }
+
+        // 更新日期显示（在框内显示今天标识）
+        function updateDateDisplay() {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            const formattedToday = `${yyyy}-${mm}-${dd}`;
+            const workDateInput = document.getElementById('workDate');
+            const dateDisplay = document.getElementById('dateDisplay');
+            
+            // 检查是否为"全部"状态
+            if (workDateInput.dataset.selectAll === 'true') {
+                dateDisplay.innerHTML = '全部';
+                dateDisplay.classList.remove('today');
+                workDateInput.removeAttribute('data-today');
+                // 清除其他显示值
+                delete workDateInput.dataset.displayValue;
+                return;
+            }
+            
+            if (workDateInput.value) {
+                // 检查是否有多选日期的显示值
+                let displayText;
+                if (workDateInput.dataset.displayValue) {
+                    displayText = workDateInput.dataset.displayValue;
+                } else {
+                    // 单选模式，格式化单个日期
+                    displayText = formatDateForDisplay(workDateInput.value);
+                    
+                    // 检查是否为今天
+                    if (workDateInput.value === formattedToday) {
+                        displayText += '<span class="today-text">（今天）</span>';
+                    }
+                }
+                
+                dateDisplay.innerHTML = displayText;
+                
+                // 检查是否为今天（只在单选模式下检查）
+                if (!workDateInput.dataset.displayValue && workDateInput.value === formattedToday) {
+                    dateDisplay.classList.add('today');
+                    workDateInput.setAttribute('data-today', 'true');
+                } else {
+                    dateDisplay.classList.remove('today');
+                    workDateInput.removeAttribute('data-today');
+                }
+            } else {
+                dateDisplay.innerHTML = '请选择日期';
+                dateDisplay.classList.remove('today');
+                workDateInput.removeAttribute('data-today');
+                // 清除多选显示值和其他状态
+                delete workDateInput.dataset.displayValue;
+                delete workDateInput.dataset.selectAll;
+            }
+        }
+
+        // 设置当前日期到日期输入框并添加"今天"标识
+        function setTodayDate() {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            const formattedToday = `${yyyy}-${mm}-${dd}`;
+            const workDateInput = document.getElementById('workDate');
+            
+            // 设置默认日期为今天
+            workDateInput.value = formattedToday;
+            
+            // 更新显示
+            updateDateDisplay();
+        }
+
+        // 处理日期输入框交互
+        function setupDateInteraction() {
+            const workDateInput = document.getElementById('workDate');
+            
+            // 点击显示区域时激活输入框或打开日期选择器
+            const dateDisplay = document.getElementById('dateDisplay');
+            dateDisplay.addEventListener('click', function() {
+                showDatePicker();
+            });
+            
+            // 输入框点击时打开日期选择器
+            workDateInput.addEventListener('click', function(e) {
+                e.preventDefault();
+                showDatePicker();
+            });
+            
+            // 防止原生日期输入框获得焦点
+            workDateInput.addEventListener('focus', function(e) {
+                e.preventDefault();
+                this.blur(); // 立即失去焦点
+                showDatePicker();
+            });
+            
+            // 日期改变时更新显示
+            workDateInput.addEventListener('change', function() {
+                updateDateDisplay();
+            });
+        }
+
+        // 日期选择器状态管理
+        let datePickerState = {
+            currentDate: new Date(),
+            displayDate: new Date(),
+            singleSelectedDate: null, // 单选模式下的选中日期
+            multiSelectedDates: [], // 多选模式下的选中日期数组
+            isMultiSelect: false // 是否多选模式
+        };
+
+        // 月份选择器状态变量
+        let selectedYear = datePickerState.displayDate.getFullYear();
+        let selectedMonth = datePickerState.displayDate.getMonth();
+
+        // 显示日期选择器
+        function showDatePicker() {
+            // 立即保护明细checkbox状态，防止被意外重置
+            const detailCheckbox = document.getElementById('projectDetail');
+            const activeWorkType = document.querySelector('input[name="workType"]:checked');
+            
+            const modal = document.getElementById('datePickerModal');
+            modal.style.display = 'flex';
+            
+            // 初始化选择器状态
+            initializeDatePicker();
+            
+            // 渲染日历
+            renderCalendar();
+            
+            // 这里简化了原有的复杂保护逻辑，因为点工单页面结构简单
+        }
+
+        // 隐藏日期选择器
+        function hideDatePicker() {
+            const modal = document.getElementById('datePickerModal');
+            modal.style.display = 'none';
+        }
+
+        // 初始化日期选择器
+        function initializeDatePicker() {
+            const workDateInput = document.getElementById('workDate');
+            
+            // 检查当前标签状态 - 点工单版本
+            const activeTab = document.querySelector('input[name="workTab"]:checked');
+            const isDetailActive = activeTab && activeTab.value === '明细';
+            
+            // 在明细标签页面显示多选功能
+            const shouldShowMultiSelect = isDetailActive;
+            
+            // 控制多选图标的显示/隐藏
+            const toggleBtn = document.getElementById('toggleMultiSelect');
+            const multiSelectInfo = document.getElementById('multiSelectInfo');
+            const selectAllBtn = document.getElementById('selectAllDates');
+            
+            if (toggleBtn) {
+                if (shouldShowMultiSelect) {
+                    toggleBtn.style.setProperty('display', 'flex', 'important');
+                    toggleBtn.style.setProperty('visibility', 'visible', 'important');
+                    toggleBtn.style.setProperty('opacity', '1', 'important');
+                    toggleBtn.style.setProperty('align-items', 'center', 'important');
+                    toggleBtn.style.setProperty('justify-content', 'center', 'important');
+                } else {
+                    toggleBtn.style.setProperty('display', 'none', 'important');
+                }
+            }
+            
+            if (multiSelectInfo) {
+                if (!shouldShowMultiSelect) {
+                    multiSelectInfo.style.setProperty('display', 'none', 'important');
+                }
+            }
+            
+            // 控制全部按钮的显示/隐藏 - 只在多选模式下显示
+            if (selectAllBtn) {
+                if (shouldShowMultiSelect) {
+                    selectAllBtn.style.setProperty('display', 'flex', 'important');
+                    selectAllBtn.style.setProperty('align-items', 'center', 'important');
+                    selectAllBtn.style.setProperty('justify-content', 'center', 'important');
+                    selectAllBtn.style.setProperty('visibility', 'visible', 'important');
+                    selectAllBtn.style.setProperty('opacity', '1', 'important');
+                } else {
+                    selectAllBtn.style.setProperty('display', 'none', 'important');
+                }
+            }
+            
+            // 控制月份标题样式和功能 - 只在明细页面启用
+            const currentMonthEl = document.getElementById('currentMonth');
+            if (currentMonthEl) {
+                if (shouldShowMultiSelect) {
+                    currentMonthEl.classList.add('month-title');
+                } else {
+                    currentMonthEl.classList.remove('month-title');
+                }
+            }
+            
+            // 如果不是在允许多选的界面，重置为多选状态
+            if (!shouldShowMultiSelect) {
+                datePickerState.isMultiSelect = false;
+            }
+            
+            // 设置当前显示日期
+            if (workDateInput.value) {
+                datePickerState.displayDate = new Date(workDateInput.value + 'T00:00:00');
+                
+                // 检查是否为全部状态
+                if (workDateInput.dataset.selectAll === 'true') {
+                    datePickerState.singleSelectedDate = null;
+                    datePickerState.multiSelectedDates = [];
+                    datePickerState.isMultiSelect = false;
+                }
+                // 检查是否有多选日期
+                else if (shouldShowMultiSelect && workDateInput.dataset.displayValue && workDateInput.dataset.displayValue.includes('~')) {
+                    const dates = workDateInput.dataset.displayValue.split(' ~ ');
+                    if (dates.length === 2) {
+                        datePickerState.multiSelectedDates = dates;
+                        datePickerState.isMultiSelect = true;
+                        if (toggleBtn) {
+                            toggleBtn.innerHTML = '🔢';
+                            toggleBtn.title = '切换单选模式';
+                        }
+                        if (multiSelectInfo) multiSelectInfo.style.setProperty('display', 'block', 'important');
+                    }
+                } else {
+                    datePickerState.singleSelectedDate = workDateInput.value;
+                    datePickerState.isMultiSelect = false;
+                    if (toggleBtn) {
+                        toggleBtn.innerHTML = '📅';
+                        toggleBtn.title = '切换多选模式';
+                    }
+                }
+            } else {
+                datePickerState.displayDate = new Date();
+                datePickerState.isMultiSelect = false;
+                if (toggleBtn) {
+                    toggleBtn.innerHTML = '📅';
+                    toggleBtn.title = '切换多选模式';
+                }
+            }
+            
+            // 绑定事件监听器
+            bindDatePickerEvents();
+        }
+
+        // 绑定日期选择器事件
+        function bindDatePickerEvents() {
+            // 检查当前标签状态 - 点工单版本
+            const activeTab = document.querySelector('input[name="workTab"]:checked');
+            const isDetailActive = activeTab && activeTab.value === '明细';
+            const shouldShowMultiSelect = isDetailActive;
+            
+            // 多选切换按钮
+            const toggleBtn = document.getElementById('toggleMultiSelect');
+            if (toggleBtn) toggleBtn.onclick = toggleMultiSelect;
+            
+            // 月份切换
+            document.getElementById('prevMonth').onclick = () => changeMonth(-1);
+            document.getElementById('nextMonth').onclick = () => changeMonth(1);
+            
+            // 全部按钮
+            const selectAllBtn = document.getElementById('selectAllDates');
+            if (selectAllBtn) {
+                selectAllBtn.onclick = selectAllDates;
+            }
+            
+            // 月份标题点击事件
+            const currentMonthEl = document.getElementById('currentMonth');
+            if (currentMonthEl) {
+                if (shouldShowMultiSelect) {
+                    currentMonthEl.onclick = showMonthPicker;
+                    currentMonthEl.classList.add('month-title');
+                } else {
+                    currentMonthEl.onclick = null;
+                    currentMonthEl.classList.remove('month-title');
+                }
+            }
+            
+            // 月份选择器事件
+            // 移除条件判断，确保月份选择功能在所有情况下都能正常工作
+            const prevYearBtn = document.getElementById('prevYear');
+            const nextYearBtn = document.getElementById('nextYear');
+            const monthPickerOverlay = document.getElementById('monthPickerOverlay');
+            
+            if (prevYearBtn) prevYearBtn.onclick = () => changePickerYear(-1);
+            if (nextYearBtn) nextYearBtn.onclick = () => changePickerYear(1);
+            
+            if (monthPickerOverlay) {
+                monthPickerOverlay.addEventListener('click', function(e) {
+                    if (e.target === monthPickerOverlay) {
+                        hideMonthPicker();
+                    }
+                });
+            }
+            
+            const monthItems = document.querySelectorAll('.month-item');
+            monthItems.forEach(item => {
+                item.onclick = function() {
+                    const month = parseInt(this.dataset.month);
+                    selectMonth(month);
+                };
+            });
+            
+            // 点击模态框外部关闭
+            const modal = document.getElementById('datePickerModal');
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    hideDatePicker();
+                }
+            });
+        }
+
+        // 显示月份选择器
+        function showMonthPicker() {
+            const monthPickerOverlay = document.getElementById('monthPickerOverlay');
+            const pickerYearEl = document.getElementById('pickerYear');
+            const monthItems = document.querySelectorAll('.month-item');
+            
+            if (monthPickerOverlay && pickerYearEl) {
+                selectedYear = datePickerState.displayDate.getFullYear();
+                selectedMonth = datePickerState.displayDate.getMonth();
+                pickerYearEl.textContent = selectedYear;
+                
+                // 获取当前日期
+                const today = new Date();
+                const currentYear = today.getFullYear();
+                const currentMonth = today.getMonth();
+                
+                monthItems.forEach(item => {
+                    item.classList.remove('selected');
+                    item.classList.remove('disabled');
+                    item.style.cursor = 'pointer';
+                    item.style.opacity = '1';
+                    item.style.pointerEvents = 'auto';
+                    
+                    const month = parseInt(item.dataset.month);
+                    
+                    // 检查是否是未来月份
+                    if (selectedYear > currentYear || (selectedYear === currentYear && month > currentMonth)) {
+                        // 未来月份，灰色显示并不可选择
+                        item.classList.add('disabled');
+                        item.style.cursor = 'not-allowed';
+                        item.style.opacity = '0.5';
+                        item.style.pointerEvents = 'none';
+                    } else if (month === selectedMonth) {
+                        item.classList.add('selected');
+                    }
+                });
+                
+                monthPickerOverlay.style.display = 'flex';
+            }
+        }
+        
+        // 隐藏月份选择器
+        function hideMonthPicker() {
+            const monthPickerOverlay = document.getElementById('monthPickerOverlay');
+            if (monthPickerOverlay) {
+                monthPickerOverlay.style.display = 'none';
+            }
+        }
+        
+        // 改变年份选择器的年份
+        function changePickerYear(delta) {
+            const pickerYearEl = document.getElementById('pickerYear');
+            if (pickerYearEl) {
+                selectedYear += delta;
+                pickerYearEl.textContent = selectedYear;
+                
+                // 更新月份禁用状态
+                const monthItems = document.querySelectorAll('.month-item');
+                const today = new Date();
+                const currentYear = today.getFullYear();
+                const currentMonth = today.getMonth();
+                
+                monthItems.forEach(item => {
+                    item.classList.remove('disabled');
+                    item.style.cursor = 'pointer';
+                    item.style.opacity = '1';
+                    item.style.pointerEvents = 'auto';
+                    
+                    const month = parseInt(item.dataset.month);
+                    
+                    // 检查是否是未来月份
+                    if (selectedYear > currentYear || (selectedYear === currentYear && month > currentMonth)) {
+                        // 未来月份，灰色显示并不可选择
+                        item.classList.add('disabled');
+                        item.style.cursor = 'not-allowed';
+                        item.style.opacity = '0.5';
+                        item.style.pointerEvents = 'none';
+                    }
+                });
+            }
+        }
+        
+        // 选择月份
+        function selectMonth(month) {
+            const pickerYearEl = document.getElementById('pickerYear');
+            if (pickerYearEl) {
+                const selectedYear = parseInt(pickerYearEl.textContent);
+                datePickerState.displayDate = new Date(selectedYear, month);
+                const firstDay = new Date(selectedYear, month, 1);
+                const lastDay = new Date(selectedYear, month + 1, 0);
+                
+                const formatDate = (date) => {
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                };
+                
+                const startDate = formatDate(firstDay);
+                const endDate = formatDate(lastDay);
+                
+                const workDateInput = document.getElementById('workDate');
+                workDateInput.value = startDate;
+                workDateInput.dataset.displayValue = `${startDate} ~ ${endDate}`;
+                delete workDateInput.dataset.selectAll;
+                
+                updateDateDisplay();
+                workDateInput.dispatchEvent(new Event('change', { bubbles: true }));
+                renderCalendar();
+                hideMonthPicker();
+                hideDatePicker();
+            }
+        }
+
+        // 选择全部日期
+        function selectAllDates() {
+            const workDateInput = document.getElementById('workDate');
+            workDateInput.value = '';
+            delete workDateInput.dataset.displayValue;
+            workDateInput.dataset.selectAll = 'true';
+            updateDateDisplay();
+            workDateInput.dispatchEvent(new Event('change', { bubbles: true }));
+            hideDatePicker();
+        }
+
+        // 切换多选模式
+        function toggleMultiSelect() {
+            // 检查当前标签状态 - 点工单版本
+            const activeTab = document.querySelector('input[name="workTab"]:checked');
+            const isDetailActive = activeTab && activeTab.value === '明细';
+            
+            if (!isDetailActive) return;
+            
+            datePickerState.isMultiSelect = !datePickerState.isMultiSelect;
+            
+            const toggleBtn = document.getElementById('toggleMultiSelect');
+            const multiSelectInfo = document.getElementById('multiSelectInfo');
+            const selectAllBtn = document.getElementById('selectAllDates');
+            
+            if (datePickerState.isMultiSelect) {
+                toggleBtn.innerHTML = '🔢';
+                toggleBtn.title = '切换单选模式';
+                multiSelectInfo.style.setProperty('display', 'block', 'important');
+                if (selectAllBtn) selectAllBtn.style.setProperty('display', 'flex', 'important');
+                datePickerState.multiSelectedDates = [];
+                datePickerState.singleSelectedDate = null;
+            } else {
+                toggleBtn.innerHTML = '📅';
+                toggleBtn.title = '切换多选模式';
+                if (selectAllBtn) selectAllBtn.style.setProperty('display', 'none', 'important');
+                multiSelectInfo.style.setProperty('display', 'none', 'important');
+                datePickerState.multiSelectedDates = [];
+                datePickerState.singleSelectedDate = null;
+            }
+            renderCalendar();
+        }
+
+        // 渲染日历
+        function renderCalendar() {
+            const currentMonthEl = document.getElementById('currentMonth');
+            const calendarDays = document.getElementById('calendarDays');
+            
+            const year = datePickerState.displayDate.getFullYear();
+            const month = datePickerState.displayDate.getMonth();
+            
+            currentMonthEl.textContent = `${year}年${month + 1}月`;
+            updateMonthNavigationButtons(year, month);
+            
+            calendarDays.innerHTML = '';
+            
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const firstDayOfWeek = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
+            const daysInMonth = lastDay.getDate();
+            
+            const prevMonth = new Date(year, month - 1, 0);
+            const daysInPrevMonth = prevMonth.getDate();
+            
+            for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+                const day = daysInPrevMonth - i;
+                const dateStr = formatDate(year, month - 1, day);
+                const dayEl = createDayElement(day, true, dateStr);
+                calendarDays.appendChild(dayEl);
+            }
+            
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = formatDate(year, month, day);
+                const dayEl = createDayElement(day, false, dateStr);
+                calendarDays.appendChild(dayEl);
+            }
+            
+            const totalCells = calendarDays.children.length;
+            const remainingCells = 42 - totalCells;
+            for (let day = 1; day <= remainingCells; day++) {
+                const dateStr = formatDate(year, month + 1, day);
+                const dayEl = createDayElement(day, true, dateStr);
+                calendarDays.appendChild(dayEl);
+            }
+        }
+
+        // 更新月份导航按钮状态
+        function updateMonthNavigationButtons(year, month) {
+            const today = new Date();
+            const currentYear = today.getFullYear();
+            const currentMonth = today.getMonth();
+            const nextMonthBtn = document.getElementById('nextMonth');
+            
+            if (year > currentYear || (year === currentYear && month >= currentMonth)) {
+                nextMonthBtn.disabled = true;
+                nextMonthBtn.style.opacity = '0.3';
+                nextMonthBtn.style.cursor = 'not-allowed';
+            } else {
+                nextMonthBtn.disabled = false;
+                nextMonthBtn.style.opacity = '1';
+                nextMonthBtn.style.cursor = 'pointer';
+            }
+        }
+
+        // 农历转换
+        function getLunarCalendar(dateStr) {
+            const date = new Date(dateStr + 'T00:00:00');
+            const year = date.getFullYear();
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            const lunarDays = ['初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十',
+                              '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十',
+                              '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十'];
+            const offset = (year - 2000) * 12 + month;
+            const lunarDayIndex = (day + offset) % 30;
+            return `${lunarDays[lunarDayIndex]}`;
+        }
+
+        // 创建日期元素
+        function createDayElement(day, isOtherMonth, dateStr) {
+            const dayEl = document.createElement('div');
+            dayEl.className = 'day-cell';
+            dayEl.dataset.date = dateStr;
+            
+            const dayContent = document.createElement('div');
+            dayContent.style.display = 'flex';
+            dayContent.style.flexDirection = 'column';
+            dayContent.style.alignItems = 'center';
+            dayContent.style.justifyContent = 'center';
+            dayContent.style.height = '100%';
+            dayContent.style.padding = '5px';
+            
+            const dayNumber = document.createElement('span');
+            dayNumber.textContent = day;
+            dayNumber.style.fontSize = '14px';
+            dayNumber.style.fontWeight = 'bold';
+            dayContent.appendChild(dayNumber);
+            
+            if (!isOtherMonth) {
+                const lunarCalendar = getLunarCalendar(dateStr);
+                const lunarElement = document.createElement('span');
+                lunarElement.textContent = lunarCalendar;
+                lunarElement.style.fontSize = '10px';
+                lunarElement.style.color = '#999';
+                lunarElement.style.marginTop = '2px';
+                dayContent.appendChild(lunarElement);
+            }
+            
+            dayEl.appendChild(dayContent);
+            
+            if (isOtherMonth) {
+                dayEl.classList.add('other-month');
+                return dayEl;
+            }
+            
+            const today = new Date();
+            const todayStr = formatDate(today.getFullYear(), today.getMonth(), today.getDate());
+            if (dateStr === todayStr) {
+                dayEl.classList.add('today');
+            }
+            
+            const selectedDate = new Date(dateStr + 'T00:00:00');
+            if (selectedDate > today) {
+                dayEl.classList.add('disabled-future');
+                dayEl.style.cursor = 'not-allowed';
+                return dayEl;
+            }
+            
+            if (!datePickerState.isMultiSelect && dateStr === datePickerState.singleSelectedDate) {
+                dayEl.classList.add('selected-single');
+            }
+            
+            if (datePickerState.isMultiSelect && datePickerState.multiSelectedDates.includes(dateStr)) {
+                dayEl.classList.add('selected-multi');
+            }
+            
+            dayEl.addEventListener('click', () => selectDate(dateStr));
+            return dayEl;
+        }
+
+        // 选择日期
+        function selectDate(dateStr) {
+            if (datePickerState.isMultiSelect) {
+                const index = datePickerState.multiSelectedDates.indexOf(dateStr);
+                if (index > -1) {
+                    datePickerState.multiSelectedDates.splice(index, 1);
+                } else {
+                    if (datePickerState.multiSelectedDates.length < 2) {
+                        datePickerState.multiSelectedDates.push(dateStr);
+                        datePickerState.multiSelectedDates.sort();
+                    } else {
+                        datePickerState.multiSelectedDates[0] = datePickerState.multiSelectedDates[1];
+                        datePickerState.multiSelectedDates[1] = dateStr;
+                    }
+                }
+                
+                if (datePickerState.multiSelectedDates.length === 2) {
+                    const startDate = datePickerState.multiSelectedDates[0];
+                    const endDate = datePickerState.multiSelectedDates[1];
+                    const workDateInput = document.getElementById('workDate');
+                    workDateInput.value = startDate;
+                    workDateInput.dataset.displayValue = `${startDate} ~ ${endDate}`;
+                    delete workDateInput.dataset.selectAll;
+                    updateDateDisplay();
+                    workDateInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    setTimeout(() => { hideDatePicker(); }, 500);
+                }
+            } else {
+                datePickerState.singleSelectedDate = dateStr;
+                const workDateInput = document.getElementById('workDate');
+                workDateInput.value = dateStr;
+                delete workDateInput.dataset.displayValue;
+                delete workDateInput.dataset.selectAll;
+                updateDateDisplay();
+                workDateInput.dispatchEvent(new Event('change', { bubbles: true }));
+                hideDatePicker();
+            }
+            renderCalendar();
+        }
+
+        // 改变月份
+        function changeMonth(delta) {
+            const newDate = new Date(datePickerState.displayDate);
+            newDate.setMonth(newDate.getMonth() + delta);
+            
+            const today = new Date();
+            const currentYear = today.getFullYear();
+            const currentMonth = today.getMonth();
+            const newYear = newDate.getFullYear();
+            const newMonth = newDate.getMonth();
+            
+            if (newYear > currentYear || (newYear === currentYear && newMonth > currentMonth)) {
+                return;
+            }
+            
+            datePickerState.displayDate = newDate;
+            renderCalendar();
+        }
+
+        // 格式化日期
+        function formatDate(year, month, day) {
+            const adjustedMonth = month < 0 ? 11 : (month > 11 ? 0 : month);
+            const adjustedYear = month < 0 ? year - 1 : (month > 11 ? year + 1 : year);
+            const yyyy = adjustedYear;
+            const mm = String(adjustedMonth + 1).padStart(2, '0');
+            const dd = String(day).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+        
+        // 页面初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 通知父页面更新标题
+            if (window.parent && window.parent !== window) {
+                const targetOrigin = window.location.origin || '*';
+                window.parent.postMessage({
+                    type: 'updateTitle',
+                    page: '点工单.html'
+                }, targetOrigin);
+            }
+
+            setTodayDate();
+            setupDateInteraction();
+
+            // 标签切换处理
+            const tabRadios = document.querySelectorAll('input[name="workTab"]');
+            const tabLabels = document.querySelectorAll('.work-type-option');
+            const tabWorkContent = document.querySelectorAll('.tab-work-content');
+
+            window.updateTabContent = function(selectedValue) {
+                const detailTableSection = document.getElementById('detailTableSection');
+                const bottomButtons = document.querySelector('.bottom-buttons');
+                const totalAmountDisplay = document.getElementById('totalAmountDisplay');
+                const tabWorkContent = document.querySelectorAll('.tab-work-content');
+
+                if (selectedValue === '明细') {
+                    // 隐藏记工相关内容
+                    tabWorkContent.forEach(element => {
+                        element.style.display = 'none';
+                    });
+                    
+                    // 如果正在编辑模式，退出编辑模式
+                    if (window.isEditMode) {
+                        exitEditMode();
+                    }
+                    
+                    // 显示明细表格
+                    detailTableSection.style.display = 'block';
+                    // 隐藏保存按钮
+                    if (bottomButtons) bottomButtons.style.display = 'none';
+                    // 显示合计和生成PDF按钮
+                    if (totalAmountDisplay) totalAmountDisplay.style.display = 'flex';
+                    // 加载明细数据
+                    loadDetailData();
+                } else {
+                    // 显示所有记工相关内容
+                    tabWorkContent.forEach(element => {
+                        element.style.display = '';
+                    });
+                    // 隐藏明细表格
+                    detailTableSection.style.display = 'none';
+                    // 显示保存按钮
+                    if (bottomButtons) bottomButtons.style.display = 'flex';
+                    // 隐藏合计和生成PDF按钮
+                    if (totalAmountDisplay) totalAmountDisplay.style.display = 'none';
+                }
+            };
+
+            function updateTabContent(selectedValue) {
+                window.updateTabContent(selectedValue);
+            }
+
+            tabRadios.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    // 移除所有label的active类
+                    tabLabels.forEach(label => {
+                        label.classList.remove('active');
+                    });
+                    // 为选中的label添加active类
+                    const selectedLabel = document.querySelector(`label[for="${this.id}"]`);
+                    if (selectedLabel) {
+                        selectedLabel.classList.add('active');
+                    }
+                    // 更新内容显示
+                    updateTabContent(this.value);
+                });
+            });
+
+            // 添加日期变更事件监听器，当在明细界面变更日期时刷新数据
+            const workDateInput = document.getElementById('workDate');
+            workDateInput.addEventListener('change', function() {
+                // 检查当前是否在明细标签页面
+                const activeTab = document.querySelector('input[name="workTab"]:checked');
+                if (activeTab && activeTab.value === '明细') {
+                    // 延迟加载，确保日期值已更新
+                    setTimeout(() => {
+                        loadDetailData();
+                    }, 100);
+                }
+            });
+
+            // 添加日期范围变更事件监听器（如果有）
+            // 监听日期选择器的确认事件
+            document.addEventListener('datePickerConfirm', function() {
+                // 检查当前是否在明细标签页面
+                const activeTab = document.querySelector('input[name="workTab"]:checked');
+                if (activeTab && activeTab.value === '明细') {
+                    setTimeout(() => {
+                        loadDetailData();
+                    }, 100);
+                }
+            });
+
+            // 初始化筛选功能
+            initializeFiltering();
+            
+            // 简单的项目名称获取逻辑
+            const urlParams = new URLSearchParams(window.location.search);
+            const projectIdFromUrl = urlParams.get('project_id');
+            const storedName = localStorage.getItem('currentProjectName');
+            const storedId = localStorage.getItem('currentProjectId');
+            
+            // 处理从云相册跳转过来的参数
+            const workDateFromUrl = urlParams.get('work_date');
+            const showDetailFromUrl = urlParams.get('show_detail');
+
+            // 优先处理明细标签切换
+            if (showDetailFromUrl === 'true') {
+                // 立即设置明细标签选中
+                const detailTab = document.querySelector('input[name="workTab"][value="明细"]');
+                const workTab = document.querySelector('input[name="workTab"][value="记工"]');
+                
+                if (detailTab) {
+                    detailTab.checked = true;
+                    if (workTab) workTab.checked = false;
+                    
+                    // 额外确保UI更新
+                    const tabLabels = document.querySelectorAll('.work-type-option');
+                    tabLabels.forEach(label => label.classList.remove('active'));
+                    const selectedLabel = document.querySelector(`label[for="${detailTab.id}"]`);
+                    if (selectedLabel) selectedLabel.classList.add('active');
+                    
+                    // 立即隐藏记工相关内容，显示明细相关内容
+                    const detailTableSection = document.getElementById('detailTableSection');
+                    const tabWorkContent = document.querySelectorAll('.tab-work-content');
+                    const bottomButtons = document.querySelector('.bottom-buttons');
+                    const totalAmountDisplay = document.getElementById('totalAmountDisplay');
+                    
+                    // 隐藏记工内容
+                    tabWorkContent.forEach(element => element.style.display = 'none');
+                    // 显示明细内容
+                    if (detailTableSection) detailTableSection.style.display = 'block';
+                    // 隐藏保存按钮
+                    if (bottomButtons) bottomButtons.style.display = 'none';
+                    // 显示合计
+                    if (totalAmountDisplay) totalAmountDisplay.style.display = 'flex';
+                }
+            }
+
+            if (workDateFromUrl) {
+                const workDateInput = document.getElementById('workDate');
+                if (workDateInput) {
+                    workDateInput.value = workDateFromUrl;
+                    // 触发change事件以更新相关逻辑
+                    workDateInput.dispatchEvent(new Event('change'));
+                }
+            }
+
+            if (showDetailFromUrl === 'true') {
+                // 延迟再次触发以确保数据加载
+                setTimeout(() => {
+                    if (window.updateTabContent) {
+                        window.updateTabContent('明细');
+                    }
+                }, 100);
+            }
+
+            // 如果URL中有ID，且与存储的ID一致，则使用存储的名称
+            if (projectIdFromUrl && projectIdFromUrl === storedId && storedName) {
+                document.getElementById('projectName').value = storedName;
+            } else if (storedName) {
+                // 如果URL中没有ID，但本地有存储，也填充（或者你可以决定清空）
+                // 这里为了方便，如果URL没有ID，我们假设用户是想继续操作上次的项目
+                 document.getElementById('projectName').value = storedName;
+            }
+            
+            // 注意：这里没有实现从Supabase根据ID查名称的逻辑，因为需要引入project_finance_api.js中的projects变量
+            // 如果需要完整功能，建议确保projects变量已加载
+
+            // 班组输入框交互逻辑
+            const teamInput = document.getElementById('teamName');
+            
+            function updateTeamInputStyle() {
+                if (teamInput.value && teamInput.value.trim() !== '') {
+                    teamInput.classList.add('has-value');
+                } else {
+                    teamInput.classList.remove('has-value');
+                }
+            }
+            
+            // 监听输入和变化事件
+            teamInput.addEventListener('input', updateTeamInputStyle);
+            teamInput.addEventListener('change', updateTeamInputStyle);
+            
+            // 初始化检查
+            updateTeamInputStyle();
+
+            // 班组长输入框交互逻辑
+            const teamLeaderInput = document.getElementById('teamLeader');
+            
+            function updateTeamLeaderInputStyle() {
+                if (teamLeaderInput.value && teamLeaderInput.value.trim() !== '') {
+                    teamLeaderInput.classList.add('has-value');
+                } else {
+                    teamLeaderInput.classList.remove('has-value');
+                }
+            }
+            
+            teamLeaderInput.addEventListener('input', updateTeamLeaderInputStyle);
+            teamLeaderInput.addEventListener('change', updateTeamLeaderInputStyle);
+            updateTeamLeaderInputStyle();
+
+            // 工日输入框交互逻辑
+            const workDaysInput = document.getElementById('workDays');
+            const workDaysUnit = document.getElementById('workDaysUnit');
+            
+            function updateWorkDaysInputStyle() {
+                if (workDaysInput.value && workDaysInput.value.trim() !== '') {
+                    workDaysInput.classList.add('has-value');
+                } else {
+                    workDaysInput.classList.remove('has-value');
+                }
+            }
+            
+            workDaysInput.addEventListener('input', updateWorkDaysInputStyle);
+            workDaysInput.addEventListener('change', updateWorkDaysInputStyle);
+            updateWorkDaysInputStyle();
+
+            // 单价输入框交互逻辑
+            const unitPriceInput = document.getElementById('unitPrice');
+
+            function updateUnitPriceInputStyle() {
+                if (unitPriceInput.value && unitPriceInput.value.trim() !== '') {
+                    unitPriceInput.classList.add('has-value');
+                } else {
+                    unitPriceInput.classList.remove('has-value');
+                }
+                // 触发金额计算
+                calculateAmount();
+            }
+
+            unitPriceInput.addEventListener('input', updateUnitPriceInputStyle);
+            unitPriceInput.addEventListener('change', updateUnitPriceInputStyle);
+            updateUnitPriceInputStyle();
+
+            // 金额输入框交互逻辑
+            const amountInput = document.getElementById('amount');
+
+            function updateAmountInputStyle() {
+                if (amountInput.value && amountInput.value.trim() !== '') {
+                    amountInput.classList.add('has-value');
+                } else {
+                    amountInput.classList.remove('has-value');
+                }
+            }
+
+            // 自动计算金额
+            function calculateAmount() {
+                const workDays = parseFloat(workDaysInput.value) || 0;
+                const unitPrice = parseFloat(unitPriceInput.value) || 0;
+
+                // 计算金额
+                const amount = workDays * unitPrice;
+
+                // 如果有工日和单价，则更新金额
+                if (workDays > 0 && unitPrice > 0) {
+                    // 四舍五入到一位小数
+                    const roundedAmount = Math.round(amount * 10) / 10;
+
+                    // 如果金额是整数，显示为整数；否则保留一位小数
+                    if (roundedAmount === Math.floor(roundedAmount)) {
+                        amountInput.value = roundedAmount.toString();
+                    } else {
+                        amountInput.value = roundedAmount.toFixed(1);
+                    }
+                    updateAmountInputStyle();
+                }
+            }
+
+            // 为工日输入框添加计算事件
+            workDaysInput.addEventListener('input', calculateAmount);
+            workDaysInput.addEventListener('change', calculateAmount);
+
+            amountInput.addEventListener('input', updateAmountInputStyle);
+            amountInput.addEventListener('change', updateAmountInputStyle);
+            updateAmountInputStyle();
+
+            // 工作内容输入框交互逻辑
+            const descriptionInput = document.getElementById('description');
+            
+            function updateDescriptionInputStyle() {
+                if (descriptionInput.value && descriptionInput.value.trim() !== '') {
+                    descriptionInput.classList.add('has-value');
+                } else {
+                    descriptionInput.classList.remove('has-value');
+                }
+            }
+            
+            descriptionInput.addEventListener('input', updateDescriptionInputStyle);
+            descriptionInput.addEventListener('change', updateDescriptionInputStyle);
+            updateDescriptionInputStyle();
+
+            // 初始化图片上传功能
+            initializeImageUpload();
+        });
+        
+        // 班组长记忆功能相关函数
+        function loadTeamLeaderMemory() {
+            const memoryList = document.getElementById('teamLeaderMemoryList');
+            const savedLeaders = JSON.parse(localStorage.getItem('teamLeaderMemory') || '[]');
+            memoryList.innerHTML = '';
+            savedLeaders.forEach(leader => {
+                const option = document.createElement('option');
+                option.value = leader;
+                memoryList.appendChild(option);
+            });
+        }
+
+        function saveTeamLeaderToMemory() {
+            const leaderInput = document.getElementById('teamLeader');
+            const leader = leaderInput.value.trim();
+            if (leader) {
+                const savedLeaders = JSON.parse(localStorage.getItem('teamLeaderMemory') || '[]');
+                if (!savedLeaders.includes(leader)) {
+                    savedLeaders.push(leader);
+                    // 限制记忆条数
+                    if (savedLeaders.length > 10) {
+                        savedLeaders.shift();
+                    }
+                    localStorage.setItem('teamLeaderMemory', JSON.stringify(savedLeaders));
+                }
+            }
+        }
+
+        function filterTeamLeaderMemory() {
+            const leaderInput = document.getElementById('teamLeader');
+            const value = leaderInput.value.toLowerCase();
+            const memoryList = document.getElementById('teamLeaderMemoryList');
+            const savedLeaders = JSON.parse(localStorage.getItem('teamLeaderMemory') || '[]');
+            memoryList.innerHTML = '';
+            savedLeaders.filter(leader => leader.toLowerCase().includes(value)).forEach(leader => {
+                const option = document.createElement('option');
+                option.value = leader;
+                memoryList.appendChild(option);
+            });
+        }
+
+        // 初始化筛选功能
+        function initializeFiltering() {
+            // 日期筛选
+            const dateFilterArrow = document.getElementById('dateFilterArrow');
+            const dateFilter = document.getElementById('dateFilter');
+            
+            if (dateFilterArrow && dateFilter) {
+                dateFilter.addEventListener('change', function() {
+                    // 应用筛选
+                    applyFilters();
+                });
+
+                dateFilterArrow.addEventListener('click', function() {
+                    dateFilter.style.opacity = '1';
+                    dateFilter.style.pointerEvents = 'auto';
+                    dateFilter.focus();
+                    if (typeof dateFilter.showPicker === 'function') {
+                        dateFilter.showPicker();
+                    } else {
+                        dateFilter.click();
+                    }
+                });
+
+                dateFilter.addEventListener('blur', function() {
+                    dateFilter.style.opacity = '0';
+                    dateFilter.style.pointerEvents = 'none';
+                });
+            }
+            
+            // 班组筛选
+            const teamFilterArrow = document.getElementById('teamFilterArrow');
+            const teamFilter = document.getElementById('teamFilter');
+            
+            if (teamFilterArrow && teamFilter) {
+                teamFilter.addEventListener('change', function() {
+                    // 应用筛选
+                    applyFilters();
+                });
+
+                teamFilterArrow.addEventListener('click', function() {
+                    teamFilter.style.opacity = '1';
+                    teamFilter.style.pointerEvents = 'auto';
+                    teamFilter.focus();
+                    if (typeof teamFilter.showPicker === 'function') {
+                        teamFilter.showPicker();
+                    } else {
+                        teamFilter.click();
+                    }
+                });
+
+                teamFilter.addEventListener('blur', function() {
+                    teamFilter.style.opacity = '0';
+                    teamFilter.style.pointerEvents = 'none';
+                });
+            }
+        }
+        
+        // 应用筛选
+        function applyFilters() {
+            const dateFilter = document.getElementById('dateFilter');
+            const teamFilter = document.getElementById('teamFilter');
+            
+            const selectedDate = dateFilter ? dateFilter.value : '';
+            const selectedTeam = teamFilter ? teamFilter.value : '';
+            
+            // 获取当前表格数据
+            const tbody = document.getElementById('detailTableBody');
+            const rows = tbody.querySelectorAll('tr');
+            
+            rows.forEach(row => {
+                const dateCell = row.querySelector('td:nth-child(2)');
+                const teamCell = row.querySelector('td:nth-child(3)');
+                
+                const rowDate = dateCell ? dateCell.textContent.trim() : '';
+                const rowTeam = teamCell ? teamCell.textContent.trim() : '';
+                
+                let showRow = true;
+                
+                if (selectedDate && rowDate !== selectedDate) {
+                    showRow = false;
+                }
+                
+                if (selectedTeam && rowTeam !== selectedTeam) {
+                    showRow = false;
+                }
+                
+                row.style.display = showRow ? '' : 'none';
+            });
+        }
+        
+        // 更新筛选选项
+        function updateFilterOptions(data) {
+            // 更新日期筛选选项
+            const dateFilter = document.getElementById('dateFilter');
+            if (dateFilter) {
+                const dates = new Set();
+                data.forEach(item => {
+                    if (item.record_date) {
+                        dates.add(item.record_date);
+                    }
+                });
+                
+                // 清空现有选项，保留"全部"
+                const allOption = dateFilter.querySelector('option[value=""]');
+                dateFilter.innerHTML = '';
+                if (allOption) {
+                    dateFilter.appendChild(allOption);
+                } else {
+                    const newAllOption = document.createElement('option');
+                    newAllOption.value = '';
+                    newAllOption.textContent = '全部';
+                    dateFilter.appendChild(newAllOption);
+                }
+                
+                // 添加日期选项
+                Array.from(dates).sort().forEach(date => {
+                    const option = document.createElement('option');
+                    option.value = date;
+                    option.textContent = date;
+                    dateFilter.appendChild(option);
+                });
+            }
+            
+            // 更新班组筛选选项
+            const teamFilter = document.getElementById('teamFilter');
+            if (teamFilter) {
+                const teams = new Set();
+                data.forEach(item => {
+                    if (item.team_name) {
+                        teams.add(item.team_name);
+                    }
+                });
+                
+                // 清空现有选项，保留"全部"
+                const allOption = teamFilter.querySelector('option[value=""]');
+                teamFilter.innerHTML = '';
+                if (allOption) {
+                    teamFilter.appendChild(allOption);
+                } else {
+                    const newAllOption = document.createElement('option');
+                    newAllOption.value = '';
+                    newAllOption.textContent = '全部';
+                    teamFilter.appendChild(newAllOption);
+                }
+                
+                // 添加班组选项
+                Array.from(teams).sort().forEach(team => {
+                    const option = document.createElement('option');
+                    option.value = team;
+                    option.textContent = team;
+                    teamFilter.appendChild(option);
+                });
+            }
+        }
+
+        // 加载明细数据
+        async function loadDetailData() {
+            try {
+                const projectId = localStorage.getItem('currentProjectId');
+                if (!projectId) {
+                    console.warn('未找到项目ID');
+                    // 显示空数据状态
+                    renderDetailTable([]);
+                    return;
+                }
+
+                // 获取当前选择的日期范围
+                const workDateInput = document.getElementById('workDate');
+                let startDate = '';
+                let endDate = '';
+
+                if (workDateInput.dataset.selectAll) {
+                    // 全选模式，不设置日期范围
+                } else if (workDateInput.dataset.displayValue) {
+                    // 范围选择模式
+                    const dateRange = workDateInput.dataset.displayValue.split(' ~ ');
+                    if (dateRange.length === 2) {
+                        startDate = dateRange[0];
+                        endDate = dateRange[1];
+                    }
+                } else if (workDateInput.value) {
+                    // 单选模式
+                    startDate = workDateInput.value;
+                    endDate = workDateInput.value;
+                } else {
+                    // 日期值为空，设置为今天
+                    const today = new Date();
+                    const yyyy = today.getFullYear();
+                    const mm = String(today.getMonth() + 1).padStart(2, '0');
+                    const dd = String(today.getDate()).padStart(2, '0');
+                    const formattedToday = `${yyyy}-${mm}-${dd}`;
+                    startDate = formattedToday;
+                    endDate = formattedToday;
+                }
+
+                // 验证日期参数 (非全选模式下)
+                if (!workDateInput.dataset.selectAll && (!startDate || !endDate)) {
+                    console.warn('日期参数无效');
+                    renderDetailTable([]);
+                    return;
+                }
+
+                // 显示加载状态
+                const tbody = document.getElementById('detailTableBody');
+                if (tbody) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 20px; color: #999;">
+                                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                                    <div style="margin-bottom: 10px; font-size: 24px;">⌛</div>
+                                    <div>数据加载中...</div>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }
+
+                // 从数据库查询点工单数据
+                // 优先检查网络状态，如果是离线模式，直接从本地存储获取
+                if (!navigator.onLine) {
+                    console.log('离线模式：从本地存储获取点工单数据');
+                    const localStorageKey = 'work_records';
+                    const storedData = localStorage.getItem(localStorageKey);
+                    let localRecords = [];
+                    
+                    if (storedData) {
+                        try {
+                            localRecords = JSON.parse(storedData);
+                        } catch (e) {
+                            console.error('解析本地点工单数据失败:', e);
+                        }
+                    }
+                    
+                    // 根据筛选条件过滤本地数据
+                    let filteredRecords = localRecords.filter(record => record.project_id === projectId);
+                    
+                    // 如果不是全选模式，添加日期筛选
+                    if (!workDateInput.dataset.selectAll) {
+                        filteredRecords = filteredRecords.filter(record => {
+                            return record.record_date >= startDate && record.record_date <= endDate;
+                        });
+                    }
+                    
+                    // 排序：日期升序，创建时间升序
+                    filteredRecords.sort((a, b) => {
+                        if (a.record_date !== b.record_date) {
+                            return a.record_date.localeCompare(b.record_date);
+                        }
+                        return (a.created_at || '').localeCompare(b.created_at || '');
+                    });
+                    
+                    // 更新筛选选项
+                    updateFilterOptions(filteredRecords);
+                    
+                    // 渲染表格数据
+                    renderDetailTable(filteredRecords);
+                    // 更新合计金额
+                    updateTotalAmount(filteredRecords);
+                    return;
+                }
+
+                // 使用实际的表名 work_records
+                let query = supabase
+                    .from('work_records')
+                    .select('*')
+                    .eq('project_id', projectId);
+
+                // 如果不是全选模式，添加日期筛选
+                if (!workDateInput.dataset.selectAll) {
+                    query = query
+                        .gte('record_date', startDate)
+                        .lte('record_date', endDate);
+                }
+
+                const { data: workOrders, error } = await query
+                    .order('record_date', { ascending: true })
+                    .order('created_at', { ascending: true });
+
+                if (error) {
+                    console.error('查询点工单数据失败:', error);
+                    
+                    // 如果是网络错误，尝试从本地存储获取数据作为降级方案
+                    if (error.message && (error.message.includes('fetch') || error.message.includes('network'))) {
+                        console.log('网络请求失败，尝试从本地存储获取数据');
+                        const localStorageKey = 'work_records';
+                        const storedData = localStorage.getItem(localStorageKey);
+                        let localRecords = [];
+                        
+                        if (storedData) {
+                            try {
+                                localRecords = JSON.parse(storedData);
+                            } catch (e) {
+                                console.error('解析本地点工单数据失败:', e);
+                            }
+                        }
+                        
+                        // 根据筛选条件过滤本地数据
+                        let filteredRecords = localRecords.filter(record => record.project_id === projectId);
+                        
+                        // 如果不是全选模式，添加日期筛选
+                        if (!workDateInput.dataset.selectAll) {
+                            filteredRecords = filteredRecords.filter(record => {
+                                return record.record_date >= startDate && record.record_date <= endDate;
+                            });
+                        }
+                        
+                        // 排序：日期升序，创建时间升序
+                        filteredRecords.sort((a, b) => {
+                            if (a.record_date !== b.record_date) {
+                                return a.record_date.localeCompare(b.record_date);
+                            }
+                            return (a.created_at || '').localeCompare(b.created_at || '');
+                        });
+                        
+                        // 更新筛选选项
+                        updateFilterOptions(filteredRecords);
+                        
+                        // 渲染表格数据
+                        renderDetailTable(filteredRecords);
+                        // 更新合计金额
+                        updateTotalAmount(filteredRecords);
+                        return;
+                    }
+
+                    // 显示空数据状态
+                    renderDetailTable([]);
+                    updateTotalAmount([]);
+                    return;
+                }
+
+                // 更新筛选选项
+                updateFilterOptions(workOrders || []);
+                
+                // 渲染表格数据
+                renderDetailTable(workOrders || []);
+                // 更新合计金额
+                updateTotalAmount(workOrders || []);
+            } catch (error) {
+                console.error('加载明细数据失败:', error);
+                // 显示空数据状态
+                renderDetailTable([]);
+                updateTotalAmount([]);
+            }
+        }
+
+        // 更新合计金额
+        function updateTotalAmount(data) {
+            const totalAmountValue = document.getElementById('totalAmountValue');
+            const totalWorkDaysValue = document.getElementById('totalWorkDaysValue');
+            if (!totalAmountValue || !totalWorkDaysValue) return;
+
+            // 计算合计金额
+            const totalAmount = data.reduce((sum, item) => {
+                return sum + (parseFloat(item.amount) || 0);
+            }, 0);
+
+            // 计算工日合计
+            const totalWorkDays = data.reduce((sum, item) => {
+                return sum + (parseFloat(item.work_days) || 0);
+            }, 0);
+
+            // 格式化金额显示
+            totalAmountValue.textContent = `¥${totalAmount.toFixed(2)}`;
+            // 显示工日合计
+            totalWorkDaysValue.textContent = totalWorkDays.toFixed(1);
+        }
+
+        // 退出编辑模式
+        function exitEditMode() {
+            window.isEditMode = false;
+            
+            // 重置全局变量
+            if (window.workRecordDetail) {
+                window.workRecordDetail = null;
+            }
+            
+            // 使用 work_record_api.js 中的 resetWorkRecordForm 来重置表单
+            if (window.workRecordAPI && typeof window.workRecordAPI.resetWorkRecordForm === 'function') {
+                window.workRecordAPI.resetWorkRecordForm();
+            } else if (typeof window.resetWorkRecordForm === 'function') {
+                // 如果是挂载在 window 上的全局函数
+                window.resetWorkRecordForm();
+            } else {
+                // 降级处理：手动重置，尽可能模拟 resetWorkRecordForm 的行为
+                
+                // 1. 重置各个输入框
+                const inputs = [
+                    'teamName', 'teamLeader', 'workDays',
+                    'unitPrice', 'amount', 'description'
+                ];
+                
+                inputs.forEach(id => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.value = '';
+                        // 重置输入框样式
+                        element.style.border = '';
+                        element.style.backgroundColor = '';
+                        element.style.boxShadow = '';
+                        element.classList.remove('has-value');
+                    }
+                });
+
+                // 2. 确保项目名称不被清空（与保存逻辑一致，通常保留当前项目）
+                // 注意：这里不应该清空 projectName 和 workerName，除非有明确需求
+                // 如果需要重置 workerName:
+                const workerNameInput = document.getElementById('workerName');
+                if (workerNameInput) {
+                    workerNameInput.value = '';
+                    workerNameInput.classList.remove('has-value');
+                }
+
+                // 3. 重置日期为今天
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const todayStr = `${year}-${month}-${day}`;
+                const displayStr = `${year}年${month}月${day}日`;
+                const displayHtml = `${displayStr}<span class="today-text">（今天）</span>`;
+
+                const dateDisplay = document.getElementById('dateDisplay');
+                if (dateDisplay) {
+                    dateDisplay.innerHTML = displayHtml;
+                    dateDisplay.classList.add('today');
+                }
+                const workDateInput = document.getElementById('workDate');
+                if (workDateInput) {
+                    workDateInput.value = todayStr;
+                    delete workDateInput.dataset.displayValue;
+                    delete workDateInput.dataset.selectAll;
+                    workDateInput.setAttribute('data-today', 'true');
+                }
+
+                // 4. 重置图片
+                if (typeof window.clearImage === 'function') {
+                    window.clearImage();
+                }
+            }
+            
+            // 重置按钮状态
+            const confirmBtn = document.getElementById('confirmAccountBtn');
+            if (confirmBtn) {
+                confirmBtn.textContent = '保存';
+                delete confirmBtn.dataset.editMode;
+                delete confirmBtn.dataset.recordId;
+                // 恢复默认样式
+                confirmBtn.style.display = 'block'; 
+                confirmBtn.style.background = 'linear-gradient(135deg, rgba(0, 102, 204, 0.9), rgba(30, 144, 255, 0.8))'; // 恢复默认蓝色背景
+                confirmBtn.style.boxShadow = '0 2px 8px rgba(0, 102, 204, 0.3)'; // 恢复默认阴影
+            }
+            
+            // 确保底部按钮容器显示
+            const bottomButtons = document.querySelector('.bottom-buttons');
+            if (bottomButtons) {
+                bottomButtons.style.display = 'flex';
+            }
+        }
+        
+        // 编辑点工单记录
+        function editWorkRecord(record) {
+            // 设置编辑模式标志
+            window.isEditMode = true;
+
+            // 切换到"记工"标签
+            const workTabRadio = document.querySelector('input[name="workTab"][value="记工"]');
+            if (workTabRadio) {
+                workTabRadio.checked = true;
+                updateTabContent("记工");
+            }
+            
+            // 初始化编辑详情对象
+            window.workRecordDetail = {
+                editingRecordId: record.work_record_id,
+                oldImageList: [],
+                deleteRecordImages: async function(imagesToDelete) {
+                    if (!imagesToDelete || imagesToDelete.length === 0) return;
+                    
+                    try {
+                        // 提取文件路径
+                        const filePaths = imagesToDelete.map(url => {
+                            // URL格式: https://.../storage/v1/object/public/FYKQ/project_id/temporaryworker/filename.ext
+                            // 需要提取: project_id/temporaryworker/filename.ext
+                            const urlParts = url.split('/FYKQ/');
+                            if (urlParts.length > 1) {
+                                return decodeURIComponent(urlParts[1]);
+                            }
+                            return null;
+                        }).filter(path => path !== null);
+
+                        if (filePaths.length > 0 && window.workRecordAPI && window.workRecordAPI.supabase) {
+                            const { error } = await window.workRecordAPI.supabase
+                                .storage
+                                .from('FYKQ')
+                                .remove(filePaths);
+                            
+                            if (error) {
+                                console.error('删除旧图片失败:', error);
+                            }
+                        }
+                    } catch (e) {
+                        console.error('删除旧图片出错:', e);
+                    }
+                }
+            };
+
+            // 填充数据到输入框
+            const workDateInput = document.getElementById('workDate');
+            if (workDateInput && record.record_date) {
+                workDateInput.value = record.record_date;
+                delete workDateInput.dataset.displayValue;
+                delete workDateInput.dataset.selectAll;
+                updateDateDisplay();
+            } else {
+                console.error('日期填充失败:', { workDateInput, recordDate: record.record_date });
+            }
+            document.getElementById('teamName').value = record.team_name || '';
+            document.getElementById('teamLeader').value = record.team_leader || '';
+            document.getElementById('workDays').value = record.work_days || '';
+            document.getElementById('unitPrice').value = record.unit_price || '';
+            document.getElementById('amount').value = record.amount || '';
+            document.getElementById('description').value = record.description || '';
+            
+            // 设置技工/普工状态
+            const workerTypeCheckbox = document.getElementById('workerType');
+            workerTypeCheckbox.checked = record.worker_type === '技工';
+            
+            // 切换到记工标签页
+            document.getElementById('tabWorkRecord').checked = true;
+            document.querySelector('label[for="tabWorkRecord"]').classList.add('active');
+            document.querySelector('label[for="tabWorkFlow"]').classList.remove('active');
+            
+            // 更新标签内容显示
+            const tabWorkContent = document.querySelectorAll('.tab-work-content');
+            const detailTableSection = document.getElementById('detailTableSection');
+            
+            tabWorkContent.forEach(element => {
+                element.style.display = '';
+            });
+            detailTableSection.style.display = 'none';
+            
+            // 更新输入框样式
+            const teamInput = document.getElementById('teamName');
+            if (teamInput.value && teamInput.value.trim() !== '') {
+                teamInput.classList.add('has-value');
+            } else {
+                teamInput.classList.remove('has-value');
+            }
+            
+            const teamLeaderInput = document.getElementById('teamLeader');
+            if (teamLeaderInput.value && teamLeaderInput.value.trim() !== '') {
+                teamLeaderInput.classList.add('has-value');
+            } else {
+                teamLeaderInput.classList.remove('has-value');
+            }
+            
+            const workDaysInput = document.getElementById('workDays');
+            if (workDaysInput.value && workDaysInput.value.trim() !== '') {
+                workDaysInput.classList.add('has-value');
+            } else {
+                workDaysInput.classList.remove('has-value');
+            }
+            
+            const unitPriceInput = document.getElementById('unitPrice');
+            if (unitPriceInput.value && unitPriceInput.value.trim() !== '') {
+                unitPriceInput.classList.add('has-value');
+            } else {
+                unitPriceInput.classList.remove('has-value');
+            }
+            
+            const amountInput = document.getElementById('amount');
+            if (amountInput.value && amountInput.value.trim() !== '') {
+                amountInput.classList.add('has-value');
+            } else {
+                amountInput.classList.remove('has-value');
+            }
+            
+            const descriptionInput = document.getElementById('description');
+            if (descriptionInput.value && descriptionInput.value.trim() !== '') {
+                descriptionInput.classList.add('has-value');
+            } else {
+                descriptionInput.classList.remove('has-value');
+            }
+            
+            // 处理图片
+            if (record.image_ids && Array.isArray(record.image_ids) && record.image_ids.length > 0) {
+                // 保存旧图片列表
+                window.workRecordDetail.oldImageList = [...record.image_ids];
+                loadImagesToForm(record.image_ids);
+            } else if (record.image_ids && typeof record.image_ids === 'string' && record.image_ids.trim() !== '') {
+                // 保存旧图片列表
+                window.workRecordDetail.oldImageList = [record.image_ids];
+                loadImagesToForm([record.image_ids]);
+            } else {
+                // 清空图片
+                window.workRecordDetail.oldImageList = [];
+                if (typeof window.clearImage === 'function') {
+                    window.clearImage();
+                }
+            }
+            
+            // 隐藏合计和PDF按钮
+            const totalAmountDisplay = document.getElementById('totalAmountDisplay');
+            if (totalAmountDisplay) {
+                totalAmountDisplay.style.display = 'none';
+            }
+            
+            // 显示并修改保存按钮为修改按钮
+            const bottomButtons = document.querySelector('.bottom-buttons');
+            const confirmBtn = document.getElementById('confirmAccountBtn');
+            if (bottomButtons) {
+                bottomButtons.style.display = 'flex';
+            }
+            if (confirmBtn) {
+                confirmBtn.style.display = 'block';
+                confirmBtn.textContent = '修改';
+                // 添加编辑模式标识
+                confirmBtn.dataset.editMode = 'true';
+                // 存储当前编辑的记录ID
+                confirmBtn.dataset.recordId = record.work_record_id;
+                // 修改按钮颜色为紫色
+                confirmBtn.style.background = 'linear-gradient(135deg, #722ed1 0%, #531dab 100%)';
+                confirmBtn.style.boxShadow = '0 2px 8px rgba(114, 46, 209, 0.3)';
+            }
+        }
+        
+        // 加载图片到表单
+        function loadImagesToForm(imageIds) {
+            // 清空当前选中的图片
+            if (typeof window.clearImage === 'function') {
+                window.clearImage();
+            }
+            
+            // 确保图片上传功能已初始化
+            if (typeof window.initializeImageUpload === 'function') {
+                window.initializeImageUpload();
+            }
+            
+            // 显示加载状态
+            showImageLoadingStatus(imageIds.length);
+            
+            // 下载并显示图片
+            let loadedCount = 0;
+            imageIds.forEach((url, index) => {
+                if (url && url.trim()) {
+                    // 处理不同类型的URL
+                    if (url.startsWith('data:')) {
+                        // 直接处理data URL（base64图片）
+                        try {
+                            // 从data URL创建Blob对象
+                            const [header, data] = url.split(',');
+                            const mime = header.match(/:(.*?);/)[1];
+                            const bstr = atob(data);
+                            let n = bstr.length;
+                            const u8arr = new Uint8Array(n);
+                            while (n--) {
+                                u8arr[n] = bstr.charCodeAt(n);
+                            }
+                            const blob = new Blob([u8arr], { type: mime });
+                            
+                            // 生成文件名
+                            let fileName;
+                            const urlParts = url.split('/');
+                            if (urlParts.length > 1) {
+                                const lastPart = urlParts[urlParts.length - 1];
+                                if (lastPart.includes('.')) {
+                                    fileName = lastPart;
+                                } else {
+                                    fileName = `image_${Date.now()}_${index}.${mime.split('/')[1] || 'jpg'}`;
+                                }
+                            } else {
+                                fileName = `image_${Date.now()}_${index}.${mime.split('/')[1] || 'jpg'}`;
+                            }
+                            
+                            // 创建File对象
+                            const file = new File([blob], fileName, { type: mime });
+                            // 标记为已存在的图片，避免重复上传
+                            file.isExisting = true;
+                            file.originalUrl = url;
+                            
+                            // 添加到全局图片数组
+                            if (window.selectedImages) {
+                                window.selectedImages.push(file);
+                            } else {
+                                window.selectedImages = [file];
+                            }
+                            
+                            // 更新加载状态
+                            loadedCount++;
+                            updateImageLoadingStatus(loadedCount, imageIds.length);
+                            
+                            // 更新图片显示
+                            updateImagePreview();
+                        } catch (error) {
+                            console.error('处理base64图片失败:', error);
+                            // 即使失败也要更新加载计数
+                            loadedCount++;
+                            updateImageLoadingStatus(loadedCount, imageIds.length);
+                        }
+                    } else {
+                        // 处理普通URL图片
+                        // 使用跨域代理或添加时间戳防止缓存问题
+                        const fetchUrl = url + (url.includes('?') ? '&' : '?') + 't=' + new Date().getTime();
+                        
+                        fetch(url, { mode: 'cors' })
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error('Network response was not ok');
+                                }
+                                return response.blob();
+                            })
+                            .then(blob => {
+                                // 生成文件名
+                                const urlParts = url.split('/');
+                                const fileName = urlParts[urlParts.length - 1] || `image_${Date.now()}_${index}.jpg`;
+                                
+                                // 创建File对象
+                                const file = new File([blob], fileName, { type: blob.type });
+                                // 标记为已存在的图片，避免重复上传
+                                file.isExisting = true;
+                                file.originalUrl = url;
+                                
+                                // 添加到全局图片数组
+                                if (window.selectedImages) {
+                                    window.selectedImages.push(file);
+                                } else {
+                                    window.selectedImages = [file];
+                                }
+                                
+                                // 更新加载状态
+                                loadedCount++;
+                                updateImageLoadingStatus(loadedCount, imageIds.length);
+                                
+                                // 更新图片显示
+                                updateImagePreview();
+                            })
+                            .catch(error => {
+                                console.error('加载图片失败:', error);
+                                // 尝试直接使用URL显示，不转换为File对象
+                                // 这种情况通常发生在跨域限制导致无法获取blob时
+                                
+                                // 创建一个模拟的File对象（实际上是一个包含url的对象）
+                                // 这样至少能显示出来，虽然可能无法再次上传（除非后端支持直接处理URL）
+                                // 但我们的 updateImagePreview 使用 URL.createObjectURL(file)，所以这里需要特殊处理
+                                
+                                // 更好的降级方案：直接将原始URL添加到selectedImages
+                                // updateImagePreview 需要修改以支持字符串类型的URL
+                                
+                                const imageObj = {
+                                    name: `image_${index}.jpg`,
+                                    type: 'image/jpeg',
+                                    isExisting: true,
+                                    originalUrl: url,
+                                    // 添加一个特殊的标记，表示这是一个无法转换为Blob的远程图片
+                                    isRemoteUrl: true
+                                };
+                                
+                                if (window.selectedImages) {
+                                    window.selectedImages.push(imageObj);
+                                } else {
+                                    window.selectedImages = [imageObj];
+                                }
+                                
+                                loadedCount++;
+                                updateImageLoadingStatus(loadedCount, imageIds.length);
+                                updateImagePreview();
+                            });
+                    }
+                }
+            });
+        }
+        
+        // 更新图片预览
+        function updateImagePreview() {
+            // 确保图片上传容器已初始化
+            if (typeof window.initializeImageUpload === 'function') {
+                window.initializeImageUpload();
+            }
+            
+            const container = document.getElementById('imageUploadContainer');
+            if (!container) return;
+            
+            // 保留添加按钮，删除所有预览图片
+            const addButton = container.querySelector('.image-upload-item');
+            
+            // 清空除添加按钮外的所有内容
+            // 注意：不能直接 innerHTML = '' 再 appendChild，因为这样会丢失 addButton 的事件绑定
+            // 应该只删除 .image-preview-item
+            const existingPreviews = container.querySelectorAll('.image-preview-item');
+            existingPreviews.forEach(el => el.remove());
+            
+            // 如果添加按钮不存在（可能被意外清空），重新创建
+            if (!addButton) {
+                // 如果容器是空的，这里需要重新初始化添加按钮
+                // 但通常 initializeImageUpload 会处理
+                // 如果没有，手动创建
+                if (typeof window.initializeImageUpload !== 'function') {
+                     const initialItem = document.createElement('div');
+                    initialItem.className = 'image-upload-item';
+                    initialItem.innerHTML = `
+                        <label for="imageUpload" style="display: block; width: 100px; height: 100px; border: 1px dashed #ddd; border-radius: 4px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 24px; color: #999; margin-bottom: 5px;">+</div>
+                                <div style="font-size: 12px; color: #999;">添加图片</div>
+                            </div>
+                        </label>
+                    `;
+                    container.appendChild(initialItem);
+                }
+            }
+            
+            // 重新获取添加按钮（以防上面刚创建）
+            const currentAddButton = container.querySelector('.image-upload-item');
+            
+            // 添加预览图片
+            if (window.selectedImages && window.selectedImages.length > 0) {
+                window.selectedImages.forEach((file, index) => {
+                    const previewItem = document.createElement('div');
+                    previewItem.className = 'image-preview-item';
+                    previewItem.style.cssText = `
+                        position: relative;
+                        width: 100px;
+                        height: 100px;
+                        border: 1px solid #ddd;
+                        border-radius: 4px;
+                        overflow: hidden;
+                        margin-right: 10px;
+                        margin-bottom: 10px;
+                    `;
+                    
+                    const img = document.createElement('img');
+                    
+                    // 处理图片源
+                    if (file.isRemoteUrl) {
+                        img.src = file.originalUrl;
+                    } else if (file instanceof File || file instanceof Blob) {
+                        img.src = URL.createObjectURL(file);
+                    } else if (typeof file === 'string') {
+                        img.src = file;
+                    } else {
+                        // 兜底
+                        img.src = file.originalUrl || '';
+                    }
+                    
+                    img.style.cssText = `
+                        width: 100%;
+                        height: 100%;
+                        object-fit: cover;
+                        cursor: pointer;
+                    `;
+                    
+                    // 添加点击预览功能
+                    img.onclick = function() {
+                        viewImage(this.src);
+                    };
+                    
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.innerHTML = '×';
+                    deleteBtn.style.cssText = `
+                        position: absolute;
+                        top: 2px;
+                        right: 2px;
+                        background: rgba(255, 0, 0, 0.7);
+                        color: white;
+                        border: none;
+                        border-radius: 50%;
+                        width: 20px;
+                        height: 20px;
+                        font-size: 16px;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    `;
+                    deleteBtn.onclick = function() {
+                        window.selectedImages.splice(index, 1);
+                        updateImagePreview();
+                    };
+
+                    previewItem.appendChild(img);
+                    previewItem.appendChild(deleteBtn);
+                    
+                    // 插入到添加按钮之前
+                    if (currentAddButton && currentAddButton.parentNode === container) {
+                        container.insertBefore(previewItem, currentAddButton);
+                    } else {
+                        container.appendChild(previewItem);
+                    }
+                });
+            }
+        }
+        
+        /**
+         * 显示图片加载状态
+         */
+        function showImageLoadingStatus(totalImages) {
+            const container = document.getElementById('imageUploadContainer');
+            if (!container) return;
+            
+            // 创建加载指示器
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = 'imageLoadingIndicator';
+            loadingDiv.style.cssText = `
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(255, 255, 255, 0.95);
+                padding: 15px 25px;
+                border-radius: 8px;
+                border: 1px solid #ddd;
+                font-size: 14px;
+                color: #666;
+                z-index: 1000;
+                box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+                text-align: center;
+            `;
+            loadingDiv.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                    <div style="
+                        width: 18px;
+                        height: 18px;
+                        border: 2px solid #1890ff;
+                        border-top: 2px solid transparent;
+                        border-radius: 50%;
+                        animation: spin 0.8s linear infinite;
+                    "></div>
+                    <span id="loadingText">正在加载图片...</span>
+                </div>
+                <div id="loadingProgress" style="margin-top: 8px; font-size: 12px; color: #999;">0 / ${totalImages}</div>
+            `;
+            
+            // 添加旋转动画样式
+            if (!document.getElementById('loadingAnimationStyle')) {
+                const style = document.createElement('style');
+                style.id = 'loadingAnimationStyle';
+                style.textContent = `
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            // 如果容器没有position:relative，添加它
+            if (getComputedStyle(container).position === 'static') {
+                container.style.position = 'relative';
+            }
+            
+            container.appendChild(loadingDiv);
+        }
+        
+        /**
+         * 更新图片加载状态
+         */
+        function updateImageLoadingStatus(loadedCount, totalCount) {
+            const loadingIndicator = document.getElementById('imageLoadingIndicator');
+            if (!loadingIndicator) return;
+            
+            // 更新进度文本
+            const progressText = loadingIndicator.querySelector('#loadingProgress');
+            if (progressText) {
+                progressText.textContent = `${loadedCount} / ${totalCount}`;
+            }
+            
+            // 如果所有图片都加载完成，隐藏加载指示器
+            if (loadedCount >= totalCount) {
+                setTimeout(() => {
+                    if (loadingIndicator && loadingIndicator.parentNode) {
+                        loadingIndicator.remove();
+                    }
+                }, 300); // 稍微延迟一下，让用户能看到加载完成的状态
+            }
+        }
+        
+        /**
+         * 隐藏图片加载状态
+         */
+        function hideImageLoadingStatus() {
+            const loadingIndicator = document.getElementById('imageLoadingIndicator');
+            if (loadingIndicator) {
+                loadingIndicator.remove();
+            }
+        }
+
+        // 渲染明细表格
+        function renderDetailTable(data) {
+            const tbody = document.getElementById('detailTableBody');
+            tbody.innerHTML = '';
+
+            if (!data || data.length === 0) {
+                const emptyRow = document.createElement('tr');
+                emptyRow.innerHTML = `
+                    <td colspan="10" style="text-align: center; padding: 20px; color: #999;">
+                        暂无数据
+                    </td>
+                `;
+                tbody.appendChild(emptyRow);
+                return;
+            }
+
+            data.forEach((item, index) => {
+                const row = document.createElement('tr');
+
+                // 处理图片显示
+                let imageHtml = '-';
+                if (item.image_ids) {
+                    // 确保 image_ids 是数组且有值
+                    const imageId = Array.isArray(item.image_ids) ? item.image_ids[0] : item.image_ids;
+                    if (imageId) {
+                        imageHtml = `<span class="image-icon" style="cursor: pointer; color: #1890ff; font-size: 14px;" onclick="viewImage('${imageId}')">🖼️</span>`;
+                    }
+                }
+
+                // 处理工日显示
+                const workDaysDisplay = item.work_days ? `${item.work_days}个工` : '-';
+
+                // 处理类型显示
+                const workTypeDisplay = item.worker_type || '-';
+
+                // 处理单价显示
+                let unitPriceDisplay = '-';
+                if (item.unit_price) {
+                    if (Number.isInteger(item.unit_price)) {
+                        unitPriceDisplay = item.unit_price.toString();
+                    } else {
+                        unitPriceDisplay = item.unit_price.toFixed(1);
+                    }
+                }
+
+                // 处理金额显示
+                let amountDisplay = '-';
+                if (item.amount) {
+                    if (Number.isInteger(item.amount)) {
+                        amountDisplay = `¥${item.amount}`;
+                    } else {
+                        amountDisplay = `¥${item.amount.toFixed(1)}`;
+                    }
+                }
+
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${item.record_date}</td>
+                    <td>${item.team_name || '-'}</td>
+                    <td>${item.team_leader || '-'}</td>
+                    <td>${workDaysDisplay}</td>
+                    <td>${workTypeDisplay}</td>
+                    <td>${unitPriceDisplay}</td>
+                    <td>${amountDisplay}</td>
+                    <td class="work-content-cell" style="max-width: 150px; width: 150px; white-space: normal; text-align: left; word-wrap: break-word; overflow: visible;">${item.description || '-'}</td>
+                    <td>${imageHtml}</td>
+                    <span class="delete-icon" onclick="deleteWorkRecord('${item.work_record_id}', ${JSON.stringify(item.image_ids || []).replace(/"/g, '&quot;')})">🗑️</span>
+                `;
+
+                // 添加双击事件监听器
+                row.addEventListener('dblclick', function() {
+                    editWorkRecord(item);
+                });
+
+                // 添加点击事件监听器，实现行选中
+                row.addEventListener('click', function(e) {
+                    // 阻止事件冒泡，避免触发文档点击事件
+                    e.stopPropagation();
+                    
+                    // 移除其他行的选中状态
+                    document.querySelectorAll('.modern-table tbody tr.selected').forEach(selectedRow => {
+                        selectedRow.classList.remove('selected');
+                    });
+                    
+                    // 添加当前行的选中状态
+                    this.classList.add('selected');
+                    
+                    // 修改按钮文本为"生成点工单"
+                    const generatePdfBtn = document.getElementById('generatePdfBtn');
+                    if (generatePdfBtn) {
+                        generatePdfBtn.textContent = '生成点工单';
+                        // 修改按钮背景颜色
+                        generatePdfBtn.style.background = 'linear-gradient(135deg, #1890ff 0%, #40a9ff 100%)';
+                        generatePdfBtn.style.boxShadow = '0 2px 8px rgba(24, 144, 255, 0.3)';
+                    }
+                });
+
+                tbody.appendChild(row);
+            });
+        }
+
+        // 删除点工单记录
+        function deleteWorkRecord(recordId, imageIds = []) {
+            // 显示删除确认模态框
+            showDeleteModal(recordId, imageIds);
+        }
+
+        // 显示删除确认模态框
+        function showDeleteModal(recordId, imageIds) {
+            // 检查模态框是否已存在
+            let modal = document.getElementById('deleteConfirmModal');
+            if (!modal) {
+                // 创建模态框
+                modal = document.createElement('div');
+                modal.id = 'deleteConfirmModal';
+                modal.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background-color: rgba(0, 0, 0, 0.5);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 10000;
+                `;
+                
+                // 模态框内容
+                modal.innerHTML = `
+                    <div style="
+                        background-color: white;
+                        border-radius: 8px;
+                        padding: 15px;
+                        width: 85%;
+                        max-width: 320px;
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                    ">
+                        <div style="
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            margin-bottom: 15px;
+                        ">
+                            <h3 style="margin: 0; color: #333; font-size: 16px;">确认删除</h3>
+                            <button id="closeDeleteModalBtn" style="
+                                background: none;
+                                border: none;
+                                font-size: 18px;
+                                cursor: pointer;
+                                color: #999;
+                                transition: all 0.3s ease;
+                            " onmouseover="this.style.color='#ff4d4f';this.style.transform='rotate(90deg)'" onmouseout="this.style.color='#999';this.style.transform='rotate(0deg)'">×</button>
+                        </div>
+                        <p style="color: #666; margin-bottom: 15px; font-size: 13px;">
+                            确定要删除这条记录吗？此操作不可恢复。
+                        </p>
+                        <div style="margin-bottom: 15px;">
+                            <label style="
+                                display: block;
+                                margin-bottom: 6px;
+                                color: #333;
+                                font-weight: bold;
+                                font-size: 13px;
+                            ">请输入密码确认删除：</label>
+                            <input type="password" id="deletePasswordInput" style="
+                                width: 100%;
+                                padding: 8px;
+                                border: 1px solid #d9d9d9;
+                                border-radius: 4px;
+                                font-size: 13px;
+                                box-sizing: border-box;
+                            ">
+                            <div id="passwordErrorMsg" style="
+                                color: #ff4d4f;
+                                font-size: 12px;
+                                margin-top: 4px;
+                                display: none;
+                            ">密码错误，请重试</div>
+                        </div>
+                        <div style="
+                            display: flex;
+                            justify-content: flex-end;
+                            gap: 8px;
+                        ">
+                            <button id="cancelDeleteBtn" style="
+                                padding: 6px 12px;
+                                border: 1px solid #d9d9d9;
+                                border-radius: 4px;
+                                background-color: white;
+                                color: #333;
+                                cursor: pointer;
+                                font-size: 13px;
+                                transition: all 0.3s ease;
+                            " onmouseover="this.style.backgroundColor='#f5f5f5';this.style.borderColor='#bfbfbf'" onmouseout="this.style.backgroundColor='white';this.style.borderColor='#d9d9d9'">取消</button>
+                            <button id="confirmDeleteBtn" style="
+                                padding: 6px 12px;
+                                border: 1px solid #ff4d4f;
+                                border-radius: 4px;
+                                background-color: #ff4d4f;
+                                color: white;
+                                cursor: pointer;
+                                font-size: 13px;
+                                transition: all 0.3s ease;
+                            " onmouseover="this.style.backgroundColor='#ff7875';this.style.borderColor='#ff7875';this.style.transform='scale(1.05)'" onmouseout="this.style.backgroundColor='#ff4d4f';this.style.borderColor='#ff4d4f';this.style.transform='scale(1)'">确认删除</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+                
+                // 绑定事件
+                bindDeleteModalEvents();
+            }
+            
+            // 显示模态框
+            modal.style.display = 'flex';
+            
+            // 保存当前要删除的记录ID和图片ID
+            modal.recordIdToDelete = recordId;
+            modal.imageIdsToDelete = imageIds;
+            
+            // 聚焦密码输入框
+            setTimeout(() => {
+                const passwordInput = document.getElementById('deletePasswordInput');
+                if (passwordInput) {
+                    passwordInput.focus();
+                }
+            }, 100);
+        }
+
+        // 绑定删除模态框事件
+        function bindDeleteModalEvents() {
+            const modal = document.getElementById('deleteConfirmModal');
+            const closeBtn = document.getElementById('closeDeleteModalBtn');
+            const cancelBtn = document.getElementById('cancelDeleteBtn');
+            const confirmBtn = document.getElementById('confirmDeleteBtn');
+            const passwordInput = document.getElementById('deletePasswordInput');
+            const errorMsg = document.getElementById('passwordErrorMsg');
+            
+            // 关闭模态框
+            const closeModal = () => {
+                if (modal) {
+                    modal.style.display = 'none';
+                    // 清空密码输入
+                    if (passwordInput) {
+                        passwordInput.value = '';
+                    }
+                    // 隐藏错误信息
+                    if (errorMsg) {
+                        errorMsg.style.display = 'none';
+                    }
+                }
+            };
+            
+            // 关闭按钮事件
+            if (closeBtn) {
+                closeBtn.addEventListener('click', closeModal);
+            }
+            
+            // 取消按钮事件
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', closeModal);
+            }
+            
+            // 点击模态框外部关闭
+            if (modal) {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        closeModal();
+                    }
+                });
+            }
+            
+            // 确认删除事件
+            if (confirmBtn) {
+                confirmBtn.addEventListener('click', async () => {
+                    // 获取输入的密码
+                    const password = passwordInput?.value || '';
+                    
+                    // 验证密码
+                    if (await verifyPassword(password)) {
+                        // 密码正确，执行删除
+                        if (modal && modal.recordIdToDelete) {
+                            executeDelete(modal.recordIdToDelete, modal.imageIdsToDelete);
+                            closeModal();
+                        }
+                    } else {
+                        // 密码错误，显示错误信息
+                        if (errorMsg) {
+                            errorMsg.style.display = 'block';
+                        }
+                        // 清空密码输入
+                        if (passwordInput) {
+                            passwordInput.value = '';
+                            passwordInput.focus();
+                        }
+                    }
+                });
+            }
+            
+            // 回车键触发确认删除
+            if (passwordInput) {
+                passwordInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        confirmBtn?.click();
+                    }
+                });
+            }
+        }
+
+        // 验证密码 - 不管是否在线，只验证本地的登录密码
+        async function verifyPassword(password) {
+            try {
+                // 获取当前登录用户信息
+                const currentUserStr = localStorage.getItem('currentUser');
+                if (!currentUserStr) {
+                    console.error('未找到当前登录用户信息');
+                    return false;
+                }
+                
+                const currentUser = JSON.parse(currentUserStr);
+                const phone = currentUser.phone || currentUser.login_name;
+                
+                if (!phone) {
+                    console.error('当前登录用户没有电话信息');
+                    return false;
+                }
+                
+                // 不管是否在线，只使用本地存储的登录信息验证
+                return verifyOfflinePassword(phone, password);
+            } catch (error) {
+                console.error('密码验证失败:', error);
+                return false;
+            }
+        }
+        
+        // 离线验证密码
+        function verifyOfflinePassword(phone, password) {
+            try {
+                // 从本地存储获取登录信息
+                // 检查是否有登录成功保存的信息
+                const loginInfoStr = localStorage.getItem('loginInfo');
+                if (loginInfoStr) {
+                    const loginInfo = JSON.parse(loginInfoStr);
+                    // 验证phone和password是否匹配
+                    if (loginInfo.phone === phone && loginInfo.password === password) {
+                        return true;
+                    }
+                }
+                
+                // 尝试从其他可能的存储位置获取
+                const currentUserStr = localStorage.getItem('currentUser');
+                if (currentUserStr) {
+                    const currentUser = JSON.parse(currentUserStr);
+                    // 有些情况下，currentUser中可能直接包含password
+                    if (currentUser.password && currentUser.password === password) {
+                        return true;
+                    }
+                }
+                
+                return false;
+            } catch (error) {
+                console.error('离线密码验证失败:', error);
+                return false;
+            }
+        }
+
+        // 执行删除操作
+        function executeDelete(recordId, imageIds) {
+            if (window.workRecordAPI) {
+                workRecordAPI.deleteWorkRecord(recordId, imageIds).then(result => {
+                    if (result.success) {
+                        showNotification('删除成功', false);
+                        // 重新加载明细数据
+                        loadDetailData();
+                    } else {
+                        showNotification('删除失败，请重试', true);
+                    }
+                }).catch(error => {
+                    console.error('删除记录失败:', error);
+                    showNotification('删除失败，请重试', true);
+                });
+            } else {
+                showNotification('API未初始化，请刷新页面重试', true);
+            }
+        }
+
+        // 查看大图
+        function viewImage(imageUrl) {
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.9);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                cursor: pointer;
+            `;
+
+            const imgContainer = document.createElement('div');
+            imgContainer.style.cssText = `
+                position: relative;
+                width: 90%;
+                height: 90%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                overflow: hidden;
+            `;
+
+            const img = document.createElement('img');
+            img.id = 'draggableImage';
+            img.src = imageUrl;
+            img.style.cssText = `
+                max-width: 100%;
+                max-height: 100%;
+                object-fit: contain;
+                position: absolute;
+                cursor: move;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+            `;
+            img.ondragstart = function() { return false; };
+
+            const closeBtn = document.createElement('button');
+            closeBtn.innerHTML = '×';
+            closeBtn.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #f5222d;
+                color: white;
+                border: none;
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                font-size: 20px;
+                cursor: pointer;
+                z-index: 10001;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            `;
+
+            imgContainer.appendChild(img);
+            modal.appendChild(imgContainer);
+            modal.appendChild(closeBtn);
+            document.body.appendChild(modal);
+
+            // 图片拖动和缩放功能
+            let isDragging = false;
+            let offsetX, offsetY;
+            let scale = 1;
+
+            img.addEventListener('mousedown', function(e) {
+                isDragging = true;
+                offsetX = e.clientX - img.getBoundingClientRect().left;
+                offsetY = e.clientY - img.getBoundingClientRect().top;
+                img.style.cursor = 'grabbing';
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+                img.style.left = (e.clientX - offsetX) + 'px';
+                img.style.top = (e.clientY - offsetY) + 'px';
+                img.style.transform = `translate(0, 0) scale(${scale})`;
+            });
+
+            document.addEventListener('mouseup', function() {
+                isDragging = false;
+                img.style.cursor = 'move';
+            });
+
+            // 鼠标滚轮缩放功能
+            img.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                
+                const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                scale += delta;
+                scale = Math.max(0.5, Math.min(3, scale));
+                
+                img.style.left = '50%';
+                img.style.top = '50%';
+                img.style.transform = `translate(-50%, -50%) scale(${scale})`;
+            });
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal || e.target === closeBtn || e.target === imgContainer) {
+                    modal.remove();
+                }
+            });
+
+            closeBtn.addEventListener('click', () => {
+                modal.remove();
+            });
+        }
+
+        // 初始化全局图片数组
+        window.selectedImages = [];
+
+        // 清除图片函数
+        window.clearImage = function() {
+            // 清空全局图片数组
+            window.selectedImages = [];
+            
+            const container = document.getElementById('imageUploadContainer');
+            if (container) {
+                // 保留添加按钮，删除所有预览图片
+                const items = container.querySelectorAll('.image-preview-item');
+                items.forEach(item => item.remove());
+            }
+            document.getElementById('imageUpload').value = '';
+            const imageModal = document.getElementById('imageModal');
+            if (imageModal) {
+                imageModal.style.display = 'none';
+            }
+        }
+
+        // 初始化图片上传功能
+        function initializeImageUpload() {
+            if (window.imageUploadInitialized) {
+                return;
+            }
+            
+            // 检查是否已经初始化过图片上传容器
+            if (document.getElementById('imageUploadContainer')) {
+                // 容器已存在，但仍需要确保事件绑定正确
+                window.imageUploadInitialized = true;
+                bindImageUploadEvents();
+                return;
+            }
+            
+            // 获取图片表单组 - 通过查找包含图片标签的div
+            const labels = document.querySelectorAll('label');
+            let formGroup = null;
+            for (let label of labels) {
+                if (label.textContent.includes('图片')) {
+                    formGroup = label.closest('div');
+                    break;
+                }
+            }
+            if (!formGroup) return;
+            
+            // 创建图片上传微缩框容器
+            const container = document.createElement('div');
+            container.id = 'imageUploadContainer';
+            container.style.display = 'flex';
+            container.style.gap = '10px';
+            container.style.flexWrap = 'wrap';
+            container.style.marginTop = '10px';
+            
+            // 创建初始添加图片微缩框
+            const initialItem = document.createElement('div');
+            initialItem.className = 'image-upload-item';
+            initialItem.innerHTML = `
+                <label for="imageUpload" style="display: block; width: 100px; height: 100px; border: 1px dashed #ddd; border-radius: 4px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 24px; color: #999; margin-bottom: 5px;">+</div>
+                        <div style="font-size: 12px; color: #999;">添加图片</div>
+                    </div>
+                </label>
+            `;
+            
+            // 添加初始微缩框到容器
+            container.appendChild(initialItem);
+            
+            // 将容器添加到表单组中
+            formGroup.appendChild(container);
+            
+            // 绑定图片选择事件
+            bindImageUploadEvents();
+            
+            window.imageUploadInitialized = true;
+        }
+
+        // 绑定图片上传事件
+        function bindImageUploadEvents() {
+            const imageUpload = document.getElementById('imageUpload');
+            if (!imageUpload) return;
+            
+            // 移除已存在的事件监听器（如果有的话）
+            const newImageUpload = imageUpload.cloneNode(true);
+            imageUpload.parentNode.replaceChild(newImageUpload, imageUpload);
+            
+            newImageUpload.addEventListener('change', function(e) {
+                if (e.target.files && e.target.files.length > 0) {
+                    const file = e.target.files[0];
+                    // 处理文件名（中文转拼音）
+                    const originalName = file.name;
+                    const nameWithoutExt = originalName.substring(0, originalName.lastIndexOf('.'));
+                    const ext = originalName.substring(originalName.lastIndexOf('.'));
+                    const pinyinName = window.convertChineseToEnglish ? window.convertChineseToEnglish(nameWithoutExt) + ext : originalName;
+                    
+                    // 创建一个新的File对象，使用拼音文件名
+                    const fileWithPinyinName = new File([file], pinyinName, {
+                        type: file.type,
+                        lastModified: file.lastModified
+                    });
+                    
+                    // 添加到全局数组
+                    window.selectedImages.push(fileWithPinyinName);
+
+                    
+                    // 压缩图片
+                    processImage(fileWithPinyinName).then(compressed => {
+                        // 给压缩后的blob添加拼音文件名
+                        const blobWithPinyinName = new File([compressed.blob], pinyinName, {
+                            type: compressed.blob.type
+                        });
+                        
+                        // 替换全局数组中的原始文件为压缩后的带拼音文件名的blob
+                        window.selectedImages[window.selectedImages.length - 1] = blobWithPinyinName;
+                        
+                        // 渲染预览
+                        renderImagePreview(file, window.selectedImages.length - 1);
+                    }).catch(error => {
+                        console.warn('图片压缩失败，使用原始图片:', error);
+                        // 渲染预览
+                        renderImagePreview(file, window.selectedImages.length - 1);
+                    });
+                    
+                    // 清空input值，允许选择相同文件
+                    e.target.value = '';
+                }
+            });
+        }
+
+        // 图片压缩函数
+        function processImage(file) {
+            return new Promise((resolve, reject) => {
+                try {
+                    // 检查file是否为有效的File或Blob对象
+                    if (!file || typeof file !== 'object' || !(file instanceof File || file instanceof Blob)) {
+                        reject(new Error('无效的图片文件对象'));
+                        return;
+                    }
+                    
+                    // 检查文件类型是否为图片
+                    if (!file.type || !file.type.startsWith('image/')) {
+                        reject(new Error('不是有效的图片类型'));
+                        return;
+                    }
+                    
+                    if (typeof Compressor === 'undefined') {
+                        // 如果没有加载Compressor库，直接返回原图
+                        resolve({
+                            dataURL: URL.createObjectURL(file),
+                            blob: file,
+                            width: 0,
+                            height: 0
+                        });
+                        return;
+                    }
+                    
+                    new Compressor(file, {
+                        quality: 0.7,
+                        maxWidth: 1920,
+                        maxHeight: 1080,
+                        success(result) {
+                            const reader = new FileReader();
+                            reader.readAsDataURL(result);
+                            reader.onload = function(e) {
+                                resolve({
+                                    dataURL: e.target.result,
+                                    blob: result,
+                                    width: 0,
+                                    height: 0
+                                });
+                            };
+                            reader.onerror = function() {
+                                reject(new Error('文件读取失败'));
+                            };
+                        },
+                        error(err) {
+                            reject(err);
+                        }
+                    });
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        }
+
+        // 渲染单个图片预览
+        function renderImagePreview(file, index) {
+            const container = document.getElementById('imageUploadContainer');
+            if (!container) return;
+            
+            const initialItem = container.querySelector('.image-upload-item');
+            
+            const previewItem = document.createElement('div');
+            previewItem.className = 'image-preview-item';
+            previewItem.style.position = 'relative';
+            previewItem.style.width = '100px';
+            previewItem.style.height = '100px';
+            previewItem.style.borderRadius = '4px';
+            previewItem.style.overflow = 'hidden';
+            previewItem.style.border = '1px solid #ddd';
+            
+            // 保存文件对象引用和唯一标识符
+            previewItem.fileObject = file;
+            previewItem.dataset.fileIndex = index;
+            
+            // 生成唯一标识符
+            const uniqueId = `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            previewItem.dataset.uniqueId = uniqueId;
+            
+            // 创建临时URL，支持File/Blob对象
+            let tempUrl;
+            let isUrl = false;
+            
+            if (file instanceof File || file instanceof Blob) {
+                // 如果是File或Blob对象，创建本地URL
+                tempUrl = URL.createObjectURL(file);
+            } else {
+                return;
+            }
+            
+            // 创建预览图片
+            const previewImg = document.createElement('img');
+            previewImg.style.width = '100%';
+            previewImg.style.height = '100%';
+            previewImg.style.objectFit = 'cover';
+            previewImg.style.cursor = 'pointer';
+            previewImg.src = tempUrl;
+            
+            // 查看大图功能
+            previewImg.addEventListener('click', function() {
+                const modal = document.getElementById('imageModal');
+                modal.innerHTML = `
+                    <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2001;" 
+                         onclick="if(event.target === this) document.getElementById('imageModal').style.display='none'">
+                        <img id="draggableImage" src="${tempUrl}" 
+                             style="max-width: 90%; max-height: 90%; position: absolute; cursor: move; top: 50%; left: 50%; transform: translate(-50%, -50%);" 
+                             ondragstart="return false;">
+                        <button onclick="document.getElementById('imageModal').style.display='none'" 
+                                style="position: fixed; top: 20px; right: 20px; background: #f5222d; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; z-index: 2002;">×</button>
+                    </div>
+                `;
+                modal.style.display = 'block';
+                
+                // 图片拖动和缩放功能
+                const img = document.getElementById('draggableImage');
+                let isDragging = false;
+                let offsetX, offsetY;
+                let scale = 1; // 初始缩放比例
+
+                img.addEventListener('mousedown', function(e) {
+                    isDragging = true;
+                    // 计算拖动偏移量，考虑缩放因素
+                    offsetX = e.clientX - img.getBoundingClientRect().left;
+                    offsetY = e.clientY - img.getBoundingClientRect().top;
+                    img.style.cursor = 'grabbing';
+                });
+
+                document.addEventListener('mousemove', function(e) {
+                    if (!isDragging) return;
+                    // 拖动时，使用绝对定位而非transform平移
+                    img.style.left = (e.clientX - offsetX) + 'px';
+                    img.style.top = (e.clientY - offsetY) + 'px';
+                    img.style.transform = `scale(${scale})`;
+                });
+
+                document.addEventListener('mouseup', function() {
+                    isDragging = false;
+                    img.style.cursor = 'move';
+                });
+                
+                // 鼠标滚轮缩放功能
+                img.addEventListener('wheel', function(e) {
+                    e.preventDefault();
+                    
+                    // 计算缩放比例
+                    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                    scale += delta;
+                    
+                    // 限制缩放范围
+                    scale = Math.max(0.5, Math.min(3, scale));
+                    
+                    // 应用缩放并保持中心
+                    img.style.left = '50%';
+                    img.style.top = '50%';
+                    img.style.transform = `translate(-50%, -50%) scale(${scale})`;
+                });
+            });
+            
+            // 创建删除按钮
+            const deleteBtn = document.createElement('button');
+            deleteBtn.innerHTML = '×';
+            deleteBtn.style.position = 'absolute';
+            deleteBtn.style.top = '5px';
+            deleteBtn.style.right = '5px';
+            deleteBtn.style.width = '24px';
+            deleteBtn.style.height = '24px';
+            deleteBtn.style.background = 'rgba(0, 0, 0, 0.5)';
+            deleteBtn.style.color = 'white';
+            deleteBtn.style.border = 'none';
+            deleteBtn.style.borderRadius = '50%';
+            deleteBtn.style.cursor = 'pointer';
+            deleteBtn.style.fontSize = '16px';
+            deleteBtn.style.fontWeight = 'bold';
+            deleteBtn.style.display = 'flex';
+            deleteBtn.style.alignItems = 'center';
+            deleteBtn.style.justifyContent = 'center';
+            deleteBtn.style.padding = '0';
+            
+            // 删除图片功能 - 直接使用文件对象引用
+            deleteBtn.addEventListener('click', function() {
+                // 直接使用文件对象引用删除
+                const fileToDelete = previewItem.fileObject;
+                console.log('要删除的文件对象:', fileToDelete);
+                
+                if (fileToDelete && window.selectedImages) {
+                    // 查找文件对象在数组中的索引
+                    const fileIndex = window.selectedImages.findIndex(file => file === fileToDelete);
+                    console.log('找到文件在数组中的索引:', fileIndex);
+                    
+                    if (fileIndex !== -1) {
+                        console.log('删除前数组长度:', window.selectedImages.length);
+                        window.selectedImages.splice(fileIndex, 1);
+                        console.log('删除后数组长度:', window.selectedImages.length);
+                    } else {
+                        console.log('未找到文件对象在数组中的位置');
+                        
+                        // 如果找不到，尝试使用文件名匹配
+                        const nameIndex = window.selectedImages.findIndex(file => file.name === fileToDelete.name);
+                        if (nameIndex !== -1) {
+                            console.log('通过文件名找到索引:', nameIndex);
+                            window.selectedImages.splice(nameIndex, 1);
+                            console.log('删除后数组长度:', window.selectedImages.length);
+                        }
+                    }
+                }
+                
+                // 移除预览元素
+                previewItem.remove();
+                
+                // 释放对象URL
+                if (!isUrl) {
+                    URL.revokeObjectURL(tempUrl);
+                }
+                
+                console.log('删除操作完成，当前 window.selectedImages:', window.selectedImages ? window.selectedImages.length : 0, '张图片');
+            });
+            
+            // 添加到预览微缩框
+            previewItem.appendChild(previewImg);
+            previewItem.appendChild(deleteBtn);
+            
+            // 插入到添加按钮之前
+            container.insertBefore(previewItem, initialItem);
+        }
+
+        // 绑定保存按钮事件
+        document.addEventListener('DOMContentLoaded', function() {
+            const confirmBtn = document.getElementById('confirmAccountBtn');
+            
+            if (confirmBtn) {
+                confirmBtn.addEventListener('click', function() {
+                    if (typeof saveWorkRecord === 'function') {
+                        saveWorkRecord();
+                    } else {
+                        console.error('saveWorkRecord 函数未找到');
+                    }
+                });
+            } else {
+                console.error('未找到保存按钮');
+            }
+
+            // 添加文档点击事件监听器，点击表格外部空白处取消行选中
+            document.addEventListener('click', function(e) {
+                // 检查点击的元素是否在表格内部
+                const table = document.querySelector('.modern-table');
+                if (table && !table.contains(e.target)) {
+                    // 取消所有行的选中状态
+                    document.querySelectorAll('.modern-table tbody tr.selected').forEach(selectedRow => {
+                        selectedRow.classList.remove('selected');
+                    });
+                    
+                    // 恢复按钮文本为"生成表格"
+                    const generatePdfBtn = document.getElementById('generatePdfBtn');
+                    if (generatePdfBtn) {
+                        generatePdfBtn.textContent = '生成表格';
+                        // 恢复按钮原始背景颜色
+                        generatePdfBtn.style.background = 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)';
+                        generatePdfBtn.style.boxShadow = '0 2px 8px rgba(82, 196, 26, 0.3)';
+                    }
+                }
+            });
+
+        });
+    </script>
+
+    <!-- 为底部按钮预留空间，防止遮挡内容 -->
+    <div style="height: 70px;"></div>
+
+    <!-- 底部合计显示 -->
+    <div id="totalAmountDisplay" class="total-amount-container" style="position: fixed; bottom: 0; left: 0; right: 0; display: none; justify-content: flex-start; align-items: center; background: linear-gradient(135deg, #fff7e6 0%, #fffbe6 100%); padding: 15px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 999;">
+        <div style="display: flex; align-items: center;">
+            <span style="font-size: 16px; font-weight: bold; color: #333;">合计：<span id="totalWorkDaysValue" style="color: #1890ff; font-size: 18px;">0</span><span style="color: #333;">天</span>        <span id="totalAmountValue" style="color: #ff4d4f; font-size: 18px;">¥0.00</span><span style="color: #333;">元</span></span>
+            <button id="generatePdfBtn" style="margin-left: 15px; padding: 8px 16px; background: linear-gradient(135deg, #52c41a 0%, #389e0d 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 2px 8px rgba(82, 196, 26, 0.3);">生成表格</button>
+        </div>
+    </div>
+
+    <!-- 底部保存按钮 -->
+    <div class="bottom-buttons" style="position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: flex-start; background-color: transparent; padding: 15px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 1000;">
+        <button id="confirmAccountBtn" style="padding: 8px 16px; background: linear-gradient(135deg, rgba(0, 102, 204, 0.9), rgba(30, 144, 255, 0.8)); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 2px 8px rgba(0, 102, 204, 0.3);">保存</button>
+    </div>
+
+    <style>
+        /* 确认记账按钮样式 - 蓝色主题 */
+        #confirmAccountBtn:hover {
+            background: linear-gradient(135deg, rgba(30, 144, 255, 1), rgba(0, 102, 204, 1));
+            transform: translateY(-1px) scale(1.05);
+            box-shadow: 0 4px 15px rgba(0, 102, 204, 0.4);
+        }
+
+        .total-amount-container {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(248, 249, 250, 0.95));
+            border-top: 2px solid #ff4d4f;
+            backdrop-filter: blur(10px);
+        }
+
+        #totalAmountValue {
+            font-weight: 700;
+            text-shadow: 0 1px 2px rgba(255, 77, 79, 0.2);
+        }
+
+        /* 生成PDF按钮样式 */
+        #generatePdfBtn:hover {
+            background: linear-gradient(135deg, #73d13d 0%, #52c41a 100%);
+            transform: translateY(-1px) scale(1.05);
+            box-shadow: 0 4px 15px rgba(82, 196, 26, 0.4);
+        }
+    </style>
+</body>
+</html>
