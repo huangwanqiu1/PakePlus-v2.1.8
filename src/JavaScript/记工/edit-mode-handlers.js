@@ -952,70 +952,66 @@ async function handleRemarkAndImagesForEditing(record) {
  * @returns {Promise<Object>} 包含dataURL和name的对象
  */
 async function downloadImageToDataURL(imageUrl) {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
         try {
-            // 从URL中解析图片名称
-            const urlParts = imageUrl.split('/');
-            let originalName = urlParts[urlParts.length - 1];
+            let imageBlob;
+            let originalName;
             
-            // 去除URL参数和哈希值
-            originalName = originalName.split('?')[0].split('#')[0];
-            
-            // 创建图片对象
-            const img = new Image();
-            img.crossOrigin = 'anonymous'; // 处理跨域问题
-            
-            img.onload = function() {
-                try {
-                    // 创建 canvas 来转换图片为 DataURL
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
+            // 检查是否是 Supabase Storage URL
+            if (imageUrl.includes('supabase.co/storage/v1/object/public/')) {
+                // 从URL中解析 bucketName 和 fileName
+                const urlParts = imageUrl.split('supabase.co/storage/v1/object/public/');
+                if (urlParts.length > 1) {
+                    const pathParts = urlParts[1].split('/');
+                    const bucketName = pathParts[0];
+                    const fileName = pathParts.slice(1).join('/');
                     
-                    // 设置 canvas 尺寸
-                    canvas.width = img.width;
-                    canvas.height = img.height;
+                    // 解码文件名
+                    originalName = decodeURIComponent(fileName.split('/').pop());
                     
-                    // 绘制图片
-                    ctx.drawImage(img, 0, 0);
-                    
-                    // 转换为 DataURL
-                    const dataURL = canvas.toDataURL('image/jpeg', 0.8);
-                    
-                    // 从DataURL创建Blob对象
-                    fetch(dataURL) // 使用fetch获取Blob
-                        .then(response => response.blob())
-                        .then(blob => {
-                            // 创建带有原始文件名的File对象
-                            const file = new File([blob], originalName, {
-                                type: blob.type,
-                                lastModified: Date.now()
-                            });
-                            resolve(file);
-                        })
-                        .catch(error => {
-                            console.error('从DataURL创建Blob失败:', error);
-                            // 如果创建File对象失败，至少返回带有名称的dataURL对象
-                            resolve({
-                                dataURL: dataURL,
-                                name: originalName
-                            });
-                        });
-                } catch (error) {
-                    console.error('转换图片为 DataURL 失败:', error);
-                    reject(error);
+                    try {
+                        // 使用 Supabase Storage API 下载图片（带认证）
+                        const supabase = await window.waitForSupabase();
+                        const { data, error } = await supabase
+                            .storage
+                            .from(bucketName)
+                            .download(fileName);
+                        
+                        if (error) {
+                            console.error('使用 Supabase API 下载图片失败:', error);
+                            throw error;
+                        }
+                        
+                        imageBlob = data;
+                    } catch (supabaseError) {
+                        console.error('Supabase Storage 下载失败，尝试使用公开 URL:', supabaseError);
+                        // 如果 Supabase API 失败，回退到使用公开 URL
+                        throw new Error('Supabase Storage 下载失败');
+                    }
+                } else {
+                    throw new Error('无法解析 Supabase Storage URL');
                 }
-            };
+            } else {
+                // 非 Supabase URL，使用传统方式下载
+                originalName = imageUrl.split('/').pop().split('?')[0].split('#')[0];
+                
+                const response = await fetch(imageUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                imageBlob = await response.blob();
+            }
             
-            img.onerror = function(error) {
-                console.error('加载图片失败:', imageUrl, error);
-                reject(new Error('图片加载失败'));
-            };
+            // 创建带有原始文件名的File对象
+            const file = new File([imageBlob], originalName, {
+                type: imageBlob.type || 'image/jpeg',
+                lastModified: Date.now()
+            });
             
-            // 开始加载图片
-            img.src = imageUrl;
+            resolve(file);
             
         } catch (error) {
-            console.error('下载图片失败:', error);
+            console.error('下载图片失败:', imageUrl, error);
             reject(error);
         }
     });
