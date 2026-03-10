@@ -907,7 +907,19 @@ class WorkFlowService {
     /**
      * 显示图片预览
      */
-    showImagePreview(imageUrl) {
+    async showImagePreview(imageUrl) {
+        let displayUrl = imageUrl;
+        
+        // 如果是 Supabase Storage URL，使用认证方式获取图片
+        if (imageUrl.includes('supabase.co/storage/v1/object/public/')) {
+            try {
+                displayUrl = await this._getAuthenticatedImageUrl(imageUrl);
+            } catch (error) {
+                console.error('获取认证图片URL失败:', error);
+                // 如果失败，继续使用原始URL
+            }
+        }
+        
         let modal = document.getElementById('workFlowImagePreviewModal');
         if (!modal) {
             modal = document.createElement('div');
@@ -919,7 +931,7 @@ class WorkFlowService {
         modal.innerHTML = `
             <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2001;" 
                  onclick="if(event.target === this) document.getElementById('workFlowImagePreviewModal').style.display='none'">
-                <img id="workFlowPreviewDraggableImage" src="${imageUrl}" 
+                <img id="workFlowPreviewDraggableImage" src="${displayUrl}" 
                      style="max-width: 90%; max-height: 90%; position: absolute; cursor: move; top: 50%; left: 50%; transform: translate(-50%, -50%);"
                      ondragstart="return false;">
                 <button onclick="document.getElementById('workFlowImagePreviewModal').style.display='none'" 
@@ -960,6 +972,43 @@ class WorkFlowService {
             img.style.top = '50%';
             img.style.transform = `translate(-50%, -50%) scale(${scale})`;
         });
+    }
+
+    /**
+     * 获取认证的图片URL（将Supabase Storage图片转换为带认证的URL）
+     */
+    async _getAuthenticatedImageUrl(imageUrl) {
+        try {
+            const urlParts = imageUrl.split('supabase.co/storage/v1/object/public/');
+            if (urlParts.length > 1) {
+                const pathParts = urlParts[1].split('/');
+                const bucketName = pathParts[0];
+                const fileName = pathParts.slice(1).join('/');
+                
+                // 使用 Supabase Storage API 下载图片
+                const supabase = await window.waitForSupabase();
+                const { data, error } = await supabase
+                    .storage
+                    .from(bucketName)
+                    .download(fileName);
+                
+                if (error) {
+                    throw error;
+                }
+                
+                // 将 Blob 转换为 dataURL
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(data);
+                });
+            }
+            return imageUrl;
+        } catch (error) {
+            console.error('获取认证图片URL失败:', error);
+            return imageUrl;
+        }
     }
 
     /**
