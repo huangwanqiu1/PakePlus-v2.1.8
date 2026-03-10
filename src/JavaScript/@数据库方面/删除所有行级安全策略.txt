@@ -1,0 +1,79 @@
+-- ============================================
+-- 删除所有表的行级安全策略
+-- ============================================
+
+-- 1. users 表
+DROP POLICY IF EXISTS "users_allow_insert" ON public.users;
+DROP POLICY IF EXISTS "users_allow_select" ON public.users;
+DROP POLICY IF EXISTS "users_allow_select_by_user_id" ON public.users;
+DROP POLICY IF EXISTS "users_allow_select_by_email" ON public.users;
+DROP POLICY IF EXISTS "users_allow_update" ON public.users;
+DROP POLICY IF EXISTS "users_allow_delete_own" ON public.users;
+ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
+
+-- 2. projects 表
+DROP POLICY IF EXISTS "projects_allow_insert" ON public.projects;
+DROP POLICY IF EXISTS "projects_allow_select" ON public.projects;
+DROP POLICY IF EXISTS "projects_allow_update" ON public.projects;
+DROP POLICY IF EXISTS "projects_allow_delete_own" ON public.projects;
+ALTER TABLE public.projects DISABLE ROW LEVEL SECURITY;
+
+-- 3. user_projects 表
+DROP POLICY IF EXISTS "user_projects_allow_select" ON public.user_projects;
+DROP POLICY IF EXISTS "user_projects_allow_insert" ON public.user_projects;
+DROP POLICY IF EXISTS "user_projects_allow_update" ON public.user_projects;
+DROP POLICY IF EXISTS "user_projects_allow_delete" ON public.user_projects;
+ALTER TABLE public.user_projects DISABLE ROW LEVEL SECURITY;
+
+-- 4. attendance_records 表
+DROP POLICY IF EXISTS "attendance_records_allow_select" ON public.attendance_records;
+DROP POLICY IF EXISTS "attendance_records_allow_insert" ON public.attendance_records;
+DROP POLICY IF EXISTS "attendance_records_allow_update" ON public.attendance_records;
+DROP POLICY IF EXISTS "attendance_records_allow_delete" ON public.attendance_records;
+ALTER TABLE public.attendance_records DISABLE ROW LEVEL SECURITY;
+
+-- 5. settlement_records 表
+DROP POLICY IF EXISTS "settlement_records_allow_select" ON public.settlement_records;
+DROP POLICY IF EXISTS "settlement_records_allow_insert" ON public.settlement_records;
+DROP POLICY IF EXISTS "settlement_records_allow_update" ON public.settlement_records;
+DROP POLICY IF EXISTS "settlement_records_allow_delete" ON public.settlement_records;
+ALTER TABLE public.settlement_records DISABLE ROW LEVEL SECURITY;
+
+-- 6. project_expenses 表
+DROP POLICY IF EXISTS "project_expenses_allow_select" ON public.project_expenses;
+DROP POLICY IF EXISTS "project_expenses_allow_insert" ON public.project_expenses;
+DROP POLICY IF EXISTS "project_expenses_allow_update" ON public.project_expenses;
+DROP POLICY IF EXISTS "project_expenses_allow_delete" ON public.project_expenses;
+ALTER TABLE public.project_expenses DISABLE ROW LEVEL SECURITY;
+
+-- 7. project_income 表
+DROP POLICY IF EXISTS "project_income_allow_select" ON public.project_income;
+DROP POLICY IF EXISTS "project_income_allow_insert" ON public.project_income;
+DROP POLICY IF EXISTS "project_income_allow_update" ON public.project_income;
+DROP POLICY IF EXISTS "project_income_allow_delete" ON public.project_income;
+ALTER TABLE public.project_income DISABLE ROW LEVEL SECURITY;
+
+-- 8. employees 表
+DROP POLICY IF EXISTS "employees_allow_select" ON public.employees;
+DROP POLICY IF EXISTS "employees_allow_insert" ON public.employees;
+DROP POLICY IF EXISTS "employees_allow_update" ON public.employees;
+DROP POLICY IF EXISTS "employees_allow_delete" ON public.employees;
+ALTER TABLE public.employees DISABLE ROW LEVEL SECURITY;
+
+-- 9. construction_logs 表
+DROP POLICY IF EXISTS "construction_logs_allow_select" ON public.construction_logs;
+DROP POLICY IF EXISTS "construction_logs_allow_insert" ON public.construction_logs;
+DROP POLICY IF EXISTS "construction_logs_allow_update" ON public.construction_logs;
+DROP POLICY IF EXISTS "construction_logs_allow_delete" ON public.construction_logs;
+ALTER TABLE public.construction_logs DISABLE ROW LEVEL SECURITY;
+
+-- 10. work_records 表
+DROP POLICY IF EXISTS "work_records_allow_select" ON public.work_records;
+DROP POLICY IF EXISTS "work_records_allow_insert" ON public.work_records;
+DROP POLICY IF EXISTS "work_records_allow_update" ON public.work_records;
+DROP POLICY IF EXISTS "work_records_allow_delete" ON public.work_records;
+ALTER TABLE public.work_records DISABLE ROW LEVEL SECURITY;
+
+-- ============================================
+-- 完成：所有表的RLS策略已删除
+-- ============================================
