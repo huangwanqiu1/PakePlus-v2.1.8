@@ -233,6 +233,7 @@ class PDFGenerator {
                     const writable = await fileHandle.createWritable();
                     await writable.write(pdfData);
                     await writable.close();
+                    console.log('PDF已通过文件保存对话框保存');
                     return true;
                 } catch (err) {
                     // 用户取消保存或其他错误，使用默认保存方式
@@ -240,10 +241,32 @@ class PDFGenerator {
                 }
             }
             
-            // 默认保存方式
-            pdf.save(filename);
+            // 尝试使用pdf.save()
+            try {
+                pdf.save(filename);
+                console.log('PDF已通过pdf.save()保存');
+                return true;
+            } catch (saveErr) {
+                console.log('pdf.save()错误:', saveErr);
+            }
             
-            return true;
+            // 降级方案：使用Blob和URL.createObjectURL
+            try {
+                const pdfBlob = pdf.output('blob');
+                const url = URL.createObjectURL(pdfBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                console.log('PDF已通过Blob降级方案保存');
+                return true;
+            } catch (blobErr) {
+                console.log('Blob降级方案错误:', blobErr);
+                throw new Error('无法保存PDF文件，请检查浏览器设置或权限');
+            }
         } catch (error) {
             console.error('生成PDF失败:', error);
             throw error;
