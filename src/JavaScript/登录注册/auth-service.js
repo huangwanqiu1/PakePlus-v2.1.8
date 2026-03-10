@@ -4,8 +4,9 @@
  * 显示通知
  * @param {string} message - 通知消息
  * @param {boolean} isError - 是否为错误消息
+ * @param {number} duration - 显示时长（毫秒），默认3000ms
  */
-function showNotification(message, isError = false) {
+function showNotification(message, isError = false, duration = 3000) {
     // 检查是否已存在通知元素，如果存在则移除
     const existingNotification = document.querySelector('.auth-notification');
     if (existingNotification) {
@@ -36,7 +37,7 @@ function showNotification(message, isError = false) {
         if (notification.parentNode) {
             notification.remove();
         }
-    }, 3000);
+    }, duration);
 }
 
 /**
@@ -46,6 +47,15 @@ function showNotification(message, isError = false) {
  */
 function validatePhone(phone) {
     return /^1[3-9]\d{9}$/.test(phone);
+}
+
+/**
+ * 邮箱验证
+ * @param {string} email - 邮箱
+ * @returns {boolean} 是否为有效邮箱
+ */
+function validateEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 /**
@@ -84,11 +94,12 @@ function validateLoginForm(loginPhoneInput, loginPasswordInput) {
  * 验证注册表单
  * @param {HTMLElement} registerNameInput - 姓名输入框
  * @param {HTMLElement} registerPhoneInput - 手机号输入框
+ * @param {HTMLElement} registerEmailInput - 邮箱输入框
  * @param {HTMLElement} registerPasswordInput - 密码输入框
  * @param {HTMLElement} confirmPasswordInput - 确认密码输入框
  * @returns {boolean} 表单是否有效
  */
-function validateRegisterForm(registerNameInput, registerPhoneInput, registerPasswordInput, confirmPasswordInput) {
+function validateRegisterForm(registerNameInput, registerPhoneInput, registerEmailInput, registerPasswordInput, confirmPasswordInput) {
     let isValid = true;
 
     // 验证登录名
@@ -109,6 +120,16 @@ function validateRegisterForm(registerNameInput, registerPhoneInput, registerPas
     } else {
         document.getElementById('registerPhoneError').style.display = 'none';
         registerPhoneInput.classList.remove('error');
+    }
+
+    // 验证邮箱
+    if (!validateEmail(registerEmailInput.value)) {
+        document.getElementById('registerEmailError').style.display = 'block';
+        registerEmailInput.classList.add('error');
+        isValid = false;
+    } else {
+        document.getElementById('registerEmailError').style.display = 'none';
+        registerEmailInput.classList.remove('error');
     }
 
     // 验证密码
@@ -158,6 +179,7 @@ function switchToRegister() {
 // 导出为全局函数
 window.showNotification = showNotification;
 window.validatePhone = validatePhone;
+window.validateEmail = validateEmail;
 window.validateLoginForm = validateLoginForm;
 window.validateRegisterForm = validateRegisterForm;
 window.switchToLogin = switchToLogin;
