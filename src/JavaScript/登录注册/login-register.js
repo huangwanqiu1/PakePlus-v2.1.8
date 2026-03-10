@@ -138,30 +138,37 @@ function bindRealTimeValidationEvents() {
     // 注册表单实时验证
     const registerNameInput = document.getElementById('registerName');
     const registerPhoneInput = document.getElementById('registerPhone');
+    const registerEmailInput = document.getElementById('registerEmail');
     const registerPasswordInput = document.getElementById('registerPassword');
     const confirmPasswordInput = document.getElementById('confirmPassword');
     
     if (registerNameInput) {
         registerNameInput.addEventListener('input', () => {
-            validateRegisterForm(registerNameInput, registerPhoneInput, registerPasswordInput, confirmPasswordInput);
+            validateRegisterForm(registerNameInput, registerPhoneInput, registerEmailInput, registerPasswordInput, confirmPasswordInput);
         });
     }
     
     if (registerPhoneInput) {
         registerPhoneInput.addEventListener('input', () => {
-            validateRegisterForm(registerNameInput, registerPhoneInput, registerPasswordInput, confirmPasswordInput);
+            validateRegisterForm(registerNameInput, registerPhoneInput, registerEmailInput, registerPasswordInput, confirmPasswordInput);
+        });
+    }
+    
+    if (registerEmailInput) {
+        registerEmailInput.addEventListener('input', () => {
+            validateRegisterForm(registerNameInput, registerPhoneInput, registerEmailInput, registerPasswordInput, confirmPasswordInput);
         });
     }
     
     if (registerPasswordInput) {
         registerPasswordInput.addEventListener('input', () => {
-            validateRegisterForm(registerNameInput, registerPhoneInput, registerPasswordInput, confirmPasswordInput);
+            validateRegisterForm(registerNameInput, registerPhoneInput, registerEmailInput, registerPasswordInput, confirmPasswordInput);
         });
     }
     
     if (confirmPasswordInput) {
         confirmPasswordInput.addEventListener('input', () => {
-            validateRegisterForm(registerNameInput, registerPhoneInput, registerPasswordInput, confirmPasswordInput);
+            validateRegisterForm(registerNameInput, registerPhoneInput, registerEmailInput, registerPasswordInput, confirmPasswordInput);
         });
     }
 }
@@ -209,91 +216,78 @@ async function handleLoginSubmit(e) {
         const phone = loginPhoneInput.value;
         const password = loginPasswordInput.value;
         
-        // 第一次验证：查询所有phone字段数据并检查输入的手机号是否存在
-        console.log('执行第一次验证');
-        const { data: allUsers, error } = await window.supabase
-            .from('users')
-            .select('phone') // 只查询phone字段，减少数据传输
-            .eq('phone', phone) // 直接查找匹配的手机号
-            .limit(1); // 限制返回结果数量，提高查询效率
-        
-        // 检查查询结果
-        
-        // 检查查询是否成功
-        if (error) {
-            console.error('[错误] 查询手机号时出错:', error);
-            showNotification('系统查询失败，请稍后重试', true);
+        if (!window.supabase) {
+            console.error('Supabase客户端未初始化');
+            showNotification('系统初始化失败，请刷新页面重试', true);
             return;
         }
         
-        // 检查手机号是否存在于查询结果中
-        if (!allUsers || allUsers.length === 0) {
-            console.log('[验证失败] 手机号未注册');
-            showNotification('当前手机号未注册，请注册！', true);
-            return;
-        }
+        console.log('执行第一步：通过手机号查询用户信息');
         
-        console.log('[验证成功] 手机号已注册');
-        
-        // 手机号已存在，现在获取完整的用户信息用于密码验证
         const { data: userInfoData, error: userInfoError } = await window.supabase
-            .from('users')
-            .select('user_id, phone, login_name, password')
-            .eq('phone', phone);
+            .rpc('check_phone_exists', { phone_number: phone });
         
-        // 检查查询是否成功
         if (userInfoError) {
             console.error('[错误] 获取用户信息时出错:', userInfoError);
             showNotification('系统查询失败，请稍后重试', true);
             return;
         }
         
-        // 处理可能是数组的返回数据，获取第一个元素
-        const userInfo = Array.isArray(userInfoData) && userInfoData.length > 0 ? userInfoData[0] : userInfoData;
-        
-        // 准备进行第二次验证
-        
-        // 第二次验证：验证密码是否正确
-        console.log('执行第二次验证');
-        
-        // 安全比较密码，去除可能的空格并确保字段存在
-        const dbPassword = userInfo?.password ? String(userInfo.password).trim() : '';
-        const inputPassword = String(password).trim();
-        
-        if (userInfo && dbPassword === inputPassword) {
-            console.log('[验证成功] 密码验证通过');
-            // 登录成功，保存用户信息
-            const userDataToSave = {
-                user_id: userInfo.user_id,
-                phone: userInfo.phone,
-                login_name: userInfo.login_name,
-                password: userInfo.password
-            };
-            localStorage.setItem('currentUser', JSON.stringify(userDataToSave));
-            localStorage.setItem('loggedInPhone', phone);
-            
-            // 登录成功，准备跳转到首页
-            showNotification('登录成功！');
-            
-            // 跳转到首页页面
-            setTimeout(() => {
-                window.location.href = '首页.html';
-            }, 1500);
-            return;
-        } else {
-            // 密码错误，显示错误提示
-            console.log('[验证失败] 密码验证失败');
-            showNotification('密码错误，请重新输入！', true);
+        if (!userInfoData || userInfoData.length === 0) {
+            console.log('[验证失败] 手机号未注册');
+            showNotification('当前手机号未注册，请注册！', true);
             return;
         }
+        
+        const userInfo = userInfoData[0];
+        console.log('[验证成功] 手机号已注册，用户信息:', userInfo);
+        
+        console.log('执行第二步：使用邮箱和密码登录');
+        const { data: authData, error: authError } = await window.supabase.auth.signInWithPassword({
+            email: userInfo.email,
+            password: password
+        });
+        
+        if (authError) {
+            console.error('[错误] 登录失败:', authError);
+            if (authError.code === '400') {
+                showNotification('密码错误，请重新输入！', true);
+            } else if (authError.code === '401') {
+                showNotification('认证失败，请检查邮箱和密码', true);
+            } else {
+                showNotification('登录失败：' + authError.message, true);
+            }
+            return;
+        }
+        
+        console.log('[验证成功] 登录成功:', authData);
+        
+        const userDataToSave = {
+            user_id: userInfo.user_id,
+            phone: phone,
+            login_name: userInfo.login_name,
+            email: userInfo.email
+        };
+        localStorage.setItem('currentUser', JSON.stringify(userDataToSave));
+        localStorage.setItem('loggedInPhone', phone);
+        
+        showNotification('登录成功！');
+        
+        setTimeout(() => {
+            window.location.href = '首页.html';
+        }, 1500);
+        return;
 
     } catch (error) {
         console.error('登录验证失败:', error);
-        // 区分不同类型的错误
         if (error.code && error.code.includes('406')) {
             showNotification('服务暂时不可用，请稍后重试', true);
         } else if (error.code === 'PGRST116') {
             showNotification('手机号未注册，请先注册！', true);
+        } else if (error.name === 'TypeError') {
+            showNotification('系统错误，请刷新页面重试', true);
+        } else if (error.message && error.message.includes('网络')) {
+            showNotification('网络连接异常，请检查网络后重试', true);
         } else {
             showNotification('登录失败，请稍后重试', true);
         }
@@ -312,15 +306,15 @@ async function handleRegisterSubmit(e) {
     
     const registerNameInput = document.getElementById('registerName');
     const registerPhoneInput = document.getElementById('registerPhone');
+    const registerEmailInput = document.getElementById('registerEmail');
     const registerPasswordInput = document.getElementById('registerPassword');
     const confirmPasswordInput = document.getElementById('confirmPassword');
     const registerButton = document.getElementById('registerButton');
     
-    // 在函数顶部定义registerData变量，确保finally块可访问
     let registerData = {};
     
     try {
-        if (!validateRegisterForm(registerNameInput, registerPhoneInput, registerPasswordInput, confirmPasswordInput)) return;
+        if (!validateRegisterForm(registerNameInput, registerPhoneInput, registerEmailInput, registerPasswordInput, confirmPasswordInput)) return;
 
         registerButton.disabled = true;
         registerButton.innerHTML = '<span class="loading"></span>注册中...';
@@ -328,32 +322,26 @@ async function handleRegisterSubmit(e) {
         const formData = new FormData(document.getElementById('registerForm'));
         registerData = {
             phone: formData.get('phone'),
-            login_name: formData.get('login_name'), // 正确获取表单中的登录名
-            password: formData.get('password'),
-            // 不再手动生成user_id，由数据库自动生成UUID
-            // created_at和updated_at由数据库自动生成
+            email: formData.get('email'),
+            login_name: formData.get('login_name'),
+            password: formData.get('password')
         };
 
-        // 使用新增的初始化状态对象进行更详细的检查
         if (window.supabaseInitStatus && window.supabaseInitStatus.error) {
             console.error('Supabase初始化状态错误:', window.supabaseInitStatus.error);
-            // 根据具体错误类型提供更精确的提示
             if (window.supabaseInitStatus.error.includes('CDN') || window.supabaseInitStatus.error.includes('加载')) {
                 showNotification('网络连接问题：无法连接到服务。请检查网络连接后重试。', true);
             } else if (window.supabaseInitStatus.error.includes('createClient')) {
                 showNotification('服务初始化失败：缺少必要组件。请刷新页面重试。', true);
             } else {
-                showNotification('服务未就绪：' + window.supabaseInitStatus.error + '。请刷新页面重试。', true);
+                showNotification('服务未就绪：' + window.supabaseInitStatus.error + '。请刷新页面重试', true);
             }
             return;
         }
         
-        // 检查Supabase客户端是否已初始化且功能完整
         if (!window.supabase) {
             console.error('Supabase客户端未初始化');
             showNotification('注册失败：服务连接中，请稍等片刻后重试', true);
-            
-            // 初始化失败，不进行重试
             return;
         }
         
@@ -363,90 +351,92 @@ async function handleRegisterSubmit(e) {
             return;
         }
         
-        // Supabase客户端可用，继续处理
+        console.log('第一步：检查手机号是否已注册:', { phone: registerData.phone });
         
-        // 输出手机号查询日志
-        console.log('检查手机号是否已注册:', { phone: registerData.phone });
-        
-        // 使用Supabase检查手机号是否已注册
-        const { data: existingUsers, error: queryError } = await window.supabase
-            .from('users')
-            .select('phone') // 只查询phone列，减少数据传输
-            .eq('phone', registerData.phone)
-            .limit(1);
+        const { data: phoneExistsData, error: phoneQueryError } = await window.supabase
+            .rpc('check_phone_exists', { phone_number: registerData.phone });
             
-        // 处理查询错误
-        if (queryError) {
-            console.error('查询手机号时出错:', queryError);
+        if (phoneQueryError) {
+            console.error('查询手机号时出错:', phoneQueryError);
             showNotification('检查手机号时出错，请重试', true);
             return;
         }
         
-        // 检查是否存在相同手机号
-        if (existingUsers && existingUsers.length > 0) {
+        if (phoneExistsData && phoneExistsData.length > 0) {
             showNotification('当前手机号已注册，请登录！', true);
             setTimeout(() => {
-                // 切换到登录表单
                 switchToLogin();
             }, 2000);
             return;
         }
         
-        // 手机号未注册，可以继续注册流程
-        console.log('手机号未注册，继续注册流程');
-
-        // 清理和验证数据格式
-        const sanitizedData = {
-            phone: registerData.phone || '',
-            login_name: registerData.login_name || 'user_' + Date.now(),
-            password: registerData.password || '',
-            // user_id、created_at和updated_at由数据库自动生成
-        };
+        console.log('第二步：检查邮箱是否已注册:', { email: registerData.email });
         
-        // 准备上传清理后的用户数据到Supabase
+        const { data: emailExistsData, error: emailQueryError } = await window.supabase
+            .rpc('check_email_exists', { email_address: registerData.email });
+            
+        if (emailQueryError) {
+            console.error('查询邮箱时出错:', emailQueryError);
+            showNotification('检查邮箱时出错，请重试', true);
+            return;
+        }
         
-        // 使用Supabase保存用户数据
-        const { data, error: insertError } = await window.supabase
-            .from('users')
-            .insert([sanitizedData]) // 包装在数组中确保正确格式
-            .select();
+        if (emailExistsData === true) {
+            showNotification('当前邮箱已注册，请更换邮箱！', true);
+            return;
+        }
         
-        // 检查数据上传结果
+        console.log('第三步：使用邮箱和密码注册Supabase Auth');
         
-        if (insertError) {
-            // 检测用户名或手机号冲突错误
-            if (insertError.code === '23505') {
-                if (insertError.details && insertError.details.includes('login_name')) {
-                    showNotification('用户名已注册，请更换用户名！', true);
-                } else if (insertError.details && insertError.details.includes('phone')) {
-                    showNotification('手机号已注册，请更换手机号！', true);
-                } else {
-                    // 其他唯一约束冲突，输出日志
-                    console.error('插入用户数据时出错:', insertError);
-                    showNotification(`注册失败: ${insertError.message || '数据格式错误'}`, true);
+        const { data: authData, error: authError } = await window.supabase.auth.signUp({
+            email: registerData.email,
+            password: registerData.password,
+            options: {
+                data: {
+                    login_name: registerData.login_name,
+                    phone: registerData.phone
                 }
+            }
+        });
+        
+        if (authError) {
+            console.error('注册Supabase Auth失败:', authError);
+            
+            if (authError.message && authError.message.includes('rate limit')) {
+                showNotification('注册过于频繁，请1小时后再试或联系管理员', true);
+            } else if (authError.message && authError.message.includes('already been registered')) {
+                showNotification('该邮箱已被注册，请更换邮箱或直接登录', true);
             } else {
-                // 非唯一约束冲突，输出日志
-                console.error('插入用户数据时出错:', insertError);
-                showNotification(`注册失败: ${insertError.message || '数据格式错误'}`, true);
+                showNotification('注册失败：' + authError.message, true);
             }
             return;
         }
         
-        if (data) {
-            console.log('用户数据上传成功到Supabase:', data);
-            showNotification('注册成功！即将跳转到登录界面', false);
-            setTimeout(() => {
-                // 切换到登录表单
-                switchToLogin();
-            }, 1500);
-        } else {
-            console.log('数据上传成功');
-            showNotification('注册成功！即将跳转到登录界面', false);
-            setTimeout(() => {
-                switchToLogin();
-            }, 1500);
+        console.log('Supabase Auth注册成功:', authData);
+        
+        console.log('第四步：将用户信息保存到users表');
+        
+        const { error: insertError } = await window.supabase
+            .rpc('register_user', {
+                p_phone: registerData.phone,
+                p_email: registerData.email,
+                p_login_name: registerData.login_name,
+                p_user_id: authData.user.id
+            });
+        
+        if (insertError) {
+            console.error('插入用户数据时出错:', insertError);
+            showNotification('注册失败：保存用户信息失败', true);
+            return;
         }
+        
+        console.log('用户数据保存成功');
+        
+        showNotification('注册信息提交成功，请进入邮箱进行验证后登录！', false, 5000);
+        setTimeout(() => {
+            switchToLogin();
+        }, 1500);
+        
     } catch (error) {
         console.error('注册过程发生异常:', error);
         
@@ -460,11 +450,9 @@ async function handleRegisterSubmit(e) {
             showNotification('注册失败：发生意外错误。错误信息：' + (error.message || '未知错误'), true);
         }
     } finally {
-        // 无论成功或失败，都恢复按钮状态
         registerButton.disabled = false;
         registerButton.innerHTML = '注册';
         
-        // 填充登录表单
         const loginPhoneInput = document.getElementById('loginPhone');
         const loginPasswordInput = document.getElementById('loginPassword');
         if (loginPhoneInput && loginPasswordInput) {
@@ -472,5 +460,4 @@ async function handleRegisterSubmit(e) {
             loginPasswordInput.value = registerData.password;
         }
     }
-
 }
