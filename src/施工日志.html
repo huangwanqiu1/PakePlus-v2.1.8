@@ -1779,8 +1779,10 @@
                     if (result.success) {
                         if (result.data && result.data.is_local) {
                             showNotification(currentEditingLogId ? '已更新到本地存储，将在网络恢复后同步' : '已保存到本地存储，将在网络恢复后同步', false);
+                            playSuccessSound();
                         } else {
                             showNotification(currentEditingLogId ? '更新成功' : '保存成功', false);
+                            playSuccessSound();
                         }
                         
                         // 重置表单（包括清空内容、图片、天气、重置日期）
@@ -1851,6 +1853,37 @@
                 weatherInfo.pm = parseCard(pmCard);
                 
                 return weatherInfo;
+            }
+            
+            function playSuccessSound() {
+                try {
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+                    function playTone(frequency, startTime, duration, type = 'sine') {
+                        const oscillator = audioContext.createOscillator();
+                        const gainNode = audioContext.createGain();
+
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+
+                        oscillator.frequency.value = frequency;
+                        oscillator.type = type;
+
+                        gainNode.gain.setValueAtTime(0, startTime);
+                        gainNode.gain.linearRampToValueAtTime(0.3, startTime + 0.02);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+
+                        oscillator.start(startTime);
+                        oscillator.stop(startTime + duration);
+                    }
+
+                    const now = audioContext.currentTime;
+                    playTone(523.25, now, 0.15);
+                    playTone(659.25, now + 0.15, 0.15);
+                    playTone(783.99, now + 0.3, 0.25);
+                } catch (e) {
+                    console.log('音频播放失败:', e);
+                }
             }
             
             // 显示通知的辅助函数
@@ -2029,6 +2062,7 @@
                             
                             if (result.success) {
                                 showNotification('删除成功', false);
+                                playSuccessSound();
                                 // 重置编辑ID
                                 currentEditingLogId = null;
                                 currentLogImageIds = [];
@@ -2049,7 +2083,7 @@
             }
 
             // 详情页修改按钮逻辑
-            detailModifyBtn.addEventListener('click', function() {
+            detailModifyBtn.addEventListener('click', async function() {
                 logDetailContainer.style.display = 'none';
                 writeLogContainer.style.display = 'block';
                 document.title = '编辑施工日志';
@@ -2150,30 +2184,46 @@
                     const detailImages = document.querySelectorAll('#logDetailContainer .detail-image');
 
                     // 将详情页图片转换为文件对象并添加到预览区域
-                    detailImages.forEach(async (img, index) => {
+                    for (let index = 0; index < detailImages.length; index++) {
+                        const img = detailImages[index];
                         try {
-                            // 记录原始云端图片URL
-                            originalCloudImageUrls.push(img.src);
+                            // 获取原始云端图片URL（从currentViewingLog中获取）
+                            const originalUrl = currentViewingLog?.image_ids?.[index] || img.src;
+                            originalCloudImageUrls.push(originalUrl);
 
-                            const response = await fetch(img.src);
-                            const blob = await response.blob();
+                            // 使用 Supabase Storage API 下载图片
+                            let blob;
+                            try {
+                                const objectUrl = await downloadImageToDataURL(originalUrl);
+                                const response = await fetch(objectUrl);
+                                blob = await response.blob();
+                            } catch (downloadError) {
+                                console.error('Supabase Storage 下载失败，尝试直接获取:', downloadError);
+                                const response = await fetch(img.src);
+                                blob = await response.blob();
+                            }
 
                             // 从URL中提取原始文件名
-                            const url = new URL(img.src);
-                            const pathname = decodeURIComponent(url.pathname);
-                            const originalFileName = pathname.substring(pathname.lastIndexOf('/') + 1) || `image_${index}.png`;
+                            let originalFileName = `image_${index}.png`;
+                            try {
+                                const url = new URL(originalUrl);
+                                const pathname = decodeURIComponent(url.pathname);
+                                originalFileName = pathname.substring(pathname.lastIndexOf('/') + 1) || `image_${index}.png`;
+                            } catch (e) {
+                                originalFileName = `image_${index}.png`;
+                            }
 
                             const file = new File([blob], originalFileName, { type: blob.type });
 
                             // 为云端下载的图片添加原始URL属性，用于区分云端图片和新图片
-                            file.originalUrl = img.src;
+                            file.originalUrl = originalUrl;
 
                             window.selectedImages.push(file);
                             renderImagePreview(file, window.selectedImages.length - 1);
                         } catch (e) {
                             console.error('单个图片加载失败', e);
                         }
-                    });
+                    }
                 } catch (e) {
                     console.error('填充图片列表失败', e);
                 }
@@ -2957,6 +3007,60 @@
                 return card;
             }
 
+            async function downloadImageToDataURL(imageUrl) {
+                return new Promise(async (resolve, reject) => {
+                    try {
+                        let imageBlob;
+                        
+                        if (imageUrl.includes('supabase.co/storage/v1/object/public/')) {
+                            const urlParts = imageUrl.split('supabase.co/storage/v1/object/public/');
+                            if (urlParts.length > 1) {
+                                const pathParts = urlParts[1].split('/');
+                                const bucketName = pathParts[0];
+                                const fileName = pathParts.slice(1).join('/');
+                                
+                                try {
+                                    const supabase = await window.waitForSupabase();
+                                    const { data, error } = await supabase
+                                        .storage
+                                        .from(bucketName)
+                                        .download(decodeURIComponent(fileName));
+                                    
+                                    if (error) {
+                                        console.error('使用 Supabase API 下载图片失败:', error);
+                                        throw error;
+                                    }
+                                    
+                                    imageBlob = data;
+                                } catch (supabaseError) {
+                                    console.error('Supabase Storage 下载失败，尝试使用公开 URL:', supabaseError);
+                                    const response = await fetch(imageUrl);
+                                    if (!response.ok) {
+                                        throw new Error(`HTTP error! status: ${response.status}`);
+                                    }
+                                    imageBlob = await response.blob();
+                                }
+                            } else {
+                                throw new Error('无法解析 Supabase Storage URL');
+                            }
+                        } else {
+                            const response = await fetch(imageUrl);
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                            }
+                            imageBlob = await response.blob();
+                        }
+                        
+                        const objectUrl = URL.createObjectURL(imageBlob);
+                        resolve(objectUrl);
+                        
+                    } catch (error) {
+                        console.error('下载图片失败:', imageUrl, error);
+                        reject(error);
+                    }
+                });
+            }
+
             // 显示日志详情
             function showLogDetail(log) {
                 const logDetailContainer = document.getElementById('logDetailContainer');
@@ -3041,36 +3145,43 @@
                 if (detailImageList) {
                     detailImageList.innerHTML = '';
                     if (log.image_ids && log.image_ids.length > 0) {
-                        log.image_ids.forEach(imageUrl => {
-                            const imgContainer = document.createElement('div');
-                            imgContainer.style.cssText = 'width: 80px; height: 80px; background-color: #f0f2f5; display: flex; align-items: center; justify-content: center; border-radius: 4px; overflow: hidden; position: relative;';
-                            
-                            // 添加加载状态
-                            const loadingDiv = document.createElement('div');
-                            loadingDiv.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(240, 242, 245, 0.8); display: flex; align-items: center; justify-content: center; z-index: 1;';
-                            loadingDiv.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" style="animation: rotate 1s linear infinite;"><circle cx="12" cy="12" r="10" stroke="#409EFF" stroke-width="2" fill="none" stroke-dasharray="31.4 31.4" stroke-linecap="round" style="animation: dash 1.5s ease-in-out infinite;"/></svg>';
-                            imgContainer.appendChild(loadingDiv);
-                            
-                            const img = document.createElement('img');
-                            img.src = imageUrl;
-                            img.alt = '施工日志图片';
-                            img.style.cssText = 'width: 100%; height: 100%; object-fit: cover; cursor: pointer;';
-                            img.className = 'detail-image';
-                            img.addEventListener('click', () => showImageModal(imageUrl));
-                            
-                            // 图片加载完成后隐藏加载状态
-                            img.onload = function() {
-                                loadingDiv.style.display = 'none';
-                            };
-                            
-                            // 图片加载失败后隐藏加载状态
-                            img.onerror = function() {
-                                loadingDiv.style.display = 'none';
-                            };
-                            
-                            imgContainer.appendChild(img);
-                            detailImageList.appendChild(imgContainer);
-                        });
+                        (async () => {
+                            for (const imageUrl of log.image_ids) {
+                                const imgContainer = document.createElement('div');
+                                imgContainer.style.cssText = 'width: 80px; height: 80px; background-color: #f0f2f5; display: flex; align-items: center; justify-content: center; border-radius: 4px; overflow: hidden; position: relative;';
+                                
+                                const loadingDiv = document.createElement('div');
+                                loadingDiv.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(240, 242, 245, 0.8); display: flex; align-items: center; justify-content: center; z-index: 1;';
+                                loadingDiv.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" style="animation: rotate 1s linear infinite;"><circle cx="12" cy="12" r="10" stroke="#409EFF" stroke-width="2" fill="none" stroke-dasharray="31.4 31.4" stroke-linecap="round" style="animation: dash 1.5s ease-in-out infinite;"/></svg>';
+                                imgContainer.appendChild(loadingDiv);
+                                
+                                const img = document.createElement('img');
+                                img.alt = '施工日志图片';
+                                img.style.cssText = 'width: 100%; height: 100%; object-fit: cover; cursor: pointer;';
+                                img.className = 'detail-image';
+                                
+                                try {
+                                    const objectUrl = await downloadImageToDataURL(imageUrl);
+                                    img.src = objectUrl;
+                                    img.addEventListener('click', () => showImageModal(objectUrl));
+                                } catch (error) {
+                                    console.error('图片加载失败:', error);
+                                    img.src = imageUrl;
+                                    img.addEventListener('click', () => showImageModal(imageUrl));
+                                }
+                                
+                                img.onload = function() {
+                                    loadingDiv.style.display = 'none';
+                                };
+                                
+                                img.onerror = function() {
+                                    loadingDiv.style.display = 'none';
+                                };
+                                
+                                imgContainer.appendChild(img);
+                                detailImageList.appendChild(imgContainer);
+                            }
+                        })();
                     } else {
                         detailImageList.innerHTML = '<span style="color: #909399; font-size: 13px;">暂无图片</span>';
                     }
