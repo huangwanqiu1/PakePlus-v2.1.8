@@ -402,6 +402,9 @@ class ProjectFinanceAPI {
 //                console.log('项目收入模式，使用配置:', { bucketName, folderName, supabaseProjectId });
             }
 
+            // 获取会话信息
+            const { data: { session } } = await this.supabase.auth.getSession();
+
             for (const image of images) {
                 if (!image || typeof image !== 'object') continue;
 
@@ -438,7 +441,7 @@ class ProjectFinanceAPI {
 //                    console.log(`上传图片: ${image.name} -> ${fileName}`);
 
                     // 使用tus-js-client上传（与结算借支保持一致）
-                    await this._uploadFileWithTus(supabaseProjectId, bucketName, fileName, processedImage);
+                    await this._uploadFileWithTus(supabaseProjectId, session?.access_token, bucketName, fileName, processedImage);
                     
                     // 生成图片URL
                     const encodedFileName = encodeURIComponent(fileName);
@@ -472,7 +475,7 @@ class ProjectFinanceAPI {
                     fileName = `${folderName}/${recordDate}/${uniqueFileName}.${fileExtension}`;
 
                     // 使用tus-js-client上传（与项目支出保持一致）
-                    await this._uploadFileWithTus(supabaseProjectId, bucketName, fileName, processedImage);
+                    await this._uploadFileWithTus(supabaseProjectId, session?.access_token, bucketName, fileName, processedImage);
                     
                     // 生成图片URL
                     const encodedFileName = encodeURIComponent(fileName);
@@ -761,58 +764,93 @@ class ProjectFinanceAPI {
     /**
      * 使用tus-js-client上传文件到Supabase（与结算借支保持一致）
      * @param {string} supabaseProjectId - Supabase项目ID
+     * @param {string} accessToken - 访问令牌
      * @param {string} bucketName - 存储桶名称
      * @param {string} fileName - 文件名
      * @param {File} file - 文件对象
      */
-    async _uploadFileWithTus(supabaseProjectId, bucketName, fileName, file) {
+    async _uploadFileWithTus(supabaseProjectId, accessToken, bucketName, fileName, file) {
+        let uploadFile = file;
+        
+        // 检查文件类型，如果是base64字符串，转换为Blob对象
+        if (typeof file === 'string' && file.startsWith('data:image/')) {
+            try {
+                // 转换base64字符串为Blob
+                const response = await fetch(file);
+                uploadFile = await response.blob();
+            } catch (error) {
+                console.error('转换base64图片失败:', error);
+                throw new Error('Failed to convert base64 string to Blob');
+            }
+        } else if (!(file instanceof File || file instanceof Blob)) {
+            throw new Error('source object may only be an instance of File, Blob, or Reader in this environment');
+        }
+        
         return new Promise((resolve, reject) => {
-            // 获取访问令牌
-            // 直接使用匿名访问令牌（与结算借支保持一致）
-            const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95ZGZmcnp6dWxzcmJpdHJyaGh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0MjcxNDEsImV4cCI6MjA3OTAwMzE0MX0.LFMDgx8eNyE3pVjVYgHqhtvaC--vP4-MtXL8fY3_v-s';
-
-            const upload = new window.tus.Upload(file, {
-                endpoint: `https://${supabaseProjectId}.supabase.co/storage/v1/upload/resumable`,
-                retryDelays: [0, 3000, 5000, 10000, 20000],
-                headers: {
-                    authorization: `Bearer ${token}`,
-                    'x-upsert': 'true', // 允许覆盖已存在的文件
-                },
+            // 检查tus是否可用
+            if (typeof window.tus === 'undefined') {
+                console.error('tus-js-client未加载');
+                reject(new Error('tus-js-client未加载'));
+                return;
+            }
+            
+            // 检查tus.isSupported
+            if (!window.tus.isSupported) {
+                console.error('当前环境不支持tus-js-client');
+                reject(new Error('当前环境不支持tus-js-client'));
+                return;
+            }
+            
+            // 创建tus上传实例
+                const upload = new window.tus.Upload(uploadFile, {
+                    // Supabase TUS endpoint (正确的URL格式，不带.storage子域名)
+                    endpoint: `https://${supabaseProjectId}.supabase.co/storage/v1/upload/resumable`,
+                    retryDelays: [0, 3000, 5000, 10000, 20000],
+                    headers: {
+                        // 使用正确的API密钥进行认证
+                        'apikey': accessToken,
+                        'authorization': `Bearer ${accessToken}`,
+                        'x-upsert': 'true', // 允许覆盖已存在的文件，解决编辑模式下的409 Conflict错误
+                    },
+                uploadDataDuringCreation: true,
+                removeFingerprintOnSuccess: true, // Important if you want to allow re-uploading the same file
                 metadata: {
                     bucketName: bucketName,
                     objectName: fileName,
                     contentType: file.type || 'image/png',
                     cacheControl: '3600',
-                    metadata: JSON.stringify({ // custom metadata passed to user_metadata column
+                    metadata: JSON.stringify({ // custom metadata passed to the user_metadata column
                         yourCustomMetadata: true,
                     }),
                 },
-                uploadDataDuringCreation: true,
-                removeFingerprintOnSuccess: true, // Important if you want to allow re-uploading the same file
-                chunkSize: 6 * 1024 * 1024, // 6MB chunks
-                onSuccess: () => {
-                    resolve();
-                },
-                onError: (error) => {
-                    console.error('Tus上传失败:', error);
+                chunkSize: 6 * 1024 * 1024, // NOTE: it must be set to 6MB (for now) do not change it
+                onError: function (error) {
+                    console.error('Failed because: ' + error);
                     reject(error);
                 },
-                onProgress: (bytesUploaded, bytesTotal) => {
+                onProgress: function (bytesUploaded, bytesTotal) {
                     const percentage = ((bytesUploaded / bytesTotal) * 100).toFixed(2);
-//                    console.log(`上传进度: ${percentage}%`);
+                },
+                onSuccess: function () {
+                    resolve(upload.url);
+                },
+            });
+            
+            // 检查是否有之前的上传可以继续
+            upload.findPreviousUploads().then(function (previousUploads) {
+                // 如果有之前的上传，选择第一个继续
+                if (previousUploads.length) {
+                    upload.resumeFromPreviousUpload(previousUploads[0]);
                 }
-                });
-
-                // 检查是否有之前的上传可以继续
-                upload.findPreviousUploads().then(function (previousUploads) {
-                    // 如果有之前的上传，选择第一个继续
-                    if (previousUploads.length) {
-                        upload.resumeFromPreviousUpload(previousUploads[0]);
-                    }
-                });
-
+                
+                // 开始上传
+                upload.start();
+            }).catch(function (error) {
+                console.error('查找之前的上传失败:', error);
+                // 直接开始新的上传
                 upload.start();
             });
+        });
     }
 
     /**
