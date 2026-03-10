@@ -63,6 +63,7 @@ class TimesheetExportService {
 
             // 6. 导出文件
             const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
             const fileName = `考勤报表_${startDateStr}至${endDateStr}.xlsx`;
             
             // 尝试使用文件保存对话框
@@ -85,8 +86,30 @@ class TimesheetExportService {
                 }
             }
             
-            // 默认保存方式
-            saveAs(new Blob([buffer]), fileName);
+            // 尝试使用saveAs
+            try {
+                saveAs(blob, fileName);
+                console.log('Excel已通过saveAs保存');
+                return;
+            } catch (saveAsErr) {
+                console.log('saveAs错误:', saveAsErr);
+            }
+            
+            // 降级方案：使用Blob和URL.createObjectURL
+            try {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                console.log('Excel已通过Blob降级方案保存');
+            } catch (blobErr) {
+                console.log('Blob降级方案错误:', blobErr);
+                throw new Error('无法保存Excel文件，请检查浏览器设置或权限');
+            }
 
         } catch (error) {
             console.error('导出失败:', error);
@@ -817,7 +840,7 @@ class TimesheetExportService {
         // 列宽
         sheet.getColumn(1).width = 10;
         sheet.getColumn(2).width = 15;
-        sheet.getColumn(3).width = 15;
+        sheet.getColumn(3).width = 20;
         sheet.getColumn(4).width = 12;
         sheet.getColumn(5).width = 12;
         sheet.getColumn(6).width = 15;
