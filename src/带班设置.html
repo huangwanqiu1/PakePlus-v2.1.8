@@ -1023,6 +1023,22 @@
         let pendingInserts = []; // 存储待插入的用户数据 {user_id, project_id}
         let tempForemanPerms = new Map(); // 临时存储新增带班的权限设置 Map<employeeId, permObject>
 
+        // 检查当前用户是否是项目所有者
+        async function checkIsProjectOwner() {
+            if (!window.supabase || !projectId) return false;
+            const { data: { user } } = await window.supabase.auth.getUser();
+            if (!user) return false;
+            
+            const { data: project, error } = await window.supabase
+                .from('projects')
+                .select('user_id')
+                .eq('project_id', projectId)
+                .single();
+            
+            if (error || !project) return false;
+            return project.user_id === user.id;
+        }
+
         // 确认添加带班
         confirmBtn.addEventListener('click', async () => {
             if (!navigator.onLine) {
@@ -1032,6 +1048,13 @@
 
             if (selectedEmployeeIds.size === 0) return;
             
+            // 检查是否是项目所有者
+            const isOwner = await checkIsProjectOwner();
+            if (!isOwner) {
+                showNotification('只有项目所有者才能添加带班', true);
+                return;
+            }
+
             const ids = Array.from(selectedEmployeeIds);
 
             // 检查选中的员工是否有手机号
@@ -1043,21 +1066,14 @@
 
             try {
                 if (window.supabase) {
-                    // Method 2: Add to user_projects
-                    
-                    // 1. Get phones
                     const targetEmployees = allEmployees.filter(emp => ids.includes(emp.employee_id));
                     const phones = targetEmployees.map(e => e.phone);
                     
-                    // 2. Find users
                     const { data: users, error: userError } = await window.supabase
-                        .from('users')
-                        .select('user_id, phone')
-                        .in('phone', phones);
+                        .rpc('get_users_by_phones', { phone_list: phones });
                     
                     if (userError) throw userError;
                     
-                    // Check if all employees have corresponding users
                     const foundPhones = new Set((users || []).map(u => u.phone));
                     const notFoundEmployees = targetEmployees.filter(e => !foundPhones.has(e.phone));
                     
@@ -1067,14 +1083,10 @@
                         return;
                     }
                     
-                    // 3. Prepare inserts
                     const inserts = users.map(u => {
-                        // 查找对应的employeeId来获取自定义权限
                         const emp = targetEmployees.find(e => e.phone === u.phone);
                         const customPerms = emp ? tempForemanPerms.get(emp.employee_id) : {};
                         
-                        // 默认权限（如果未设置，默认全开，或者根据需求全闭？之前的逻辑是默认全开）
-                        // 但既然用户逐个设置，如果有设置就用设置的，没设置就用默认全开
                         const defaultPerms = {
                              perm_add_expense: true, perm_edit_expense: true, perm_delete_expense: true,
                              perm_add_income: true, perm_edit_income: true, perm_delete_income: true,
@@ -1089,7 +1101,6 @@
                         };
                     });
                     
-                    // Check duplicates
                     const { data: existing, error: checkError } = await window.supabase
                         .from('user_projects')
                         .select('user_id')
@@ -1110,7 +1121,6 @@
 
                         showNotification('添加带班成功');
                         
-                        // 重置状态
                         tempForemanPerms.clear();
                         closeModal();
                         loadForemen();
@@ -1166,10 +1176,8 @@
 
         // Load all employees to select from
         async function loadAllEmployees() {
-            // 直接读取本地缓存
             let employees = getEmployeesFromLocalStorage();
             
-            // 过滤掉没有手机号的员工（因为无法匹配users表）
             employees = employees.filter(e => e.phone);
 
             if (employees.length === 0) {
@@ -1178,26 +1186,20 @@
                 return;
             }
 
-            // 筛选出已注册账号的员工
             try {
                 if (window.supabase) {
                     const phones = employees.map(e => e.phone);
                     
-                    // 分批查询，避免URL过长（虽然POST没这限制，但安全起见）
-                    // 假设这里数据量不大，直接查询
-                    const { data: users, error } = await window.supabase
-                        .from('users')
-                        .select('phone')
-                        .in('phone', phones);
+                    const { data: registeredPhones, error } = await window.supabase
+                        .rpc('get_registered_phones', { phone_list: phones });
                         
                     if (error) {
-                        console.error('Error fetching users:', error);
+                        console.error('Error fetching registered phones:', error);
                         showNotification('获取注册用户失败', true);
                         allEmployees = [];
                     } else {
-                        const registeredPhones = new Set(users.map(u => u.phone));
-                        // 只保留已注册的员工
-                        allEmployees = employees.filter(e => registeredPhones.has(e.phone));
+                        const registeredPhoneSet = new Set(registeredPhones.map(u => u.phone));
+                        allEmployees = employees.filter(e => registeredPhoneSet.has(e.phone));
                     }
                 } else {
                      console.warn('No supabase client');
