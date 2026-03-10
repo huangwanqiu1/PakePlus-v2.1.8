@@ -1575,8 +1575,77 @@ class WorkerCardClickHandler {
         this.showImagePreview(url);
     }
 
+    // 下载图片链接到 DataURL（使用 Supabase Storage API）
+    async downloadImageToDataURL(imageUrl) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                let imageBlob;
+                let originalName;
+                
+                // 检查是否是 Supabase Storage URL
+                if (imageUrl.includes('supabase.co/storage/v1/object/public/')) {
+                    // 从URL中解析 bucketName 和 fileName
+                    const urlParts = imageUrl.split('supabase.co/storage/v1/object/public/');
+                    if (urlParts.length > 1) {
+                        const pathParts = urlParts[1].split('/');
+                        const bucketName = pathParts[0];
+                        const fileName = pathParts.slice(1).join('/');
+                        
+                        // 解码文件名
+                        originalName = decodeURIComponent(fileName.split('/').pop());
+                        
+                        try {
+                            // 使用 Supabase Storage API 下载图片（带认证）
+                            const supabase = await window.waitForSupabase();
+                            const { data, error } = await supabase
+                                .storage
+                                .from(bucketName)
+                                .download(fileName);
+                            
+                            if (error) {
+                                console.error('使用 Supabase API 下载图片失败:', error);
+                                throw error;
+                            }
+                            
+                            imageBlob = data;
+                        } catch (supabaseError) {
+                            console.error('Supabase Storage 下载失败，尝试使用公开 URL:', supabaseError);
+                            // 如果 Supabase API 失败，回退到使用公开 URL
+                            throw new Error('Supabase Storage 下载失败');
+                        }
+                    } else {
+                        throw new Error('无法解析 Supabase Storage URL');
+                    }
+                } else {
+                    // 非 Supabase URL，使用传统方式下载
+                    originalName = imageUrl.split('/').pop().split('?')[0].split('#')[0];
+                    
+                    const response = await fetch(imageUrl);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    imageBlob = await response.blob();
+                }
+                
+                // 将 Blob 转换为 dataURL
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    resolve({
+                        dataURL: reader.result,
+                        name: originalName
+                    });
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(imageBlob);
+            } catch (error) {
+                console.error('下载图片失败:', error);
+                reject(error);
+            }
+        });
+    }
+
     // 显示图片预览
-    showImagePreview(imageUrl) {
+    async showImagePreview(imageUrl) {
         let modal = document.getElementById('detailViewImagePreviewModal');
         if (!modal) {
             modal = document.createElement('div');
@@ -1585,16 +1654,36 @@ class WorkerCardClickHandler {
             document.body.appendChild(modal);
         }
 
-        modal.innerHTML = `
-            <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2001;"
-                 onclick="if(event.target === this) document.getElementById('detailViewImagePreviewModal').style.display='none'">
-                <img id="detailViewPreviewDraggableImage" src="${imageUrl}"
-                     style="max-width: 90%; max-height: 90%; position: absolute; cursor: move; top: 50%; left: 50%; transform: translate(-50%, -50%);"
-                     ondragstart="return false;">
-                <button onclick="document.getElementById('detailViewImagePreviewModal').style.display='none'"
-                        style="position: fixed; top: 20px; right: 20px; background: #f5222d; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; z-index: 2002;">×</button>
-            </div>
-        `;
+        // 使用 Supabase Storage API 下载图片
+        try {
+            const imageData = await this.downloadImageToDataURL(imageUrl);
+            const displayUrl = imageData.dataURL;
+            
+            modal.innerHTML = `
+                <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2001;"
+                     onclick="if(event.target === this) document.getElementById('detailViewImagePreviewModal').style.display='none'">
+                    <img id="detailViewPreviewDraggableImage" src="${displayUrl}"
+                         style="max-width: 90%; max-height: 90%; position: absolute; cursor: move; top: 50%; left: 50%; transform: translate(-50%, -50%);"
+                         ondragstart="return false;">
+                    <button onclick="document.getElementById('detailViewImagePreviewModal').style.display='none'"
+                            style="position: fixed; top: 20px; right: 20px; background: #f5222d; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; z-index: 2002;">×</button>
+                </div>
+            `;
+        } catch (error) {
+            console.error('下载图片失败，使用原始URL:', error);
+            // 如果下载失败，使用原始URL
+            modal.innerHTML = `
+                <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2001;"
+                     onclick="if(event.target === this) document.getElementById('detailViewImagePreviewModal').style.display='none'">
+                    <img id="detailViewPreviewDraggableImage" src="${imageUrl}"
+                         style="max-width: 90%; max-height: 90%; position: absolute; cursor: move; top: 50%; left: 50%; transform: translate(-50%, -50%);"
+                         ondragstart="return false;">
+                    <button onclick="document.getElementById('detailViewImagePreviewModal').style.display='none'"
+                            style="position: fixed; top: 20px; right: 20px; background: #f5222d; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; z-index: 2002;">×</button>
+                </div>
+            `;
+        }
+        
         modal.style.display = 'block';
 
         const img = document.getElementById('detailViewPreviewDraggableImage');
