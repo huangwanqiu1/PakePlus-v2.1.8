@@ -158,15 +158,7 @@ class PDFGenerator {
 
     // 生成PDF
     async generatePDF() {
-        let originalText = '生成PDF'; // 默认值
         try {
-            // 获取按钮元素和原始文本
-            const generatePdfBtn = document.getElementById('generatePdfBtn');
-            if (generatePdfBtn) {
-                originalText = generatePdfBtn.textContent;
-                generatePdfBtn.textContent = '加载中...';
-            }
-            
             // 确保jsPDF库已加载
             if (typeof window.jsPDF === 'undefined') {
                 // 尝试使用其他可能的全局变量
@@ -184,9 +176,6 @@ class PDFGenerator {
 
             if (!tableData.type || tableData.data.length === 0) {
                 alert('没有可导出的数据');
-                if (generatePdfBtn) {
-                    generatePdfBtn.textContent = originalText;
-                }
                 return;
             }
 
@@ -373,6 +362,7 @@ class PDFGenerator {
                     const writable = await fileHandle.createWritable();
                     await writable.write(pdfData);
                     await writable.close();
+                    console.log('PDF已通过文件保存对话框保存');
                     return;
                 } catch (err) {
                     // 用户取消保存或其他错误，使用默认保存方式
@@ -380,22 +370,39 @@ class PDFGenerator {
                 }
             }
             
-            // 默认保存方式
-            pdf.save(fileName);
-            
-            // 恢复按钮文本
-            if (generatePdfBtn) {
-                generatePdfBtn.textContent = originalText;
+            // 尝试使用pdf.save()
+            try {
+                pdf.save(fileName);
+                console.log('PDF已通过pdf.save()保存');
+                return;
+            } catch (saveErr) {
+                console.log('pdf.save()错误:', saveErr);
             }
+            
+            // 降级方案：使用Blob和URL.createObjectURL
+            try {
+                const pdfBlob = pdf.output('blob');
+                const url = URL.createObjectURL(pdfBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                console.log('PDF已通过Blob降级方案保存');
+                return;
+            } catch (blobErr) {
+                console.log('Blob降级方案错误:', blobErr);
+                throw new Error('无法保存PDF文件，请检查浏览器设置或权限');
+            }
+            
+
             
         } catch (error) {
             console.error('生成PDF失败:', error);
-            alert('生成PDF失败，请重试');
-            // 恢复按钮文本
-            const generatePdfBtn = document.getElementById('generatePdfBtn');
-            if (generatePdfBtn) {
-                generatePdfBtn.textContent = originalText;
-            }
+            alert('生成PDF失败：' + (error.message || '请重试'));
+            throw error;
         }
     }
 
