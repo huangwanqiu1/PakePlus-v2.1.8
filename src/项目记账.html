@@ -38,6 +38,11 @@
             font-family: 'Microsoft YaHei', sans-serif;
             padding: 10px;
         }
+
+        /* 当明细界面显示时，取消页面垂直滚动条 */
+        body.detail-mode {
+            overflow-y: hidden;
+        }
         
         .work-type {
             display: flex;
@@ -652,7 +657,7 @@
             max-height: 32px;
             line-height: 16px;
             vertical-align: middle;
-            overflow: hidden;
+            overflow: visible;
             background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
             color: white;
             position: sticky;
@@ -829,6 +834,21 @@
             width: 100%;
             position: relative;
         }
+
+        /* 确保表头固定 */
+        .modern-table thead {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .modern-table th {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
+            color: white;
+        }
         
         .table-scroll table {
             width: auto !important;
@@ -944,6 +964,7 @@
                 -webkit-overflow-scrolling: touch;
                 padding-right: 15px;
                 padding-bottom: 15px;
+                position: relative;
             }
 
             .table-scroll::-webkit-scrollbar {
@@ -973,6 +994,50 @@
             .modern-table th,
             .modern-table td {
                 white-space: nowrap;
+            }
+
+            /* 冻结第一列 */
+            .modern-table th:first-child {
+                position: sticky;
+                left: 0;
+                z-index: 1001;
+                background: linear-gradient(135deg, #1890ff 100%, #40a9ff 100%);
+                color: white;
+                border-right: 2px solid #40a9ff;
+                box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+            }
+
+            .modern-table td:first-child {
+                position: sticky;
+                left: 0;
+                z-index: 999;
+                background: #ffffff;
+                color: #333;
+                border-right: 2px solid #d0d0d0;
+                box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+            }
+
+            .modern-table tbody tr:hover td:first-child {
+                background: #ffffff;
+                color: #d48806;
+                border-right: 2px solid #ffd54f;
+                box-shadow: 2px 0 5px rgba(255, 193, 7, 0.3);
+            }
+
+            .modern-table tbody tr:nth-child(even) td:first-child {
+                background: #f0f7ff;
+            }
+
+            .modern-table tbody tr:nth-child(even):hover td:first-child {
+                background: #ffffff;
+            }
+
+            .modern-table tbody tr:nth-child(odd) td:first-child {
+                background: #ffffff;
+            }
+
+            .modern-table tbody tr:nth-child(odd):hover td:first-child {
+                background: #ffffff;
             }
         }
     </style>
@@ -1091,12 +1156,12 @@
                         <tr>
                             <th>序号</th>
                             <th>日期</th>
-                            <th>
-                                付款人 <span id="payerFilterArrow" style="cursor: pointer; margin-left: 4px;">▼</span>
-                                <select id="payerFilter" style="margin-left: 8px; padding: 2px 5px; font-size: 12px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.9); color: #333; opacity: 0; position: absolute; pointer-events: none; transition: all 0.3s ease;">
-                                    <option value="">全部</option>
-                                </select>
-                            </th>
+                            <th style="position: relative;">
+                <span id="payerFilterArrow" style="cursor: pointer; margin-right: 4px; position: relative;">▼</span>付款人
+                <select id="payerFilter" style="padding: 2px 5px; font-size: 12px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.9); color: #333; opacity: 0; position: absolute; left: 0; top: 100%; margin-top: 4px; pointer-events: none; transition: all 0.3s ease; z-index: 1001;">
+                    <option value="">全部</option>
+                </select>
+            </th>
                             <th>支出金额（元）</th>
                             <th>明细说明</th>
                             <th>备注</th>
@@ -3065,6 +3130,9 @@
                         // 显示明细表格
                         if (detailTableSection) detailTableSection.style.display = 'block';
                         
+                        // 添加body类，取消页面垂直滚动条
+                        document.body.classList.add('detail-mode');
+                        
                         // 根据工作类型切换表格表头
                         if (isIncome) {
                             // 收入类型，显示收入表头（无付款人，金额为收入金额）
@@ -3088,6 +3156,9 @@
                         
                         // 隐藏合计？元区域
                         if (totalAmountDisplay) totalAmountDisplay.style.display = 'none';
+                        
+                        // 移除body类，恢复页面垂直滚动条
+                        document.body.classList.remove('detail-mode');
                     }
                 } else {
                     // 明细标签未选中，根据工作类型显示/隐藏
@@ -3108,18 +3179,92 @@
                     
                     // 隐藏合计？元区域
                     if (totalAmountDisplay) totalAmountDisplay.style.display = 'none';
+                    
+                    // 移除body类，恢复页面垂直滚动条
+                    document.body.classList.remove('detail-mode');
                 }
                 
                 // 重新初始化日期选择器，确保多选图标状态正确
-                if (typeof initializeDatePicker === 'function') {
-                    initializeDatePicker();
-                    
-                    // 额外确保多选图标可见性
-                    setTimeout(() => {
-                        ensureMultiSelectIconVisibility();
-                    }, 50);
+            if (typeof initializeDatePicker === 'function') {
+                initializeDatePicker();
+                
+                // 额外确保多选图标可见性
+                setTimeout(() => {
+                    ensureMultiSelectIconVisibility();
+                }, 50);
+            }
+            
+            // 调整表格容器高度，确保与合计区域无缝拼接
+            setTimeout(() => {
+                adjustTableContainerHeight();
+            }, 200);
+            
+            // 再次调整，确保DOM完全渲染
+            setTimeout(() => {
+                adjustTableContainerHeight();
+            }, 500);
+        }
+        
+        // 调整表格容器高度的函数
+        function adjustTableContainerHeight() {
+            const detailTableSection = document.getElementById('detailTableSection');
+            const totalAmountDisplay = document.getElementById('totalAmountDisplay');
+            
+            if (detailTableSection && detailTableSection.style.display === 'block') {
+                // 确保合计区域可见
+                if (totalAmountDisplay) {
+                    totalAmountDisplay.style.display = 'flex';
+                }
+                
+                // 计算屏幕高度
+                const screenHeight = window.innerHeight;
+                
+                // 获取合计区域的高度
+                let totalHeight = 0;
+                if (totalAmountDisplay) {
+                    totalHeight = totalAmountDisplay.offsetHeight;
+                }
+                
+                // 直接计算从表格容器顶部到屏幕底部的距离，然后减去合计区域的高度
+                const tableRect = detailTableSection.getBoundingClientRect();
+                const maxHeight = screenHeight - tableRect.top - totalHeight - 2; // 2px 是预留的边距
+                
+                // 确保高度为正数
+                const finalHeight = Math.max(100, maxHeight); // 最小高度100px
+                
+                // 设置表格滚动容器的高度
+                const tableScroll = detailTableSection.querySelector('.table-scroll');
+                if (tableScroll) {
+                    tableScroll.style.maxHeight = `${finalHeight}px`;
+                    tableScroll.style.height = `${finalHeight}px`;
+                    tableScroll.style.overflowY = 'auto';
                 }
             }
+        }
+        
+        // 绑定明细标签点击事件，确保切换时调整高度
+        document.addEventListener('DOMContentLoaded', function() {
+            const projectDetailLabel = document.querySelector('label[for="projectDetail"]');
+            if (projectDetailLabel) {
+                projectDetailLabel.addEventListener('click', function() {
+                    setTimeout(() => {
+                        adjustTableContainerHeight();
+                    }, 300);
+                });
+            }
+            
+            // 绑定工作类型切换事件
+            document.querySelectorAll('.work-type-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    setTimeout(() => {
+                        adjustTableContainerHeight();
+                    }, 300);
+                });
+            });
+        });
+        
+        // 监听窗口大小变化，重新调整表格容器高度
+        window.addEventListener('resize', adjustTableContainerHeight);
             
             // 页面初始化时检查当前选中的标签，设置所有输入区域的显示状态
             // updateInputSectionsDisplay 内部会调用 initializeDatePicker，所以这里不需要重复调用
