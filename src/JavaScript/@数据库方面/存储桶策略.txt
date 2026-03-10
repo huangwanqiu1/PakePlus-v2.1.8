@@ -1,0 +1,134 @@
+-- 安全策略说明：
+-- 1. 只有已认证用户才能访问
+-- 2. 用户只能访问自己项目相关的文件
+-- 3. 文件路径格式：{projectId}/.../{filename}
+
+-- 删除所有旧策略（如果存在）
+DROP POLICY IF EXISTS "允许所有用户查询" ON storage.objects;
+DROP POLICY IF EXISTS "允许所有用户上传" ON storage.objects;
+DROP POLICY IF EXISTS "允许所有用户更新" ON storage.objects;
+DROP POLICY IF EXISTS "允许所有用户删除" ON storage.objects;
+
+-- ============================================
+-- 安全策略：只允许认证用户访问自己的项目文件
+-- 使用内联子查询，无需创建函数
+-- ============================================
+
+-- 允许已认证用户 SELECT（查看/下载）自己项目的文件
+CREATE POLICY "FYKQ_安全查询"
+ON storage.objects
+FOR SELECT
+TO authenticated
+USING (
+  bucket_id = 'FYKQ' 
+  AND (
+    -- 用户是项目所有者
+    EXISTS (
+      SELECT 1 FROM public.projects p
+      WHERE p.project_id = split_part(name, '/', 1)
+      AND p.user_id = auth.uid()
+    )
+    OR
+    -- 用户被授权可以访问该项目
+    EXISTS (
+      SELECT 1 FROM public.user_projects up
+      JOIN public.projects p ON p.project_id = up.project_id
+      WHERE up.project_id = split_part(storage.objects.name, '/', 1)
+      AND up.user_id = auth.uid()
+    )
+  )
+);
+
+-- 允许已认证用户 INSERT（上传）到自己项目的文件
+CREATE POLICY "FYKQ_安全上传"
+ON storage.objects
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  bucket_id = 'FYKQ' 
+  AND (
+    -- 用户是项目所有者
+    EXISTS (
+      SELECT 1 FROM public.projects p
+      WHERE p.project_id = split_part(name, '/', 1)
+      AND p.user_id = auth.uid()
+    )
+    OR
+    -- 用户被授权可以访问该项目
+    EXISTS (
+      SELECT 1 FROM public.user_projects up
+      JOIN public.projects p ON p.project_id = up.project_id
+      WHERE up.project_id = split_part(storage.objects.name, '/', 1)
+      AND up.user_id = auth.uid()
+    )
+  )
+);
+
+-- 允许已认证用户 UPDATE（更新文件，如覆盖）自己项目的文件
+CREATE POLICY "FYKQ_安全更新"
+ON storage.objects
+FOR UPDATE
+TO authenticated
+USING (
+  bucket_id = 'FYKQ' 
+  AND (
+    -- 用户是项目所有者
+    EXISTS (
+      SELECT 1 FROM public.projects p
+      WHERE p.project_id = split_part(name, '/', 1)
+      AND p.user_id = auth.uid()
+    )
+    OR
+    -- 用户被授权可以访问该项目
+    EXISTS (
+      SELECT 1 FROM public.user_projects up
+      JOIN public.projects p ON p.project_id = up.project_id
+      WHERE up.project_id = split_part(storage.objects.name, '/', 1)
+      AND up.user_id = auth.uid()
+    )
+  )
+)
+WITH CHECK (
+  bucket_id = 'FYKQ' 
+  AND (
+    -- 用户是项目所有者
+    EXISTS (
+      SELECT 1 FROM public.projects p
+      WHERE p.project_id = split_part(name, '/', 1)
+      AND p.user_id = auth.uid()
+    )
+    OR
+    -- 用户被授权可以访问该项目
+    EXISTS (
+      SELECT 1 FROM public.user_projects up
+      JOIN public.projects p ON p.project_id = up.project_id
+      WHERE up.project_id = split_part(storage.objects.name, '/', 1)
+      AND up.user_id = auth.uid()
+    )
+  )
+);
+
+-- 允许已认证用户 DELETE（删除文件）自己项目的文件
+CREATE POLICY "FYKQ_安全删除"
+ON storage.objects
+FOR DELETE
+TO authenticated
+USING (
+  bucket_id = 'FYKQ' 
+  AND (
+    -- 用户是项目所有者
+    EXISTS (
+      SELECT 1 FROM public.projects p
+      WHERE p.project_id = split_part(name, '/', 1)
+      AND p.user_id = auth.uid()
+    )
+    OR
+    -- 用户被授权可以访问该项目
+    EXISTS (
+      SELECT 1 FROM public.user_projects up
+      JOIN public.projects p ON p.project_id = up.project_id
+      WHERE up.project_id = split_part(storage.objects.name, '/', 1)
+      AND up.user_id = auth.uid()
+    )
+  )
+);
