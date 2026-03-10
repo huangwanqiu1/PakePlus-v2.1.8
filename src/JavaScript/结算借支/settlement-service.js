@@ -16,7 +16,7 @@ class SettlementService {
                 
                 // 使用与supabase-client.js相同的配置
                 const supabaseUrl = 'https://oydffrzzulsrbitrrhht.supabase.co';
-                const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95ZGZmcnp6dWxzcmJpdHJyaGh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0MjcxNDEsImV4cCI6MjA3OTAwMzE0MX0.LFMDgx8eNyE3pVjVYgHqhtvaC--vP4-MtXL8fY3_v-s';
+                const supabaseKey = 'sb_publishable_l3-6N3-RsAmbns6JCOusHg_XPFd4jf7';
                 
                 // 检查supabase是否可用
                 if (typeof supabase !== 'undefined') {
@@ -111,7 +111,7 @@ class SettlementService {
             const recordDates = this.getSelectedDates();
             const payer = document.getElementById('paymentInput').value;
             const remark = document.getElementById('remark').value;
-            const images = window.selectedImages || [];
+            const images = this._processImageData();
 
             // 4. 验证必填字段
             if (!projectId) {
@@ -265,10 +265,19 @@ class SettlementService {
             
             try {
                 // 获取文件扩展名
-                const fileExtension = image.name.split('.').pop().toLowerCase();
+                // 确保只使用文件名，移除可能存在的路径信息
+                let imageName = image.name;
+                if (imageName.includes('/')) {
+                    imageName = imageName.split('/').pop();
+                }
+                if (imageName.includes('\\')) {
+                    imageName = imageName.split('\\').pop();
+                }
+                
+                const fileExtension = imageName.split('.').pop().toLowerCase();
                 
                 // 获取原始文件名（不含扩展名）
-                const originalName = image.name.substring(0, image.name.lastIndexOf('.'));
+                const originalName = imageName.substring(0, imageName.lastIndexOf('.'));
                 
                 // 生成文件名：project_id/settlement/记账日期/原始文件名.后缀
                 fileName = `${folderName}/${recordDate}/${originalName}.${fileExtension}`;
@@ -319,10 +328,19 @@ class SettlementService {
             
             try {
                 // 获取文件扩展名
-                const fileExtension = image.name.split('.').pop().toLowerCase();
+                // 确保只使用文件名，移除可能存在的路径信息
+                let imageName = image.name;
+                if (imageName.includes('/')) {
+                    imageName = imageName.split('/').pop();
+                }
+                if (imageName.includes('\\')) {
+                    imageName = imageName.split('\\').pop();
+                }
+                
+                const fileExtension = imageName.split('.').pop().toLowerCase();
                 
                 // 获取原始文件名（不含扩展名）
-                const originalName = image.name.substring(0, image.name.lastIndexOf('.'));
+                const originalName = imageName.substring(0, imageName.lastIndexOf('.'));
                 
                 // 生成文件名：project_id/settlement/记账日期/原始文件名.后缀，与在线模式保持一致
                 fileName = `${folderName}/${recordDate}/${originalName}.${fileExtension}`;
@@ -518,7 +536,8 @@ class SettlementService {
                     retryDelays: [0, 3000, 5000, 10000, 20000],
                     headers: {
                         // 使用正确的API密钥进行认证
-                        authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95ZGZmcnp6dWxzcmJpdHJyaGh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0MjcxNDEsImV4cCI6MjA3OTAwMzE0MX0.LFMDgx8eNyE3pVjVYgHqhtvaC--vP4-MtXL8fY3_v-s`,
+                        'apikey': accessToken,
+                        'authorization': `Bearer ${accessToken}`,
                         'x-upsert': 'true', // 允许覆盖已存在的文件，解决编辑模式下的409 Conflict错误
                     },
                 uploadDataDuringCreation: true,
@@ -560,6 +579,64 @@ class SettlementService {
                 upload.start();
             });
         });
+    }
+
+    /**
+     * 处理图片数据，获取图片文件对象
+     * @private
+     */
+    _processImageData() {
+        // 首先检查图片上传控件中的原始图片
+        const imageUpload = document.getElementById('imageUpload');
+        if (imageUpload && imageUpload.files.length > 0) {
+            return Array.from(imageUpload.files);
+        }
+        
+        // 如果没有原始图片，检查处理后的图片数组
+        // 这是因为图片被处理后会清空imageUpload.value，所以需要从全局数组获取
+        if (window.selectedImages && window.selectedImages.length > 0) {
+            return window.selectedImages;
+        }
+
+        return [];
+    }
+    
+    /**
+     * 检查图片是否变更
+     * @param {Array} currentImages - 当前图片选择器中的图片
+     * @param {Array} oldImages - 旧图片URL数组
+     * @returns {boolean} - 图片是否变更
+     */
+    _checkIfImagesChanged(currentImages, oldImages) {
+        // 如果没有旧图片，但当前有图片，说明是新增图片
+        if (!oldImages || oldImages.length === 0) {
+            return currentImages.length > 0;
+        }
+        
+        // 如果有旧图片但没有当前图片，说明图片被删除了
+        if (!currentImages || currentImages.length === 0) {
+            return true;
+        }
+        
+        // 如果图片数量不同，说明有变更
+        if (currentImages.length !== oldImages.length) {
+            return true;
+        }
+        
+        // 检查每个图片是否都有 originalUrl 属性
+        // 如果所有图片都有 originalUrl，说明是从旧图片下载的，需要进一步检查
+        const allHaveOriginalUrl = currentImages.every(img => img.originalUrl);
+        
+        if (allHaveOriginalUrl) {
+            // 检查 originalUrl 是否与 oldImages 完全匹配
+            const currentUrls = currentImages.map(img => img.originalUrl);
+            const urlsMatch = currentUrls.every((url, index) => url === oldImages[index]);
+            
+            return !urlsMatch;
+        } else {
+            // 如果有图片没有 originalUrl，说明是新上传的图片
+            return true;
+        }
     }
 
     // 更新记录功能
@@ -611,19 +688,7 @@ class SettlementService {
             const remark = document.getElementById('remark').value.trim();
             
             // 3. 检查图片选择器中是否有图片
-            const imageContainer = document.getElementById('imageUploadContainer');
-            const imagePreviews = imageContainer ? imageContainer.querySelectorAll('.image-preview-item') : [];
-            const hasImagesInSelector = imagePreviews.length > 0;
-            
-            // 获取图片选择器中的图片（从window.selectedImages）
-            const images = [];
-            if (window.selectedImages && window.selectedImages.length > 0) {
-                window.selectedImages.forEach(img => {
-                    if (img instanceof File || img instanceof Blob) {
-                        images.push(img);
-                    }
-                });
-            }
+            const images = this._processImageData();
             
             // 4. 获取原始记录中的旧图片URL
             let oldImages = [];
@@ -685,26 +750,33 @@ class SettlementService {
             // 7. 根据图片选择器状态处理图片
             let finalImageUrls = [];
             const isOnline = navigator.onLine;
+            const hasImagesInSelector = images.length > 0;
             
             if (!hasImagesInSelector) {
                 // 情况1：图片选择器中没有图片
                 finalImageUrls = [];
-            } else if (isOnline) {
-                // 在线模式：始终重新上传图片，确保图片是最新的
-                if (images.length > 0) {
-                    finalImageUrls = await this._uploadImagesToSupabase(images, projectId, accountingDate);
-                } else {
-                    // 如果没有images数据但有预览图片，使用旧图片URL
-                    finalImageUrls = [...oldImages];
-                }
             } else {
-                // 离线模式：始终重新上传图片，与在线模式保持一致
-                if (images.length > 0) {
-                    finalImageUrls = await this._saveImagesToLocal(images, projectId, accountingDate);
+                // 总是重新上传图片，即使没有变更
+                if (isOnline) {
+                    // 在线模式：上传图片到Supabase
+                    if (images.length > 0) {
+                        finalImageUrls = await this._uploadImagesToSupabase(images, projectId, accountingDate);
+                    } else {
+                        // 如果没有images数据但有预览图片，使用旧图片URL
+                        finalImageUrls = [...oldImages];
+                    }
                 } else {
-                    // 如果没有images数据但有预览图片，使用旧图片URL
-                    finalImageUrls = [...oldImages];
+                    // 离线模式：保存图片到本地
+                    if (images.length > 0) {
+                        finalImageUrls = await this._saveImagesToLocal(images, projectId, accountingDate);
+                    } else {
+                        // 如果没有images数据但有预览图片，使用旧图片URL
+                        finalImageUrls = [...oldImages];
+                    }
                 }
+                
+                // 对finalImageUrls进行去重，确保没有重复的图片地址
+                finalImageUrls = [...new Set(finalImageUrls)];
             }
             
             // 7. 更新现有记录
@@ -742,12 +814,12 @@ class SettlementService {
                 // 2. 检查预览图片数量是否与旧图片数量不同
                 // 3. 检查finalImageUrls与oldImages是否完全相同
                 const isImageChanged = hasRealNewImages || 
-                                     imagePreviews.length !== oldImages.length;
+                                     images.length !== oldImages.length;
                 
                 // 额外检查：当没有真正的新图片时，finalImageUrls应该与oldImages完全相同
                 // 如果完全相同，即使isImageChanged为true，也不需要处理图片删除
                 let isActuallyChanged = isImageChanged;
-                if (!hasRealNewImages && imagePreviews.length === oldImages.length) {
+                if (!hasRealNewImages && images.length === oldImages.length) {
                     // 检查两个数组的内容是否完全相同
                     const isSameImages = finalImageUrls.length === oldImages.length &&
                         finalImageUrls.every((img, index) => img === oldImages[index]);
@@ -755,7 +827,7 @@ class SettlementService {
                     if (isSameImages) {
                         isActuallyChanged = false;
                     }
-                } else if (imagePreviews.length < oldImages.length) {
+                } else if (images.length < oldImages.length) {
                     // 预览图片数量减少，说明用户删除了图片，需要处理图片删除
                     isActuallyChanged = true;
                 }
