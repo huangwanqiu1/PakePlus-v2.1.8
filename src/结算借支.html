@@ -2883,7 +2883,8 @@
             notification.className = isError ? 'notification error' : 'notification';
             notification.style.display = 'block';
             
-            if (message === '记账成功！') {
+            // 播放成功提示音的情况：记账成功、记录更新成功、记录删除成功
+            if (message === '记账成功！' || message === '记账成功！记录将在联网后同步' || message === '记录更新成功！' || message === '记录删除成功！') {
                 playSuccessSound();
             }
             
@@ -3348,38 +3349,36 @@
         
         // 下载图片链接到File对象 - 优化版，处理跨域问题
         // 图片加载函数，根据网络状态决定加载方式
-        function loadImageWithFallback(url, index) {
+        async function loadImageWithFallback(url, index) {
             const isOnline = navigator.onLine;
             
             if (isOnline) {
                 // 在线模式：只从在线获取图片
-                tryGetImageFromOnline(url, index)
-                    .then(onlineFile => {
-                        // 在线获取成功，不需要处理，因为tryGetImageFromOnline已经添加到selectedImages
-                    })
-                    .catch(error => {
-                        console.log('在线获取图片失败:', error);
-                        // 在线模式下获取失败，创建错误占位图
-                        createErrorPlaceholder(url, index);
-                    });
+                try {
+                    await tryGetImageFromOnline(url, index);
+                    // 在线获取成功，不需要处理，因为tryGetImageFromOnline已经添加到selectedImages
+                } catch (error) {
+                    console.log('在线获取图片失败:', error);
+                    // 在线模式下获取失败，创建错误占位图
+                    createErrorPlaceholder(url, index);
+                }
             } else {
                 // 离线模式：只从本地获取图片
-                tryGetImageFromLocal(url, index)
-                    .then(localFile => {
-                        if (localFile) {
-                            // 成功从本地获取
-                            window.selectedImages.push(localFile);
-                            renderImagePreview(localFile, window.selectedImages.length - 1);
-                        } else {
-                            // 本地也没有，创建错误占位图
-                            createErrorPlaceholder(url, index);
-                        }
-                    })
-                    .catch(localError => {
-                        console.error('本地获取图片失败:', localError);
-                        // 创建错误占位图
+                try {
+                    const localFile = await tryGetImageFromLocal(url, index);
+                    if (localFile) {
+                        // 成功从本地获取
+                        window.selectedImages.push(localFile);
+                        renderImagePreview(localFile, window.selectedImages.length - 1);
+                    } else {
+                        // 本地也没有，创建错误占位图
                         createErrorPlaceholder(url, index);
-                    });
+                    }
+                } catch (localError) {
+                    console.error('本地获取图片失败:', localError);
+                    // 创建错误占位图
+                    createErrorPlaceholder(url, index);
+                }
             }
         }
         
@@ -3488,95 +3487,44 @@
         }
         
         // 从在线获取图片
-        function tryGetImageFromOnline(url, index) {
-            return new Promise((resolve, reject) => {
+        async function tryGetImageFromOnline(url, index) {
+            return new Promise(async (resolve, reject) => {
                 // 先添加一个空的占位符，确保数组索引正确
                 window.selectedImages.push(null);
                 window.selectedImageUrls.push(null);
             
-            // 检查URL协议，如果是local://协议，直接调用downloadImageToDataURL处理
-            if (url.startsWith('local://')) {
-                // 直接使用downloadImageToDataURL处理本地图片
-                downloadImageToDataURL(url).then(file => {
-                    // 移除占位符
-                    window.selectedImages.pop();
-                    window.selectedImageUrls.pop();
+            try {
+                // 直接使用downloadImageToDataURL处理所有类型的URL
+                const file = await downloadImageToDataURL(url);
+                
+                // 移除占位符
+                window.selectedImages.pop();
+                window.selectedImageUrls.pop();
+                
+                if (file) {
+                    // 添加到全局图片数组
+                    window.selectedImages.push(file);
+                    // 添加原始URL到URL数组
+                    window.selectedImageUrls.push(url);
                     
-                    if (file) {
-                        // 添加到全局图片数组
-                        window.selectedImages.push(file);
-                        // 添加原始URL到URL数组
-                        window.selectedImageUrls.push(url);
-                        
-                        // 创建图片预览
-                        renderImagePreview(file, window.selectedImages.length - 1);
-                        
-                        // 缓存图片到本地，以备下次使用
-                        cacheImageToLocal(url, file, index);
-                        
-                        resolve(file);
-                    } else {
-                        reject(new Error('本地图片处理失败：文件为空'));
-                    }
-                }).catch(error => {
-                    console.error('本地图片处理失败:', error);
-                    // 移除占位符
-                    window.selectedImages.pop();
-                    window.selectedImageUrls.pop();
-                    // 尝试创建一个错误占位图
-                    createErrorPlaceholder(url, index);
-                    reject(error);
-                });
-            } else {
-                // 正常URL，使用fetch处理
-                fetch(url)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}`);
-                        }
-                        return response.blob();
-                    })
-                    .then(blob => {
-                        // 移除占位符
-                        window.selectedImages.pop();
-                        window.selectedImageUrls.pop();
-                        
-                        // 使用优化后的图片下载函数
-                        downloadImageToDataURL(url).then(file => {
-                            if (file) {
-                                // 添加到全局图片数组
-                                window.selectedImages.push(file);
-                                // 添加原始URL到URL数组
-                                window.selectedImageUrls.push(url);
-                                
-                                // 创建图片预览
-                                renderImagePreview(file, window.selectedImages.length - 1);
-                                
-                                // 缓存图片到本地，以备下次使用
-                                cacheImageToLocal(url, file, index);
-                                
-                                resolve(file);
-                            } else {
-                                reject(new Error('在线图片处理失败：文件为空'));
-                            }
-                        }).catch(error => {
-                            console.error('在线图片处理失败:', error);
-                            // 在线获取也失败，移除占位符
-                            window.selectedImages.pop();
-                            window.selectedImageUrls.pop();
-                            // 尝试创建一个错误占位图
-                            createErrorPlaceholder(url, index);
-                            reject(error);
-                        });
-                    }).catch(error => {
-                    console.error('在线获取图片失败:', error);
-                    // 移除占位符
-                    window.selectedImages.pop();
-                    window.selectedImageUrls.pop();
-                    // 尝试创建一个错误占位图
-                    createErrorPlaceholder(url, index);
-                    reject(error);
-                });
+                    // 创建图片预览
+                    renderImagePreview(file, window.selectedImages.length - 1);
+                    
+                    // 缓存图片到本地，以备下次使用
+                    cacheImageToLocal(url, file, index);
+                    
+                    resolve(file);
+                } else {
+                    reject(new Error('图片处理失败：文件为空'));
+                }
+            } catch (error) {
+                console.error('在线获取图片失败:', error);
+                // 移除占位符
+                window.selectedImages.pop();
+                window.selectedImageUrls.pop();
+                // 尝试创建一个错误占位图
+                createErrorPlaceholder(url, index);
+                reject(error);
             }
         });
         }
@@ -3659,23 +3607,17 @@
             }
         }
         
-        function downloadImageToDataURL(imageUrl) {
-            return new Promise((resolve, reject) => {
+        async function downloadImageToDataURL(imageUrl) {
+            return new Promise(async (resolve, reject) => {
                 try {
-                    // 从URL中解析图片名称
-                    let originalName = '';
+                    let imageBlob;
+                    let originalName;
                     
-                    // 首先尝试从URL的最后一部分获取文件名
+                    // 从URL中解析图片名称
                     const urlParts = imageUrl.split('/');
                     let lastPart = urlParts[urlParts.length - 1];
-                    
-                    // 去除URL参数和哈希值
                     lastPart = lastPart.split('?')[0].split('#')[0];
-                    
-                    // 解码URL编码的字符
                     lastPart = decodeURIComponent(lastPart);
-                    
-                    // 提取实际的文件名（不包含路径）
                     originalName = lastPart.split('/').pop();
                     
                     // 检查URL协议，如果是local://协议，从localStorage获取图片数据
@@ -3745,37 +3687,253 @@
                             console.error('处理blob图片失败:', error);
                             reject(error);
                         }
-                    } else {
-                        // 正常URL，使用fetch处理
-                        fetch(imageUrl)
-                            .then(response => {
-                                if (!response.ok) {
-                                    throw new Error(`HTTP error! status: ${response.status}`);
+                    } else if (imageUrl.includes('supabase.co/storage/v1/object/public/')) {
+                        // 检查是否是 Supabase Storage URL
+                        // 从URL中解析 bucketName 和 fileName
+                        const urlParts = imageUrl.split('supabase.co/storage/v1/object/public/');
+                        if (urlParts.length > 1) {
+                            const pathParts = urlParts[1].split('/');
+                            const bucketName = pathParts[0];
+                            const fileName = pathParts.slice(1).join('/');
+                            
+                            // 解码文件名
+                            originalName = decodeURIComponent(fileName.split('/').pop());
+                            
+                            try {
+                                // 使用 Supabase Storage API 下载图片（带认证）
+                                const supabase = await window.waitForSupabase();
+                                const { data, error } = await supabase
+                                    .storage
+                                    .from(bucketName)
+                                    .download(fileName);
+                                
+                                if (error) {
+                                    console.error('使用 Supabase API 下载图片失败:', error);
+                                    // 检查是否是存储桶不存在的错误
+                                    if (error.message === 'Bucket not found') {
+                                        console.warn('存储桶不存在，使用默认错误图片');
+                                        // 创建一个默认的错误图片
+                                        const errorBlob = await createErrorImageBlob();
+                                        const file = new File([errorBlob], originalName, {
+                                            type: 'image/png',
+                                            lastModified: Date.now()
+                                        });
+                                        resolve(file);
+                                        return;
+                                    }
+                                    throw error;
                                 }
-                                return response.blob();
-                            })
-                            .then(blob => {
-                                // 创建File对象
-                                const file = new File([blob], originalName, { type: blob.type });
-                                resolve(file);
-                            })
-                            .catch(error => {
-                                console.error('下载图片失败:', error);
-                                // 如果下载失败，尝试使用canvas方式
-                                fallbackImageLoad(imageUrl, originalName, resolve, reject);
-                            });
+                                
+                                imageBlob = data;
+                            } catch (supabaseError) {
+                                console.error('Supabase Storage 下载失败，尝试使用带认证的公开 URL:', supabaseError);
+                                // 尝试使用带认证的公开 URL
+                                try {
+                                    // 获取认证令牌
+                                    const getAuthToken = () => {
+                                        try {
+                                            const supabaseKey = 'sb_publishable_l3-6N3-RsAmbns6JCOusHg_XPFd4jf7';
+                                            // 尝试从localStorage获取session
+                                            const sessionStr = localStorage.getItem('sb-oydffrzzulsrbitrrhht-auth-token');
+                                            if (sessionStr) {
+                                                try {
+                                                    const session = JSON.parse(sessionStr);
+                                                    if (session.access_token) {
+                                                        return session.access_token;
+                                                    }
+                                                } catch (e) {
+                                                    console.warn('解析session失败:', e);
+                                                }
+                                            }
+                                            return supabaseKey;
+                                        } catch (e) {
+                                            console.error('获取认证令牌失败:', e);
+                                            return 'sb_publishable_l3-6N3-RsAmbns6JCOusHg_XPFd4jf7';
+                                        }
+                                    };
+                                    
+                                    const authToken = getAuthToken();
+                                    
+                                    const response = await fetch(imageUrl, {
+                                        headers: {
+                                            'apikey': authToken,
+                                            'Authorization': `Bearer ${authToken}`
+                                        }
+                                    });
+                                    
+                                    if (!response.ok) {
+                                        // 检查是否是存储桶不存在的错误
+                                        const errorData = await response.json().catch(() => ({}));
+                                        if (errorData.error === 'Bucket not found') {
+                                            console.warn('存储桶不存在，使用默认错误图片');
+                                            // 创建一个默认的错误图片
+                                            const errorBlob = await createErrorImageBlob();
+                                            const file = new File([errorBlob], originalName, {
+                                                type: 'image/png',
+                                                lastModified: Date.now()
+                                            });
+                                            resolve(file);
+                                            return;
+                                        }
+                                        throw new Error(`HTTP error! status: ${response.status}`);
+                                    }
+                                    
+                                    imageBlob = await response.blob();
+                                } catch (fetchError) {
+                                    console.error('带认证的公开 URL 下载失败:', fetchError);
+                                    // 创建一个默认的错误图片
+                                    const errorBlob = await createErrorImageBlob();
+                                    const file = new File([errorBlob], originalName, {
+                                        type: 'image/png',
+                                        lastModified: Date.now()
+                                    });
+                                    resolve(file);
+                                    return;
+                                }
+                            }
+                        } else {
+                            throw new Error('无法解析 Supabase Storage URL');
+                        }
+                    } else {
+                        // 正常URL，使用fetch处理，添加认证头
+                        // 获取认证令牌
+                        const getAuthToken = () => {
+                            try {
+                                const supabaseKey = 'sb_publishable_l3-6N3-RsAmbns6JCOusHg_XPFd4jf7';
+                                // 尝试从localStorage获取session
+                                const sessionStr = localStorage.getItem('sb-oydffrzzulsrbitrrhht-auth-token');
+                                if (sessionStr) {
+                                    try {
+                                        const session = JSON.parse(sessionStr);
+                                        if (session.access_token) {
+                                            return session.access_token;
+                                        }
+                                    } catch (e) {
+                                        console.warn('解析session失败:', e);
+                                    }
+                                }
+                                return supabaseKey;
+                            } catch (e) {
+                                console.error('获取认证令牌失败:', e);
+                                return 'sb_publishable_l3-6N3-RsAmbns6JCOusHg_XPFd4jf7';
+                            }
+                        };
+                        
+                        const authToken = getAuthToken();
+                        
+                        const response = await fetch(imageUrl, {
+                            headers: {
+                                'apikey': authToken,
+                                'Authorization': `Bearer ${authToken}`
+                            }
+                        });
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        imageBlob = await response.blob();
                     }
+                    
+                    // 创建File对象
+                    const file = new File([imageBlob], originalName, {
+                        type: imageBlob.type || 'image/jpeg',
+                        lastModified: Date.now()
+                    });
+                    resolve(file);
+                    
                 } catch (error) {
-                    console.error('图片处理失败:', error);
-                    reject(error);
+                    console.error('下载图片失败:', imageUrl, error);
+                    // 创建一个默认的错误图片
+                    try {
+                        const errorBlob = await createErrorImageBlob();
+                        const file = new File([errorBlob], originalName || 'error.png', {
+                            type: 'image/png',
+                            lastModified: Date.now()
+                        });
+                        resolve(file);
+                    } catch (e) {
+                        reject(error);
+                    }
                 }
             });
         }
         
+        // 创建错误图片Blob
+        async function createErrorImageBlob() {
+            // 创建一个简单的错误提示图片
+            const canvas = document.createElement('canvas');
+            canvas.width = 400;
+            canvas.height = 200;
+            const ctx = canvas.getContext('2d');
+            
+            // 背景
+            ctx.fillStyle = '#f5f5f5';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 文字
+            ctx.fillStyle = '#ff4d4f';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('图片加载失败', canvas.width / 2, canvas.height / 2 - 10);
+            ctx.fillText('存储桶可能不存在', canvas.width / 2, canvas.height / 2 + 15);
+            
+            return new Promise((resolve) => {
+                canvas.toBlob(resolve, 'image/png');
+            });
+        }
+        
         // 传统图片加载方式作为备选方案
-        function fallbackImageLoad(imageUrl, originalName, resolve, reject) {
+        async function fallbackImageLoad(imageUrl, originalName, resolve, reject) {
             try {
-                // 创建图片对象
+                // 首先尝试使用带认证的fetch获取图片
+                try {
+                    // 获取认证令牌
+                    const getAuthToken = () => {
+                        try {
+                            const supabaseKey = 'sb_publishable_l3-6N3-RsAmbns6JCOusHg_XPFd4jf7';
+                            // 尝试从localStorage获取session
+                            const sessionStr = localStorage.getItem('sb-oydffrzzulsrbitrrhht-auth-token');
+                            if (sessionStr) {
+                                try {
+                                    const session = JSON.parse(sessionStr);
+                                    if (session.access_token) {
+                                        return session.access_token;
+                                    }
+                                } catch (e) {
+                                    console.warn('解析session失败:', e);
+                                }
+                            }
+                            return supabaseKey;
+                        } catch (e) {
+                            console.error('获取认证令牌失败:', e);
+                            return 'sb_publishable_l3-6N3-RsAmbns6JCOusHg_XPFd4jf7';
+                        }
+                    };
+                    
+                    const authToken = getAuthToken();
+                    
+                    const response = await fetch(imageUrl, {
+                        headers: {
+                            'apikey': authToken,
+                            'Authorization': `Bearer ${authToken}`
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const blob = await response.blob();
+                    const file = new File([blob], originalName, {
+                        type: blob.type || 'image/jpeg',
+                        lastModified: Date.now()
+                    });
+                    resolve(file);
+                    return;
+                } catch (fetchError) {
+                    console.warn('带认证的fetch失败，尝试使用图片对象加载:', fetchError);
+                }
+                
+                // 如果fetch失败，尝试使用图片对象加载
                 const img = new Image();
                 img.crossOrigin = 'anonymous'; // 处理跨域问题
                 
