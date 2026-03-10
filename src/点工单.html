@@ -865,7 +865,7 @@
             max-height: none;
             line-height: 16px;
             vertical-align: middle;
-            overflow: hidden;
+            overflow: visible;
             background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
             color: white;
             position: sticky;
@@ -875,10 +875,27 @@
 
         .modern-table th:first-child {
             border-top-left-radius: 12px;
+            position: sticky;
+            left: 0;
+            z-index: 1001;
+            background: linear-gradient(135deg, #1890ff 100%, #40a9ff 100%);
+            color: white;
+            border-right: 2px solid #40a9ff;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
         }
 
         .modern-table th:last-child {
             border-top-right-radius: 12px;
+        }
+
+        /* 冻结第一列 */
+        .modern-table td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 999;
+            background: #ffffff;
+            border-right: 1px solid #e8e8e8;
+            box-shadow: 2px 0 3px rgba(0, 0, 0, 0.05);
         }
 
         /* 工作内容列样式 */
@@ -1035,20 +1052,22 @@
 
         .table-container {
             background: white;
-            border-radius: 12px;
-            padding: 2px 5px 15px 5px;
+            border-radius: 12px 12px 0 0;
+            padding: 2px 5px 5px 5px;
             margin: 2px 0;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
             border: 1px solid #e8e8e8;
+            border-bottom: none;
         }
 
         .table-scroll {
             overflow-x: auto;
             overflow-y: auto;
             max-height: 70vh;
-            border-radius: 8px;
+            border-radius: 8px 8px 0 0;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
             width: 100%;
+            background: white;
         }
 
         /* 明细表格区域 */
@@ -1158,8 +1177,8 @@
 
             /* 工日输入框 - 移动端减短 */
             #workDays {
-                width: 120px;
-                max-width: 120px;
+                width: 140px;
+                max-width: 140px;
                 flex: none;
                 font-size: 14px;
                 padding-left: 0;
@@ -1168,6 +1187,11 @@
             /* 技工/普工按钮容器 - 移动端靠近工日输入框 */
             .worker-type-wrapper {
                 margin-left: 5px !important;
+            }
+
+            /* 类型标签 - 移动端 */
+            .worker-type-label {
+                margin-left: 10px !important;
             }
 
             /* 工日单位容器 - 移动端 */
@@ -1258,11 +1282,16 @@
                 font-size: 13px;
             }
 
-            /* 工日输入框 - 超小屏幕保持减短 */
+            /* 工日输入框 - 超小屏幕 */
             #workDays {
-                width: 110px;
-                max-width: 110px;
+                width: 140px;
+                max-width: 140px;
                 font-size: 13px;
+            }
+
+            /* 类型标签 - 超小屏幕 */
+            .worker-type-label {
+                margin-left: 10px !important;
             }
 
             .date-display {
@@ -1312,14 +1341,14 @@
                         <tr>
                             <th>序号</th>
                             <th>
-                                日期 <span id="dateFilterArrow" style="cursor: pointer; margin-left: 4px;">▼</span>
-                                <select id="dateFilter" style="margin-left: 8px; padding: 2px 5px; font-size: 14px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.9); color: #333; opacity: 0; position: absolute; pointer-events: none; transition: all 0.3s ease; width: 80px;">
+                                <span id="dateFilterArrow" style="cursor: pointer; margin-right: 4px;">▼</span> 日期
+                                <select id="dateFilter" style="padding: 2px 5px; font-size: 14px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.9); color: #333; opacity: 0; position: absolute; left: 0; top: 100%; margin-top: 4px; pointer-events: none; transition: all 0.3s ease; width: 100px;">
                                     <option value="">全部</option>
                                 </select>
                             </th>
                             <th>
-                                班组 <span id="teamFilterArrow" style="cursor: pointer; margin-left: 4px;">▼</span>
-                                <select id="teamFilter" style="margin-left: 8px; padding: 2px 5px; font-size: 14px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.9); color: #333; opacity: 0; position: absolute; pointer-events: none; transition: all 0.3s ease; width: 80px;">
+                                <span id="teamFilterArrow" style="cursor: pointer; margin-right: 4px;">▼</span> 班组
+                                <select id="teamFilter" style="padding: 2px 5px; font-size: 14px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.9); color: #333; opacity: 0; position: absolute; left: 0; top: 100%; margin-top: 4px; pointer-events: none; transition: all 0.3s ease; width: 80px;">
                                     <option value="">全部</option>
                                 </select>
                             </th>
@@ -1371,7 +1400,8 @@
                 </div>
 
                 <!-- 技工/普工切换按钮 -->
-                <div class="worker-type-wrapper" style="display: inline-block; vertical-align: middle; margin-left: 10px;">
+                <label class="worker-type-label" style="margin-left: 10px; display: inline-block; vertical-align: middle;">类型：</label>
+                <div class="worker-type-wrapper" style="display: inline-block; vertical-align: middle; margin-left: 5px;">
                     <label class="checkbox-item" for="workerType" style="margin-right: 0;">
                         <input type="checkbox" id="workerType" checked>
                         <span class="custom-checkbox"></span>
@@ -2201,19 +2231,104 @@
                     if (bottomButtons) bottomButtons.style.display = 'none';
                     // 显示合计和生成PDF按钮
                     if (totalAmountDisplay) totalAmountDisplay.style.display = 'flex';
+                    
+                    // 取消界面的垂直滚动条
+                    document.body.style.overflowY = 'hidden';
+                    
+                    // 调整表格容器高度，实现与合计区域无缝拼接
+                    setTimeout(() => {
+                        if (totalAmountDisplay && detailTableSection) {
+                            // 隐藏所有记工相关的form-row元素，但保留日期选择框
+                            const formRows = document.querySelectorAll('.form-row');
+                            formRows.forEach(row => {
+                                if (!row.querySelector('.work-type.tab-navigation') && row.id !== 'dateInputSection') {
+                                    row.style.display = 'none';
+                                }
+                            });
+                            
+                            // 确保合计区域可见
+                            totalAmountDisplay.style.display = 'flex';
+                            
+                            // 计算屏幕高度
+                            const screenHeight = window.innerHeight;
+                            
+                            // 获取合计区域的高度
+                            const totalHeight = totalAmountDisplay.offsetHeight;
+                            
+                            // 直接计算从表格容器顶部到屏幕底部的距离，然后减去合计区域的高度
+                            const tableRect = detailTableSection.getBoundingClientRect();
+                            const maxHeight = screenHeight - tableRect.top - totalHeight - 2; // 2px 是预留的边距
+                            
+                            // 确保高度为正数
+                            const finalHeight = Math.max(100, maxHeight); // 最小高度100px
+                            
+                            // 设置表格滚动容器的高度
+                            const tableScroll = detailTableSection.querySelector('.table-scroll');
+                            if (tableScroll) {
+                                tableScroll.style.maxHeight = `${finalHeight}px`;
+                                tableScroll.style.height = `${finalHeight}px`;
+                                tableScroll.style.overflowY = 'auto'; // 确保表格内显示垂直滚动条
+                            }
+                        }
+                    }, 300);
+                    
                     // 加载明细数据
                     loadDetailData();
+                    
+                    // 添加窗口大小变化事件监听器
+                    window.addEventListener('resize', function() {
+                        if (totalAmountDisplay && detailTableSection && detailTableSection.style.display === 'block') {
+                            // 确保合计区域可见
+                            totalAmountDisplay.style.display = 'flex';
+                            
+                            // 计算屏幕高度
+                            const screenHeight = window.innerHeight;
+                            
+                            // 获取合计区域的高度
+                            const totalHeight = totalAmountDisplay.offsetHeight;
+                            
+                            // 直接计算从表格容器顶部到屏幕底部的距离，然后减去合计区域的高度
+                            const tableRect = detailTableSection.getBoundingClientRect();
+                            const maxHeight = screenHeight - tableRect.top - totalHeight - 2; // 2px 是预留的边距
+                            
+                            // 确保高度为正数
+                            const finalHeight = Math.max(100, maxHeight); // 最小高度100px
+                            
+                            // 设置表格滚动容器的高度
+                            const tableScroll = detailTableSection.querySelector('.table-scroll');
+                            if (tableScroll) {
+                                tableScroll.style.maxHeight = `${finalHeight}px`;
+                                tableScroll.style.height = `${finalHeight}px`;
+                                tableScroll.style.overflowY = 'auto'; // 确保表格内显示垂直滚动条
+                            }
+                        }
+                    });
                 } else {
                     // 显示所有记工相关内容
                     tabWorkContent.forEach(element => {
                         element.style.display = '';
                     });
+                    
+                    // 恢复所有form-row元素的显示
+                    const formRows = document.querySelectorAll('.form-row');
+                    formRows.forEach(row => {
+                        row.style.display = '';
+                    });
+                    
+                    // 恢复表格容器的默认样式
+                    detailTableSection.style.height = '';
+                    detailTableSection.style.margin = '';
+                    detailTableSection.style.padding = '';
+                    
                     // 隐藏明细表格
                     detailTableSection.style.display = 'none';
                     // 显示保存按钮
                     if (bottomButtons) bottomButtons.style.display = 'flex';
                     // 隐藏合计和生成PDF按钮
                     if (totalAmountDisplay) totalAmountDisplay.style.display = 'none';
+                    
+                    // 恢复界面的垂直滚动条
+                    document.body.style.overflowY = 'auto';
                 }
             };
 
@@ -3132,8 +3247,82 @@
             }
         }
         
+        // 使用Supabase Storage API下载图片
+        async function downloadImageWithSupabase(imageUrl) {
+            return new Promise(async (resolve, reject) => {
+                try {
+                    let imageBlob;
+                    let originalName;
+                    
+                    if (imageUrl.startsWith('data:')) {
+                        const [header, data] = imageUrl.split(',');
+                        const mime = header.match(/:(.*?);/)[1];
+                        const bstr = atob(data);
+                        let n = bstr.length;
+                        const u8arr = new Uint8Array(n);
+                        while (n--) {
+                            u8arr[n] = bstr.charCodeAt(n);
+                        }
+                        imageBlob = new Blob([u8arr], { type: mime });
+                        originalName = `image_${Date.now()}.${mime.split('/')[1] || 'jpg'}`;
+                    } else if (imageUrl.includes('supabase.co/storage/v1/object/public/')) {
+                        const urlParts = imageUrl.split('supabase.co/storage/v1/object/public/');
+                        if (urlParts.length > 1) {
+                            const pathParts = urlParts[1].split('/');
+                            const bucketName = pathParts[0];
+                            const fileName = pathParts.slice(1).join('/');
+                            
+                            originalName = decodeURIComponent(fileName.split('/').pop());
+                            
+                            try {
+                                const supabase = await window.waitForSupabase();
+                                const { data, error } = await supabase
+                                    .storage
+                                    .from(bucketName)
+                                    .download(fileName);
+                                
+                                if (error) {
+                                    console.error('使用 Supabase API 下载图片失败:', error);
+                                    throw error;
+                                }
+                                
+                                imageBlob = data;
+                            } catch (supabaseError) {
+                                console.error('Supabase Storage 下载失败，尝试使用公开 URL:', supabaseError);
+                                const response = await fetch(imageUrl);
+                                if (!response.ok) {
+                                    throw new Error(`HTTP error! status: ${response.status}`);
+                                }
+                                imageBlob = await response.blob();
+                            }
+                        } else {
+                            throw new Error('无法解析 Supabase Storage URL');
+                        }
+                    } else {
+                        originalName = imageUrl.split('/').pop().split('?')[0].split('#')[0];
+                        const response = await fetch(imageUrl);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        imageBlob = await response.blob();
+                    }
+                    
+                    const file = new File([imageBlob], originalName, {
+                        type: imageBlob.type || 'image/jpeg',
+                        lastModified: Date.now()
+                    });
+                    
+                    resolve(file);
+                    
+                } catch (error) {
+                    console.error('下载图片失败:', imageUrl, error);
+                    reject(error);
+                }
+            });
+        }
+        
         // 加载图片到表单
-        function loadImagesToForm(imageIds) {
+        async function loadImagesToForm(imageIds) {
             // 清空当前选中的图片
             if (typeof window.clearImage === 'function') {
                 window.clearImage();
@@ -3147,135 +3336,31 @@
             // 显示加载状态
             showImageLoadingStatus(imageIds.length);
             
+            // 初始化图片数组
+            window.selectedImages = [];
+            
             // 下载并显示图片
             let loadedCount = 0;
-            imageIds.forEach((url, index) => {
+            for (let index = 0; index < imageIds.length; index++) {
+                const url = imageIds[index];
                 if (url && url.trim()) {
-                    // 处理不同类型的URL
-                    if (url.startsWith('data:')) {
-                        // 直接处理data URL（base64图片）
-                        try {
-                            // 从data URL创建Blob对象
-                            const [header, data] = url.split(',');
-                            const mime = header.match(/:(.*?);/)[1];
-                            const bstr = atob(data);
-                            let n = bstr.length;
-                            const u8arr = new Uint8Array(n);
-                            while (n--) {
-                                u8arr[n] = bstr.charCodeAt(n);
-                            }
-                            const blob = new Blob([u8arr], { type: mime });
-                            
-                            // 生成文件名
-                            let fileName;
-                            const urlParts = url.split('/');
-                            if (urlParts.length > 1) {
-                                const lastPart = urlParts[urlParts.length - 1];
-                                if (lastPart.includes('.')) {
-                                    fileName = lastPart;
-                                } else {
-                                    fileName = `image_${Date.now()}_${index}.${mime.split('/')[1] || 'jpg'}`;
-                                }
-                            } else {
-                                fileName = `image_${Date.now()}_${index}.${mime.split('/')[1] || 'jpg'}`;
-                            }
-                            
-                            // 创建File对象
-                            const file = new File([blob], fileName, { type: mime });
-                            // 标记为已存在的图片，避免重复上传
-                            file.isExisting = true;
-                            file.originalUrl = url;
-                            
-                            // 添加到全局图片数组
-                            if (window.selectedImages) {
-                                window.selectedImages.push(file);
-                            } else {
-                                window.selectedImages = [file];
-                            }
-                            
-                            // 更新加载状态
-                            loadedCount++;
-                            updateImageLoadingStatus(loadedCount, imageIds.length);
-                            
-                            // 更新图片显示
-                            updateImagePreview();
-                        } catch (error) {
-                            console.error('处理base64图片失败:', error);
-                            // 即使失败也要更新加载计数
-                            loadedCount++;
-                            updateImageLoadingStatus(loadedCount, imageIds.length);
-                        }
-                    } else {
-                        // 处理普通URL图片
-                        // 使用跨域代理或添加时间戳防止缓存问题
-                        const fetchUrl = url + (url.includes('?') ? '&' : '?') + 't=' + new Date().getTime();
+                    try {
+                        const file = await downloadImageWithSupabase(url);
+                        file.isExisting = true;
+                        file.originalUrl = url;
                         
-                        fetch(url, { mode: 'cors' })
-                            .then(response => {
-                                if (!response.ok) {
-                                    throw new Error('Network response was not ok');
-                                }
-                                return response.blob();
-                            })
-                            .then(blob => {
-                                // 生成文件名
-                                const urlParts = url.split('/');
-                                const fileName = urlParts[urlParts.length - 1] || `image_${Date.now()}_${index}.jpg`;
-                                
-                                // 创建File对象
-                                const file = new File([blob], fileName, { type: blob.type });
-                                // 标记为已存在的图片，避免重复上传
-                                file.isExisting = true;
-                                file.originalUrl = url;
-                                
-                                // 添加到全局图片数组
-                                if (window.selectedImages) {
-                                    window.selectedImages.push(file);
-                                } else {
-                                    window.selectedImages = [file];
-                                }
-                                
-                                // 更新加载状态
-                                loadedCount++;
-                                updateImageLoadingStatus(loadedCount, imageIds.length);
-                                
-                                // 更新图片显示
-                                updateImagePreview();
-                            })
-                            .catch(error => {
-                                console.error('加载图片失败:', error);
-                                // 尝试直接使用URL显示，不转换为File对象
-                                // 这种情况通常发生在跨域限制导致无法获取blob时
-                                
-                                // 创建一个模拟的File对象（实际上是一个包含url的对象）
-                                // 这样至少能显示出来，虽然可能无法再次上传（除非后端支持直接处理URL）
-                                // 但我们的 updateImagePreview 使用 URL.createObjectURL(file)，所以这里需要特殊处理
-                                
-                                // 更好的降级方案：直接将原始URL添加到selectedImages
-                                // updateImagePreview 需要修改以支持字符串类型的URL
-                                
-                                const imageObj = {
-                                    name: `image_${index}.jpg`,
-                                    type: 'image/jpeg',
-                                    isExisting: true,
-                                    originalUrl: url,
-                                    // 添加一个特殊的标记，表示这是一个无法转换为Blob的远程图片
-                                    isRemoteUrl: true
-                                };
-                                
-                                if (window.selectedImages) {
-                                    window.selectedImages.push(imageObj);
-                                } else {
-                                    window.selectedImages = [imageObj];
-                                }
-                                
-                                loadedCount++;
-                                updateImageLoadingStatus(loadedCount, imageIds.length);
-                                updateImagePreview();
-                            });
+                        window.selectedImages.push(file);
+                        
+                        loadedCount++;
+                        updateImageLoadingStatus(loadedCount, imageIds.length);
+                        updateImagePreview();
+                    } catch (error) {
+                        console.error(`加载图片失败 (${index + 1}):`, error);
+                        loadedCount++;
+                        updateImageLoadingStatus(loadedCount, imageIds.length);
                     }
                 }
-            });
+            }
         }
         
         // 更新图片预览
@@ -3493,9 +3578,15 @@
         }
 
         // 渲染明细表格
+        // 全局变量：保存当前表格显示的数据
+        let currentTableData = [];
+
         function renderDetailTable(data) {
             const tbody = document.getElementById('detailTableBody');
             tbody.innerHTML = '';
+            
+            // 保存当前显示的数据
+            currentTableData = data || [];
 
             if (!data || data.length === 0) {
                 const emptyRow = document.createElement('tr');
@@ -3514,10 +3605,12 @@
                 // 处理图片显示
                 let imageHtml = '-';
                 if (item.image_ids) {
-                    // 确保 image_ids 是数组且有值
-                    const imageId = Array.isArray(item.image_ids) ? item.image_ids[0] : item.image_ids;
-                    if (imageId) {
-                        imageHtml = `<span class="image-icon" style="cursor: pointer; color: #1890ff; font-size: 14px;" onclick="viewImage('${imageId}')">🖼️</span>`;
+                    const imageIds = Array.isArray(item.image_ids) ? item.image_ids : [item.image_ids];
+                    const validImages = imageIds.filter(id => id && id.trim());
+                    if (validImages.length > 0) {
+                        imageHtml = validImages.map((imageId, imgIndex) => 
+                            `<span class="image-icon" style="cursor: pointer; color: #1890ff; font-size: 14px; margin-right: 4px;" onclick="viewImage('${imageId}')">🖼️</span>`
+                        ).join('');
                     }
                 }
 
@@ -3601,6 +3694,12 @@
 
         // 显示删除确认模态框
         function showDeleteModal(recordId, imageIds) {
+            // 检测网络状态
+            if (!navigator.onLine) {
+                showNotification('请联网后再删除记录', true);
+                return;
+            }
+            
             // 检查模态框是否已存在
             let modal = document.getElementById('deleteConfirmModal');
             if (!modal) {
@@ -3802,59 +3901,45 @@
             }
         }
 
-        // 验证密码 - 不管是否在线，只验证本地的登录密码
+        // 验证密码 - 使用Supabase在线验证
         async function verifyPassword(password) {
+            if (!navigator.onLine) {
+                showNotification('请联网后再删除记录', true);
+                return false;
+            }
+
             try {
-                // 获取当前登录用户信息
                 const currentUserStr = localStorage.getItem('currentUser');
                 if (!currentUserStr) {
                     console.error('未找到当前登录用户信息');
+                    showNotification('获取用户信息失败，请重新登录', true);
                     return false;
                 }
                 
                 const currentUser = JSON.parse(currentUserStr);
-                const phone = currentUser.phone || currentUser.login_name;
+                const userEmail = currentUser.email;
                 
-                if (!phone) {
-                    console.error('当前登录用户没有电话信息');
+                if (!userEmail) {
+                    console.error('用户信息中缺少email');
+                    showNotification('获取用户邮箱失败，请重新登录', true);
+                    return false;
+                }
+
+                const { data: authData, error: authError } = await window.supabase.auth.signInWithPassword({
+                    email: userEmail,
+                    password: password
+                });
+                
+                if (authError) {
+                    console.log('密码验证失败:', authError);
                     return false;
                 }
                 
-                // 不管是否在线，只使用本地存储的登录信息验证
-                return verifyOfflinePassword(phone, password);
+                console.log('密码验证成功');
+                return true;
             } catch (error) {
                 console.error('密码验证失败:', error);
-                return false;
-            }
-        }
-        
-        // 离线验证密码
-        function verifyOfflinePassword(phone, password) {
-            try {
-                // 从本地存储获取登录信息
-                // 检查是否有登录成功保存的信息
-                const loginInfoStr = localStorage.getItem('loginInfo');
-                if (loginInfoStr) {
-                    const loginInfo = JSON.parse(loginInfoStr);
-                    // 验证phone和password是否匹配
-                    if (loginInfo.phone === phone && loginInfo.password === password) {
-                        return true;
-                    }
-                }
-                
-                // 尝试从其他可能的存储位置获取
-                const currentUserStr = localStorage.getItem('currentUser');
-                if (currentUserStr) {
-                    const currentUser = JSON.parse(currentUserStr);
-                    // 有些情况下，currentUser中可能直接包含password
-                    if (currentUser.password && currentUser.password === password) {
-                        return true;
-                    }
-                }
-                
-                return false;
-            } catch (error) {
-                console.error('离线密码验证失败:', error);
+                showNotification('密码验证失败，请重试', true);
                 return false;
             }
         }
@@ -3864,6 +3949,7 @@
             if (window.workRecordAPI) {
                 workRecordAPI.deleteWorkRecord(recordId, imageIds).then(result => {
                     if (result.success) {
+                        playSuccessSound();
                         showNotification('删除成功', false);
                         // 重新加载明细数据
                         loadDetailData();
@@ -3879,8 +3965,8 @@
             }
         }
 
-        // 查看大图
-        function viewImage(imageUrl) {
+        // 查看大图 - 使用Supabase Storage API下载图片
+        async function viewImage(imageUrl) {
             const modal = document.createElement('div');
             modal.style.cssText = `
                 position: fixed;
@@ -3907,9 +3993,17 @@
                 overflow: hidden;
             `;
 
+            const loadingDiv = document.createElement('div');
+            loadingDiv.style.cssText = `
+                color: white;
+                font-size: 16px;
+                text-align: center;
+            `;
+            loadingDiv.innerHTML = '正在加载图片...';
+            imgContainer.appendChild(loadingDiv);
+
             const img = document.createElement('img');
             img.id = 'draggableImage';
-            img.src = imageUrl;
             img.style.cssText = `
                 max-width: 100%;
                 max-height: 100%;
@@ -3919,6 +4013,7 @@
                 top: 50%;
                 left: 50%;
                 transform: translate(-50%, -50%);
+                display: none;
             `;
             img.ondragstart = function() { return false; };
 
@@ -3947,6 +4042,60 @@
             modal.appendChild(closeBtn);
             document.body.appendChild(modal);
 
+            // 使用Supabase Storage API下载图片
+            try {
+                let imageBlob = null;
+                
+                if (imageUrl.includes('supabase.co/storage/v1/object/public/')) {
+                    const urlParts = imageUrl.split('supabase.co/storage/v1/object/public/');
+                    if (urlParts.length > 1) {
+                        const pathParts = urlParts[1].split('/');
+                        const bucketName = pathParts[0];
+                        const fileName = pathParts.slice(1).join('/');
+                        
+                        try {
+                            const supabase = await window.waitForSupabase();
+                            const { data, error } = await supabase
+                                .storage
+                                .from(bucketName)
+                                .download(fileName);
+                            
+                            if (error) {
+                                console.error('使用 Supabase API 下载图片失败:', error);
+                                throw error;
+                            }
+                            
+                            imageBlob = data;
+                        } catch (supabaseError) {
+                            console.error('Supabase Storage 下载失败，尝试使用公开 URL:', supabaseError);
+                            const response = await fetch(imageUrl);
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                            }
+                            imageBlob = await response.blob();
+                        }
+                    }
+                } else {
+                    const response = await fetch(imageUrl);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    imageBlob = await response.blob();
+                }
+                
+                if (imageBlob) {
+                    const blobUrl = URL.createObjectURL(imageBlob);
+                    img.src = blobUrl;
+                    img.style.display = 'block';
+                    loadingDiv.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('加载图片失败:', error);
+                loadingDiv.innerHTML = '图片加载失败';
+                loadingDiv.style.color = '#ff4d4f';
+            }
+
+            
             // 图片拖动和缩放功能
             let isDragging = false;
             let offsetX, offsetY;
