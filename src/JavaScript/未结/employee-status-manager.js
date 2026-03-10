@@ -1,8 +1,9 @@
 /**
  * 员工状态管理模块
  * 功能：
- * 1. 设为已结清：检查未结金额，更新本地和Supabase员工状态为"结清"
- * 2. 设为未结：更新本地和Supabase员工状态为"离职"
+ * 1. 设为已结清：检查未结金额，更新本地和Supabase员工状态为"结清"，写入离职日期
+ * 2. 设为未结：更新本地和Supabase员工状态为"离职"，清除离职日期
+ * 3. 支持离线模式：使用现有的 OfflineSyncService 进行离线同步
  */
 
 (function() {
@@ -23,7 +24,6 @@
          */
         async initSupabase() {
             try {
-                // 等待Supabase客户端初始化
                 if (typeof window.waitForSupabase === 'function') {
                     this.supabase = await window.waitForSupabase();
                     this.isSupabaseReady = true;
@@ -45,7 +45,6 @@
          */
         findEmployeeInLocal(projectId, empCode, empName) {
             try {
-                // 从localStorage获取员工索引
                 const indexKey = 'employeesIndex';
                 const indexData = localStorage.getItem(indexKey);
                 
@@ -56,11 +55,9 @@
 
                 const employeeIndex = JSON.parse(indexData);
                 
-                // 查找匹配的员工
                 for (const employeeId in employeeIndex) {
                     const employee = employeeIndex[employeeId];
 
-                    // 使用project_id, emp_code, emp_name三个字段匹配
                     if (employee.project_id === projectId &&
                         employee.emp_code === empCode &&
                         employee.emp_name === empName) {
@@ -82,9 +79,10 @@
          * 更新本地存储中的员工状态
          * @param {string} employeeId - 员工ID
          * @param {string} newStatus - 新的状态（"结清"或"离职"）
+         * @param {string|null} leaveDate - 离职日期，格式 YYYY-MM-DD，设为未结时传null
          * @returns {boolean} 是否更新成功
          */
-        updateEmployeeStatusInLocal(employeeId, newStatus) {
+        updateEmployeeStatusInLocal(employeeId, newStatus, leaveDate) {
             try {
                 const indexKey = 'employeesIndex';
                 const indexData = localStorage.getItem(indexKey);
@@ -100,10 +98,9 @@
                     return false;
                 }
 
-                // 更新状态
                 employeeIndex[employeeId].status = newStatus;
+                employeeIndex[employeeId].leave_date = leaveDate;
 
-                // 保存回localStorage
                 localStorage.setItem(indexKey, JSON.stringify(employeeIndex));
 
                 return true;
@@ -114,23 +111,30 @@
         }
 
         /**
-         * 更新Supabase中的员工状态
+         * 更新Supabase中的员工状态（在线时直接更新）
          * @param {string} employeeId - 员工ID
          * @param {string} newStatus - 新的状态（"结清"或"离职"）
+         * @param {string|null} leaveDate - 离职日期，格式 YYYY-MM-DD，设为未结时传null
          * @returns {Promise<boolean>} 是否更新成功
          */
-        async updateEmployeeStatusInSupabase(employeeId, newStatus) {
+        async updateEmployeeStatusInSupabase(employeeId, newStatus, leaveDate) {
             if (!this.isSupabaseReady || !this.supabase) {
                 return false;
             }
 
             try {
+                const now = new Date();
+                const beijingTime = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+                
+                const updateData = {
+                    status: newStatus,
+                    updated_at: beijingTime.toISOString(),
+                    leave_date: leaveDate
+                };
+
                 const { data, error } = await this.supabase
                     .from('employees')
-                    .update({
-                        status: newStatus,
-                        updated_at: new Date().toISOString()
-                    })
+                    .update(updateData)
                     .eq('employee_id', employeeId)
                     .select();
 
@@ -145,13 +149,30 @@
         }
 
         /**
+         * 添加操作到离线同步队列
+         * @param {string} employeeId - 员工ID
+         * @param {Object} updateData - 要更新的数据
+         */
+        addToOfflineSyncQueue(employeeId, updateData) {
+            if (window.offlineSyncService && typeof window.offlineSyncService.addToSyncQueue === 'function') {
+                window.offlineSyncService.addToSyncQueue(
+                    'update',
+                    updateData,
+                    employeeId,
+                    'employee'
+                );
+            } else {
+                console.warn('OfflineSyncService 不可用，数据仅保存在本地');
+            }
+        }
+
+        /**
          * 设为已结清
          * @param {Object} employee - 员工对象，包含project_id, emp_code, emp_name, unsettled等字段
          * @returns {Promise<Object>} 返回操作结果 {success: boolean, message: string}
          */
         async setAsSettled(employee) {
             try {
-                // 1. 检查未结金额是否为0或负数（第一步，必须在任何修改之前）
                 const unsettledAmount = parseFloat(employee.unsettled) || 0;
 
                 if (unsettledAmount > 0) {
@@ -161,7 +182,6 @@
                     };
                 }
 
-                // 2. 在本地查找员工数据
                 const found = this.findEmployeeInLocal(
                     employee.project_id,
                     employee.emp_code,
@@ -175,8 +195,10 @@
                     };
                 }
 
-                // 3. 更新本地员工状态为"结清"
-                const localUpdated = this.updateEmployeeStatusInLocal(found.employeeId, '结清');
+                const today = new Date();
+                const leaveDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+                const localUpdated = this.updateEmployeeStatusInLocal(found.employeeId, '结清', leaveDate);
 
                 if (!localUpdated) {
                     return {
@@ -185,8 +207,19 @@
                     };
                 }
 
-                // 4. 更新Supabase员工状态为"结清"
-                const supabaseUpdated = await this.updateEmployeeStatusInSupabase(found.employeeId, '结清');
+                if (navigator.onLine && this.isSupabaseReady) {
+                    await this.updateEmployeeStatusInSupabase(found.employeeId, '结清', leaveDate);
+                } else {
+                    const now = new Date();
+                    const beijingTime = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+                    
+                    const updateData = {
+                        status: '结清',
+                        leave_date: leaveDate,
+                        updated_at: beijingTime.toISOString()
+                    };
+                    this.addToOfflineSyncQueue(found.employeeId, updateData);
+                }
 
                 return {
                     success: true,
@@ -208,7 +241,6 @@
          */
         async setAsUnsettled(employee) {
             try {
-                // 1. 在本地查找员工数据
                 const found = this.findEmployeeInLocal(
                     employee.project_id,
                     employee.emp_code,
@@ -222,8 +254,7 @@
                     };
                 }
 
-                // 2. 更新本地员工状态为"离职"
-                const localUpdated = this.updateEmployeeStatusInLocal(found.employeeId, '离职');
+                const localUpdated = this.updateEmployeeStatusInLocal(found.employeeId, '离职', null);
 
                 if (!localUpdated) {
                     return {
@@ -232,8 +263,19 @@
                     };
                 }
 
-                // 3. 更新Supabase员工状态为"离职"
-                const supabaseUpdated = await this.updateEmployeeStatusInSupabase(found.employeeId, '离职');
+                if (navigator.onLine && this.isSupabaseReady) {
+                    await this.updateEmployeeStatusInSupabase(found.employeeId, '离职', null);
+                } else {
+                    const now = new Date();
+                    const beijingTime = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+                    
+                    const updateData = {
+                        status: '离职',
+                        leave_date: null,
+                        updated_at: beijingTime.toISOString()
+                    };
+                    this.addToOfflineSyncQueue(found.employeeId, updateData);
+                }
 
                 return {
                     success: true,
@@ -249,31 +291,12 @@
         }
     }
 
-    // 创建全局单例实例
     const manager = new EmployeeStatusManager();
 
-    // 导出为全局对象
     window.EmployeeStatusManager = {
-        /**
-         * 设为已结清
-         * @param {Object} employee - 员工对象
-         * @returns {Promise<Object>} 返回操作结果
-         */
         setAsSettled: (employee) => manager.setAsSettled(employee),
-
-        /**
-         * 设为未结（离职）
-         * @param {Object} employee - 员工对象
-         * @returns {Promise<Object>} 返回操作结果
-         */
         setAsUnsettled: (employee) => manager.setAsUnsettled(employee),
-
-        /**
-         * 获取管理器实例
-         * @returns {EmployeeStatusManager} 管理器实例
-         */
         getInstance: () => manager
     };
-
 
 })();
