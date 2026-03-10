@@ -21,7 +21,7 @@ class AccountingFlowService {
                 
                 // 使用与supabase-client.js相同的配置
                 const supabaseUrl = 'https://oydffrzzulsrbitrrhht.supabase.co';
-                const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95ZGZmcnp6dWxzcmJpdHJyaGh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0MjcxNDEsImV4cCI6MjA3OTAwMzE0MX0.LFMDgx8eNyE3pVjVYgHqhtvaC--vP4-MtXL8fY3_v-s';
+                const supabaseKey = 'sb_publishable_l3-6N3-RsAmbns6JCOusHg_XPFd4jf7';
                 
                 // 检查supabase是否可用
                 if (typeof supabase !== 'undefined') {
@@ -424,6 +424,10 @@ class AccountingFlowService {
     async _handleAuditClick(e) {
         const auditButton = e.target.closest('.audit-button');
         if (auditButton && !auditButton.disabled) {
+            // 立即禁用按钮，防止重复点击
+            auditButton.disabled = true;
+            auditButton.setAttribute('disabled', 'disabled');
+            
             // 阻止事件冒泡，避免触发父容器的编辑跳转
             e.preventDefault();
             e.stopPropagation();
@@ -1382,19 +1386,35 @@ class AccountingFlowService {
         modal.innerHTML = `
             <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2001;" 
                  onclick="if(event.target === this) document.getElementById('accountingFlowImagePreviewModal').style.display='none'">
-                <img id="accountingFlowPreviewDraggableImage" src="${imageUrl}" 
+                <img id="accountingFlowPreviewDraggableImage" 
                      style="max-width: 90%; max-height: 90%; position: absolute; cursor: move; top: 50%; left: 50%; transform: translate(-50%, -50%);"
                      ondragstart="return false;">
                 <button onclick="document.getElementById('accountingFlowImagePreviewModal').style.display='none'" 
                         style="position: fixed; top: 20px; right: 20px; background: #f5222d; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; z-index: 2002;">×</button>
+                <div id="accountingFlowImageLoading" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 18px; z-index: 2003;">加载中...</div>
+                <div id="accountingFlowImageError" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 18px; z-index: 2003; display: none;">图片加载失败</div>
             </div>
         `;
         modal.style.display = 'block';
 
         const img = document.getElementById('accountingFlowPreviewDraggableImage');
+        const loading = document.getElementById('accountingFlowImageLoading');
+        const error = document.getElementById('accountingFlowImageError');
         let isDragging = false;
         let offsetX, offsetY;
         let scale = 1;
+
+        // 加载图片（带认证）
+        this.loadImageWithAuth(imageUrl).then(blob => {
+            const objectUrl = URL.createObjectURL(blob);
+            img.src = objectUrl;
+            loading.style.display = 'none';
+            error.style.display = 'none';
+        }).catch(err => {
+            console.error('图片加载失败:', err);
+            loading.style.display = 'none';
+            error.style.display = 'block';
+        });
 
         img.addEventListener('mousedown', function(e) {
             isDragging = true;
@@ -1422,6 +1442,128 @@ class AccountingFlowService {
             img.style.left = '50%';
             img.style.top = '50%';
             img.style.transform = `translate(-50%, -50%) scale(${scale})`;
+        });
+    }
+
+    // 带认证加载图片
+    async loadImageWithAuth(imageUrl) {
+        // 检查是否是 Supabase Storage URL
+        if (imageUrl.includes('supabase.co/storage/v1/object/public/')) {
+            // 从URL中解析 bucketName 和 fileName
+            const urlParts = imageUrl.split('supabase.co/storage/v1/object/public/');
+            if (urlParts.length > 1) {
+                const pathParts = urlParts[1].split('/');
+                const bucketName = pathParts[0];
+                const fileName = pathParts.slice(1).join('/');
+                
+                try {
+                    // 使用 Supabase Storage API 下载图片（带认证）
+                    const supabase = await window.waitForSupabase();
+                    const { data, error } = await supabase
+                        .storage
+                        .from(bucketName)
+                        .download(fileName);
+                    
+                    if (error) {
+                        console.error('使用 Supabase API 下载图片失败:', error);
+                        // 尝试使用带认证的公开 URL
+                        return this.fetchWithAuth(imageUrl);
+                    }
+                    
+                    return data;
+                } catch (supabaseError) {
+                    console.error('Supabase Storage 下载失败，尝试使用带认证的公开 URL:', supabaseError);
+                    // 尝试使用带认证的公开 URL
+                    return this.fetchWithAuth(imageUrl);
+                }
+            }
+        }
+        
+        // 非 Supabase URL，直接使用带认证的 fetch
+        return this.fetchWithAuth(imageUrl);
+    }
+
+    // 带认证的 fetch
+    async fetchWithAuth(imageUrl) {
+        // 获取认证令牌
+        const getAuthToken = () => {
+            try {
+                const supabaseKey = 'sb_publishable_l3-6N3-RsAmbns6JCOusHg_XPFd4jf7';
+                // 尝试从localStorage获取session
+                const sessionStr = localStorage.getItem('sb-oydffrzzulsrbitrrhht-auth-token');
+                if (sessionStr) {
+                    try {
+                        const session = JSON.parse(sessionStr);
+                        if (session.access_token) {
+                            return session.access_token;
+                        }
+                    } catch (e) {
+                        console.warn('解析session失败:', e);
+                    }
+                }
+                return supabaseKey;
+            } catch (e) {
+                console.error('获取认证令牌失败:', e);
+                return 'sb_publishable_l3-6N3-RsAmbns6JCOusHg_XPFd4jf7';
+            }
+        };
+
+        const authToken = getAuthToken();
+
+        try {
+            const response = await fetch(imageUrl, {
+                headers: {
+                    'apikey': authToken,
+                    'Authorization': `Bearer ${authToken}`
+                }
+            });
+
+            if (!response.ok) {
+                // 检查是否是存储桶不存在的错误
+                try {
+                    const errorData = await response.json();
+                    if (errorData.error === 'Bucket not found' || errorData.message === 'Bucket not found') {
+                        console.warn('存储桶不存在:', errorData.message || 'Bucket not found');
+                        // 创建一个默认的错误图片
+                        return this.createErrorImageBlob();
+                    }
+                } catch (jsonError) {
+                    // 如果响应不是JSON格式，直接创建错误图片
+                    console.warn('响应不是JSON格式，创建错误图片');
+                    return this.createErrorImageBlob();
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            return response.blob();
+        } catch (error) {
+            console.error('图片加载失败:', error);
+            // 创建一个默认的错误图片
+            return this.createErrorImageBlob();
+        }
+    }
+
+    // 创建错误图片Blob
+    createErrorImageBlob() {
+        // 创建一个简单的错误提示图片
+        const canvas = document.createElement('canvas');
+        canvas.width = 400;
+        canvas.height = 200;
+        const ctx = canvas.getContext('2d');
+        
+        // 背景
+        ctx.fillStyle = '#f5f5f5';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // 文字
+        ctx.fillStyle = '#ff4d4f';
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('图片加载失败', canvas.width / 2, canvas.height / 2 - 10);
+        ctx.fillText('存储桶可能不存在', canvas.width / 2, canvas.height / 2 + 15);
+        
+        return new Promise((resolve) => {
+            canvas.toBlob(resolve, 'image/png');
         });
     }
 
