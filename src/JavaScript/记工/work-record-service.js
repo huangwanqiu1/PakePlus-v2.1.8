@@ -649,14 +649,37 @@ class WorkRecordService {
                     for (const imageUrl of image_ids) {
                         try {
                             // 从URL中提取完整的文件路径
-                            const urlParts = imageUrl.split('/');
+                            let urlToProcess = imageUrl;
+                            
+                            // 先解码URL，确保获取正确的路径
+                            try {
+                                urlToProcess = decodeURIComponent(imageUrl);
+                            } catch (e) {
+                                // 解码失败，使用原始URL
+                                console.warn('URL解码失败:', imageUrl, e);
+                                urlToProcess = imageUrl;
+                            }
+                            
+                            const urlParts = urlToProcess.split('/');
                             // 找到包含bucketName的索引
                             const bucketIndex = urlParts.indexOf('FYKQ');
                             if (bucketIndex !== -1 && bucketIndex + 1 < urlParts.length) {
                                 // 从bucketName后面的部分开始构建完整的文件路径
                                 const encodedFilePath = urlParts.slice(bucketIndex + 1).join('/');
-                                // 解码文件路径
-                                const filePath = decodeURIComponent(encodedFilePath);
+                                
+                                // 再次解码文件路径，确保中文文件名正确
+                                let filePath;
+                                try {
+                                    filePath = decodeURIComponent(encodedFilePath);
+                                } catch (e) {
+                                    console.warn('文件路径解码失败:', encodedFilePath, e);
+                                    filePath = encodedFilePath;
+                                }
+                                
+                                // console.log('删除图片 - 原始URL:', imageUrl);
+                                // console.log('删除图片 - 解码URL:', urlToProcess);
+                                // console.log('删除图片 - 编码路径:', encodedFilePath);
+                                // console.log('删除图片 - 解码路径:', filePath);
                                 
                                 // 使用Supabase API删除图片
                                 await supabase.storage
@@ -664,6 +687,7 @@ class WorkRecordService {
                                     .remove([filePath]);
                             }
                         } catch (imageError) {
+                            // console.error('删除图片失败:', imageUrl, imageError);
                             // 继续删除其他图片
                         }
                     }
@@ -675,14 +699,32 @@ class WorkRecordService {
                 if (window.offlineSyncService) {
                     for (const imageUrl of image_ids) {
                         // 从URL中提取完整的文件路径
-                        const urlParts = imageUrl.split('/');
+                        let urlToProcess = imageUrl;
+                        
+                        // 先解码URL，确保获取正确的路径
+                        try {
+                            urlToProcess = decodeURIComponent(imageUrl);
+                        } catch (e) {
+                            // 解码失败，使用原始URL
+                            console.warn('URL解码失败:', imageUrl, e);
+                            urlToProcess = imageUrl;
+                        }
+                        
+                        const urlParts = urlToProcess.split('/');
                         // 找到包含bucketName的索引
                         const bucketIndex = urlParts.indexOf('FYKQ');
                         if (bucketIndex !== -1 && bucketIndex + 1 < urlParts.length) {
                             // 从bucketName后面的部分开始构建完整的文件路径
                             const encodedFilePath = urlParts.slice(bucketIndex + 1).join('/');
-                            // 解码文件路径
-                            const filePath = decodeURIComponent(encodedFilePath);
+                            
+                            // 再次解码文件路径，确保中文文件名正确
+                            let filePath;
+                            try {
+                                filePath = decodeURIComponent(encodedFilePath);
+                            } catch (e) {
+                                console.warn('文件路径解码失败:', encodedFilePath, e);
+                                filePath = encodedFilePath;
+                            }
                             
                             // 添加到同步队列
                             window.offlineSyncService.addToSyncQueue('delete_image', {
@@ -1217,6 +1259,7 @@ class WorkRecordService {
             // 处理图片 - 无论是在线还是离线，都先准备好图片
             let imageUrls = [];
             let oldImagesDeleted = false; // 标记是否已经删除过旧图片
+            let hasImageChanged = false; // 标记图片是否变更
             
             if (!hasImagesInSelector) {
                 // 情况1：图片选择器中没有图片 - 删除记录中的旧图片
@@ -1231,7 +1274,7 @@ class WorkRecordService {
             } else if (images.length > 0) {
                 // 情况2：图片选择器中有图片
                 // 检查图片是否变更
-                const hasImageChanged = this._checkIfImagesChanged(images, oldImages);
+                hasImageChanged = this._checkIfImagesChanged(images, oldImages);
                 
                 if (hasImageChanged) {
                     // 图片有变更：删除旧图片，上传新图片
@@ -1243,8 +1286,8 @@ class WorkRecordService {
                         oldImagesDeleted = true;
                     }
                 } else {
-                    // 图片未变更：也上传此图片
-                    console.log('图片未变更，重新上传图片');
+                    // 图片未变更：不删除旧图片，但上传新图片
+                    console.log('图片未变更，不删除旧图片，上传新图片');
                 }
                 
                 // 上传图片（无论是否变更都上传）
@@ -1256,11 +1299,22 @@ class WorkRecordService {
                     let dateStr;
                     if (recordDate) {
                         const recordDateObj = new Date(recordDate);
-                        const year = recordDateObj.getFullYear();
-                        const month = String(recordDateObj.getMonth() + 1).padStart(2, '0');
-                        const day = String(recordDateObj.getDate()).padStart(2, '0');
-                        dateStr = `${year}-${month}-${day}`;
+                        // 确保日期有效
+                        if (!isNaN(recordDateObj.getTime())) {
+                            const year = recordDateObj.getFullYear();
+                            const month = String(recordDateObj.getMonth() + 1).padStart(2, '0');
+                            const day = String(recordDateObj.getDate()).padStart(2, '0');
+                            dateStr = `${year}-${month}-${day}`;
+                        } else {
+                            // 日期无效，使用当前日期
+                            const currentDate = new Date();
+                            const year = currentDate.getFullYear();
+                            const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                            const day = String(currentDate.getDate()).padStart(2, '0');
+                            dateStr = `${year}-${month}-${day}`;
+                        }
                     } else {
+                        // 没有日期，使用当前日期
                         const currentDate = new Date();
                         const year = currentDate.getFullYear();
                         const month = String(currentDate.getMonth() + 1).padStart(2, '0');
@@ -1303,7 +1357,8 @@ class WorkRecordService {
             workRecord.image_ids = imageUrls;
             
             // 比较新旧图片，删除不再使用的旧图片（仅在未删除过旧图片时执行）
-            if (!oldImagesDeleted && hasImagesInSelector && oldImages && oldImages.length > 0) {
+            // 离线模式下图片未变更时不删除旧图片
+            if (!oldImagesDeleted && hasImagesInSelector && oldImages && oldImages.length > 0 && (isOnline || hasImageChanged)) {
                 const deletedImages = oldImages.filter(oldImg => !imageUrls.includes(oldImg));
                 
                 if (deletedImages.length > 0) {
@@ -3283,7 +3338,8 @@ class WorkRecordService {
 
         }
         
-        if (message === '记工成功') {
+        // 播放成功提示音：当消息包含"成功"且不是错误消息时
+        if (!isError && message.includes('成功')) {
             this.playSuccessSound();
         }
     }
@@ -3315,7 +3371,7 @@ class WorkRecordService {
             playTone(659.25, now + 0.15, 0.15);
             playTone(783.99, now + 0.3, 0.25);
             
-            console.log('成功提示音已播放');
+            // console.log('成功提示音已播放');
         } catch (e) {
             console.log('音频播放失败:', e);
         }
@@ -3653,6 +3709,13 @@ class WorkRecordService {
             // 获取会话信息
             const { data: { session } } = await supabase.auth.getSession();
             
+            // 确定使用的认证令牌：优先使用用户访问令牌，否则使用匿名密钥
+            const authToken = session?.access_token || 'sb_publishable_l3-6N3-RsAmbns6JCOusHg_XPFd4jf7';
+            
+            if (!session) {
+                console.warn('未找到用户会话，使用匿名密钥进行上传');
+            }
+            
             // 使用tus-js-client上传图片
             for (let i = 0; i < images.length; i++) {
                 let image = images[i];
@@ -3773,13 +3836,18 @@ class WorkRecordService {
                 // 生成新的文件名：项目ID/attendance/当前日期/原始名称.后缀
                 const fileName = `${recordProjectId}/${folderName}/${dateStr}/${finalName}.${fileExtension}`;
                 
+                // console.log('上传图片 - 最终文件名:', fileName);
+                // console.log('上传图片 - 原始名称:', originalName);
+                // console.log('上传图片 - 处理后名称:', finalName);
+                
                 try {
                     // 使用tus-js-client上传图片
-                    await this._uploadFileWithTus(supabaseProjectId, session?.access_token, bucketName, fileName, image);
+                    await this._uploadFileWithTus(supabaseProjectId, authToken, bucketName, fileName, image);
                     
-                    // 生成图片URL
+                    // 生成图片URL（使用带认证的URL格式）
                     const encodedFileName = encodeURIComponent(fileName);
                     const imageUrl = `https://${supabaseProjectId}.supabase.co/storage/v1/object/public/${bucketName}/${encodedFileName}`;
+                    // console.log('上传图片 - 生成URL:', imageUrl);
                     uploadedUrls.push(imageUrl);
                 } catch (uploadError) {
                     console.error('上传过程中发生异常:', uploadError);
@@ -3819,12 +3887,22 @@ class WorkRecordService {
         if (recordDate) {
             // 使用传入的记工日期
             const recordDateObj = new Date(recordDate);
-            const year = recordDateObj.getFullYear();
-            const month = String(recordDateObj.getMonth() + 1).padStart(2, '0');
-            const day = String(recordDateObj.getDate()).padStart(2, '0');
-            dateStr = `${year}-${month}-${day}`;
+            // 确保日期有效
+            if (!isNaN(recordDateObj.getTime())) {
+                const year = recordDateObj.getFullYear();
+                const month = String(recordDateObj.getMonth() + 1).padStart(2, '0');
+                const day = String(recordDateObj.getDate()).padStart(2, '0');
+                dateStr = `${year}-${month}-${day}`;
+            } else {
+                // 日期无效，使用当前日期
+                const currentDate = new Date();
+                const year = currentDate.getFullYear();
+                const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                const day = String(currentDate.getDate()).padStart(2, '0');
+                dateStr = `${year}-${month}-${day}`;
+            }
         } else {
-            // 兼容处理：如果没有传入日期，使用当前日期
+            // 没有日期，使用当前日期
             const currentDate = new Date();
             const year = currentDate.getFullYear();
             const month = String(currentDate.getMonth() + 1).padStart(2, '0');
@@ -4032,8 +4110,8 @@ class WorkRecordService {
                 endpoint: `https://${projectId}.supabase.co/storage/v1/upload/resumable`,
                 retryDelays: [0, 3000, 5000, 10000, 20000],
                 headers: {
-                    // 使用正确的API密钥进行认证
-                    authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95ZGZmcnp6dWxzcmJpdHJyaGh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0MjcxNDEsImV4cCI6MjA3OTAwMzE0MX0.LFMDgx8eNyE3pVjVYgHqhtvaC--vP4-MtXL8fY3_v-s`,
+                    // 使用传入的用户访问令牌进行认证
+                    authorization: `Bearer ${accessToken}`,
                     'x-upsert': 'true', // optionally set upsert to true to overwrite existing files
                 },
                 uploadDataDuringCreation: true,
