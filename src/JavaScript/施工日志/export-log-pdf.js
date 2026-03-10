@@ -19,10 +19,55 @@
             return null;
         }
 
-        // If it's online
+        // If it's Supabase Storage URL, use Supabase Storage API to download
+        if (url.includes('supabase.co/storage/v1/object/public/')) {
+            try {
+                const urlParts = url.split('supabase.co/storage/v1/object/public/');
+                if (urlParts.length > 1) {
+                    const pathParts = urlParts[1].split('/');
+                    const bucketName = pathParts[0];
+                    const fileName = pathParts.slice(1).join('/');
+                    
+                    try {
+                        const supabase = await window.waitForSupabase();
+                        const { data, error } = await supabase
+                            .storage
+                            .from(bucketName)
+                            .download(decodeURIComponent(fileName));
+                        
+                        if (error) {
+                            console.error('使用 Supabase API 下载图片失败:', error);
+                            throw error;
+                        }
+                        
+                        return new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result);
+                            reader.onerror = reject;
+                            reader.readAsDataURL(data);
+                        });
+                    } catch (supabaseError) {
+                        console.error('Supabase Storage 下载失败，尝试使用公开 URL:', supabaseError);
+                        // 如果 Supabase API 失败，回退到使用公开 URL
+                        const response = await fetch(url, { mode: 'cors' });
+                        if (!response.ok) throw new Error('Network response was not ok');
+                        const blob = await response.blob();
+                        return new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result);
+                            reader.onerror = reject;
+                            reader.readAsDataURL(blob);
+                        });
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to load image for PDF:', url, e);
+                return null;
+            }
+        }
+
+        // If it's other online URL
         try {
-            // For Supabase storage URLs, we might need to handle CORS if not configured
-            // But usually public buckets allow CORS.
             const response = await fetch(url, { mode: 'cors' });
             if (!response.ok) throw new Error('Network response was not ok');
             const blob = await response.blob();
@@ -914,6 +959,7 @@
                     const writable = await fileHandle.createWritable();
                     await writable.write(pdfData);
                     await writable.close();
+                    console.log('PDF已通过文件保存对话框保存');
                     return;
                 } catch (err) {
                     // 用户取消保存或其他错误，使用默认保存方式
@@ -921,9 +967,32 @@
                 }
             }
             
-            // 默认保存方式
-            pdf.save(fileName);
-            setTimeout(() => {}, 0);
+            // 尝试使用pdf.save()
+            try {
+                pdf.save(fileName);
+                console.log('PDF已通过pdf.save()保存');
+                return;
+            } catch (saveErr) {
+                console.log('pdf.save()错误:', saveErr);
+            }
+            
+            // 降级方案：使用Blob和URL.createObjectURL
+            try {
+                const pdfBlob = pdf.output('blob');
+                const url = URL.createObjectURL(pdfBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                console.log('PDF已通过Blob降级方案保存');
+                return;
+            } catch (blobErr) {
+                console.log('Blob降级方案错误:', blobErr);
+                throw new Error('无法保存PDF文件，请检查浏览器设置或权限');
+            }
         } catch (error) {
             console.error('Export failed:', error);
             alert('导出过程中发生错误: ' + error.message);
@@ -1045,6 +1114,7 @@
                     const writable = await fileHandle.createWritable();
                     await writable.write(arrayBuffer);
                     await writable.close();
+                    console.log('Word已通过文件保存对话框保存');
                     return;
                 } catch (err) {
                     // 用户取消保存或其他错误，使用默认保存方式
@@ -1052,9 +1122,22 @@
                 }
             }
             
-            // 默认保存方式
-            downloadBlob(docxBlob, fileName);
-            setTimeout(() => {}, 0);
+            // 降级方案：使用Blob和URL.createObjectURL
+            try {
+                const url = URL.createObjectURL(docxBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                console.log('Word已通过Blob降级方案保存');
+                return;
+            } catch (blobErr) {
+                console.log('Blob降级方案错误:', blobErr);
+                throw new Error('无法保存Word文件，请检查浏览器设置或权限');
+            }
         } catch (error) {
             console.error('Export failed:', error);
             alert('导出过程中发生错误: ' + error.message);
