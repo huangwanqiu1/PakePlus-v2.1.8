@@ -1947,6 +1947,22 @@
             try {
                 // 检查是否在线
                 if (navigator.onLine && window.supabase && typeof window.supabase.from === 'function') {
+                    // 检查是否有有效的认证 session
+                    const { data: { session }, error: sessionError } = await window.supabase.auth.getSession();
+                    
+                    if (sessionError || !session) {
+                        console.error('❌ 没有有效的认证 session，无法保存到 Supabase');
+                        console.error('❌ Session 错误:', sessionError);
+                        
+                        // 直接提示用户重新登录，不尝试自动重新登录（出于安全考虑）
+                        console.error('❌ 认证已过期，请重新登录');
+                        showNotification('认证已过期，请重新登录', true);
+                        setTimeout(() => {
+                            window.location.href = 'index.html';
+                        }, 2000);
+                        return false;
+                    }
+                    
                     // 在线时直接保存到云端
                 const { data, error } = await window.supabase
                     .from('projects')
@@ -1958,6 +1974,15 @@
                     console.error('❌ 错误详情 - 消息:', error.message);
                     console.error('❌ 错误详情 - 详情:', error.details);
                     console.error('❌ 发送的数据:', projectData);
+                    
+                    // 如果是 RLS 策略错误，提示用户重新登录
+                    if (error.code === '42501' || error.message.includes('row-level security')) {
+                        showNotification('认证已过期，请重新登录', true);
+                        setTimeout(() => {
+                            window.location.href = 'index.html';
+                        }, 2000);
+                        return false;
+                    }
                     
                     // 如果云端保存失败，添加到同步队列
                     if (window.offlineSyncService) {
@@ -2623,7 +2648,8 @@
                 'construction_logs',
                 'project_expenses',
                 'project_income',
-                'work_records'
+                'work_records',
+                'user_projects' // 用户项目权限表
             ];
             
             console.log('开始删除依赖表数据...');
@@ -2820,67 +2846,66 @@
                     return;
                 }
 
-                // 获取当前登录用户的密码
-                let currentUser = {};
-                try {
-                    const currentUserStr = localStorage.getItem('currentUser');
-                    if (currentUserStr) {
-                        currentUser = JSON.parse(currentUserStr);
-                    }
-                } catch (e) {
-                    console.error('解析currentUser失败:', e);
-                }
-
-                if (!currentUser.password) {
-                    // 如果本地没有存储密码（异常情况），尝试重新登录或提示
-                    console.error('未找到用户密码信息');
-                    showNotification('用户信息异常，请重新登录', true);
+                // 先检查网络状态
+                if (!navigator.onLine) {
+                    // 离线模式，提示用户联网后再删除
+                    showNotification('请联网后再删除该项目', true);
                     return;
                 }
-
-                // 验证密码
-                if (inputPassword !== currentUser.password) {
+                
+                // 获取当前登录用户信息
+                const currentUserStr = localStorage.getItem('currentUser');
+                if (!currentUserStr) {
+                    showNotification('获取用户信息失败，请重新登录', true);
+                    return;
+                }
+                
+                const userData = JSON.parse(currentUserStr);
+                
+                // 从用户数据中获取邮箱
+                const userEmail = userData.email;
+                
+                if (!userEmail) {
+                    console.error('[删除项目] 用户信息中缺少email');
+                    showNotification('获取用户邮箱失败，请重新登录', true);
+                    return;
+                }
+                
+                // 使用 Supabase Auth API 验证密码（通过重新登录验证）
+                console.log('[删除项目] 验证密码');
+                
+                const { data: authData, error: authError } = await window.supabase.auth.signInWithPassword({
+                    email: userEmail,
+                    password: inputPassword
+                });
+                
+                if (authError) {
+                    console.log('[删除项目] 密码验证失败:', authError);
                     showNotification('密码错误，无法删除项目！', true);
                     return;
                 }
+                
+                console.log('[删除项目] 密码验证成功');
 
                 // 密码验证通过，继续执行删除逻辑
                 
-                // 检查网络状态
-                if (navigator.onLine) {
-                    // 在线模式
-                    showNotification('正在删除项目及关联数据...', false);
-                    
-                    // 1. 删除关联的数据库记录
-                    await deleteProjectRelatedData(projectToDeleteId);
-                    
-                    // 2. 删除关联的存储文件
-                    await deleteProjectStorage(projectToDeleteId);
+                // 在线模式
+                showNotification('正在删除项目及关联数据...', false);
+                
+                // 1. 删除关联的数据库记录
+                await deleteProjectRelatedData(projectToDeleteId);
+                
+                // 2. 删除关联的存储文件
+                await deleteProjectStorage(projectToDeleteId);
 
-                    // 3. 删除项目本身
-                    const { error } = await supabase
-                        .from('projects')
-                        .delete()
-                        .eq('project_id', projectToDeleteId);
+                // 3. 删除项目本身
+                const { error } = await supabase
+                    .from('projects')
+                    .delete()
+                    .eq('project_id', projectToDeleteId);
 
-                    if (error) {
-                        throw error;
-                    }
-                } else {
-                    // 离线模式
-                    showNotification('离线模式：正在本地删除并添加到同步队列...', false);
-                    
-                    // 1. 清理本地数据
-                    deleteProjectLocalData(projectToDeleteId);
-                    
-                    // 2. 添加到同步队列（使用特殊的操作类型 '删除项目关联数据'）
-                    if (window.offlineSyncService) {
-                        window.offlineSyncService.addToSyncQueue('删除项目关联数据', { projectId: projectToDeleteId }, projectToDeleteId, 'project');
-                        console.log('已添加完整删除任务到同步队列');
-                    } else {
-                        console.warn('离线同步服务未初始化，无法添加同步任务');
-                        showNotification('同步服务未启动，离线删除可能无法同步到云端', true);
-                    }
+                if (error) {
+                    throw error;
                 }
 
                 // 查找项目 - 使用正确的project_id字段
