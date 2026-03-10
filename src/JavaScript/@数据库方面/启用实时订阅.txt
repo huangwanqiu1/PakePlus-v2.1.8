@@ -1,0 +1,11 @@
+-- 为 attendance_records 表启用实时订阅
+ALTER PUBLICATION supabase_realtime ADD TABLE public.attendance_records;
+
+-- 为 employees 表启用实时订阅
+ALTER PUBLICATION supabase_realtime ADD TABLE public.employees;
+
+-- 为 project_expenses 表启用实时订阅
+ALTER PUBLICATION supabase_realtime ADD TABLE public.project_expenses;
+
+-- 为 settlement_records 表启用实时订阅
+ALTER PUBLICATION supabase_realtime ADD TABLE public.settlement_records;
