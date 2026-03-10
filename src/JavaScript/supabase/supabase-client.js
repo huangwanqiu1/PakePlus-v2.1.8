@@ -7,7 +7,7 @@
     if (typeof window.supabase === 'undefined') {
         // 优先尝试加载本地Supabase客户端库
         const script = document.createElement('script');
-        script.src = './supabase.min.js';
+        script.src = 'JavaScript/supabase/supabase.min.js';
         script.async = false; // 同步加载以确保库在初始化前可用
         script.onload = initSupabaseClient;
         script.onerror = function() {
@@ -31,56 +31,16 @@
         try {
             // Supabase配置
             const supabaseUrl = 'https://oydffrzzulsrbitrrhht.supabase.co';
-            const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95ZGZmcnp6dWxzcmJpdHJyaGh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0MjcxNDEsImV4cCI6MjA3OTAwMzE0MX0.LFMDgx8eNyE3pVjVYgHqhtvaC--vP4-MtXL8fY3_v-s';
+            const supabaseKey = 'sb_publishable_l3-6N3-RsAmbns6JCOusHg_XPFd4jf7';
             
             // 创建客户端实例时配置全局头信息
             window.supabase = supabase.createClient(supabaseUrl, supabaseKey, {
                 auth: {
-                    persistSession: false, // 禁用自动持久化会话
-                    autoRefreshToken: false, // 禁用自动刷新令牌
-                    detectSessionInUrl: false, // 禁用URL中的会话检测
-                    storage: {
-                        // 使用内存存储代替localStorage，避免使用cookie
-                        getItem: () => null,
-                        setItem: () => {},
-                        removeItem: () => {}
-                    }
-                },
-                global: {
-                        fetch: async (url, options = {}) => {
-                            // 获取当前会话，如果有用户登录则使用用户的访问令牌
-                            const getCurrentAuthToken = async () => {
-                                try {
-                                    // 尝试从本地存储获取用户信息
-                                    const currentUserStr = localStorage.getItem('currentUser');
-                                    if (currentUserStr) {
-                                        // 从本地存储的用户信息中获取令牌
-                                        // 注意：这里我们不依赖Supabase的会话管理
-                                        return supabaseKey; // 使用匿名密钥
-                                    }
-                                } catch (e) {
-                                    // 如果获取失败，使用匿名密钥
-                                    console.error('获取用户访问令牌失败:', e);
-                                }
-                                return supabaseKey;
-                            };
-                            
-                            const authToken = await getCurrentAuthToken();
-                            const headers = {
-                                'Accept': 'application/json',
-                                'Content-Type': 'application/json',
-                                'apikey': supabaseKey,
-                                'Authorization': `Bearer ${authToken}`,
-                                ...options.headers
-                            };
-                            
-                            // 拦截响应以添加调试信息
-                            const originalFetch = window.fetch;
-                            return originalFetch(url, { ...options, headers }).then(response => {
-                                return response;
-                            });
-                        }
-                    }
+                    persistSession: true, // 启用自动持久化会话
+                    autoRefreshToken: true, // 启用自动刷新令牌
+                    detectSessionInUrl: true, // 启用URL中的会话检测
+                    storage: window.localStorage // 使用 localStorage 存储 session
+                }
             });
             
             // 设置初始化状态
