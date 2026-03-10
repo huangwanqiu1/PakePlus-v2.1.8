@@ -21,15 +21,81 @@ class WorkOrderPDFGenerator {
                         window.workOrderPDFCreator.generateWorkOrderPDF();
                     }
                 } else {
-                    // 按钮显示为"生成表格"，执行原有的PDF生成功能
-                    this.generatePdfReport();
+                    // 按钮显示为"生成表格"，显示生成范围选择模态框
+                    this.showGenerateRangeModal();
                 }
             });
         }
     }
 
+    // 显示生成范围选择模态框
+    showGenerateRangeModal() {
+        // 检查模态框是否已存在
+        let modal = document.getElementById('pdfGenerateRangeModal');
+        if (!modal) {
+            // 创建模态框
+            modal = document.createElement('div');
+            modal.id = 'pdfGenerateRangeModal';
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div style="background: white; border-radius: 12px; padding: 20px; width: 320px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);">
+                    <h3 style="color: #ED7D31; margin-bottom: 15px; font-size: 18px; text-align: center;">选择生成范围</h3>
+                    <div style="display: flex; gap: 15px; justify-content: center; margin-bottom: 15px;">
+                        <div style="flex: 1; padding: 15px 10px; border: 2px solid #e2e8f0; border-radius: 8px; cursor: pointer; transition: all 0.3s; background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%); text-align: center;" id="generateAllDataBtn" onmouseover="this.style.borderColor='#667eea'; this.style.boxShadow='0 8px 20px rgba(102, 126, 234, 0.2)';" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none';">
+                            <div style="font-size: 32px; margin-bottom: 8px;">📂</div>
+                            <div style="font-size: 14px; font-weight: bold; color: #374151; margin-bottom: 4px; text-align: center;">全部数据</div>
+                            <div style="font-size: 11px; color: #64748b; text-align: center;">生成所有记录</div>
+                        </div>
+                        <div style="flex: 1; padding: 15px 10px; border: 2px solid #e2e8f0; border-radius: 8px; cursor: pointer; transition: all 0.3s; background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%); text-align: center;" id="generateVisibleDataBtn" onmouseover="this.style.borderColor='#10b981'; this.style.boxShadow='0 8px 20px rgba(16, 185, 129, 0.2)';" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none';">
+                            <div style="font-size: 32px; margin-bottom: 8px;">📑</div>
+                            <div style="font-size: 14px; font-weight: bold; color: #374151; margin-bottom: 4px; text-align: center;">表内显示数据</div>
+                            <div style="font-size: 11px; color: #64748b; text-align: center;">只生成当前表格数据</div>
+                        </div>
+                    </div>
+                    <div style="text-align: center;">
+                        <button id="cancelGenerateBtn" style="background-color: #64748b; color: white; border: none; padding: 10px 30px; border-radius: 6px; cursor: pointer; font-size: 14px;" onmouseover="this.style.backgroundColor='#475569'" onmouseout="this.style.backgroundColor='#64748b'">取消</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            // 绑定按钮事件
+            document.getElementById('generateAllDataBtn').addEventListener('click', () => {
+                this.generatePdfReport(false);
+                this.closeModal();
+            });
+
+            document.getElementById('generateVisibleDataBtn').addEventListener('click', () => {
+                this.generatePdfReport(true);
+                this.closeModal();
+            });
+
+            document.getElementById('cancelGenerateBtn').addEventListener('click', () => {
+                this.closeModal();
+            });
+
+            // 点击模态框外部关闭
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    this.closeModal();
+                }
+            });
+        } else {
+            modal.style.display = 'flex';
+        }
+    }
+
+    // 关闭模态框
+    closeModal() {
+        const modal = document.getElementById('pdfGenerateRangeModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+
     // 生成PDF报告
-    async generatePdfReport() {
+    async generatePdfReport(onlyVisibleData = false) {
         try {
             // 检查是否加载了必要的PDF库
             if (typeof jspdf === 'undefined' || typeof html2canvas === 'undefined') {
@@ -41,17 +107,27 @@ class WorkOrderPDFGenerator {
             const projectId = localStorage.getItem('currentProjectId');
             const projectName = localStorage.getItem('currentProjectName') || '未知项目';
 
-            // 从数据库查询点工单数据
-            const { data: workOrders, error } = await supabase
-                .from('work_records')
-                .select('*')
-                .eq('project_id', projectId)
-                .order('record_date', { ascending: true });
+            // 根据参数决定使用全部数据还是只使用表格内显示的数据
+            let workOrders;
+            if (onlyVisibleData && typeof currentTableData !== 'undefined' && currentTableData.length > 0) {
+                // 使用表格内显示的数据
+                workOrders = currentTableData;
+                console.log('使用表格内显示的数据生成PDF，记录数:', workOrders.length);
+            } else {
+                // 从数据库查询所有点工单数据
+                const { data: allWorkOrders, error } = await supabase
+                    .from('work_records')
+                    .select('*')
+                    .eq('project_id', projectId)
+                    .order('record_date', { ascending: true });
 
-            if (error) {
-                console.error('查询点工单数据失败:', error);
-                alert('获取数据失败，请重试');
-                return;
+                if (error) {
+                    console.error('查询点工单数据失败:', error);
+                    alert('获取数据失败，请重试');
+                    return;
+                }
+                workOrders = allWorkOrders;
+                console.log('使用全部数据生成PDF，记录数:', workOrders.length);
             }
 
             // 计算合计金额
@@ -303,19 +379,43 @@ class WorkOrderPDFGenerator {
                     const writable = await fileHandle.createWritable();
                     await writable.write(pdfData);
                     await writable.close();
+                    console.log('PDF已通过文件保存对话框保存');
+                    return true;
                 } catch (err) {
                     // 用户取消保存或其他错误，使用默认保存方式
                     console.log('文件保存对话框错误:', err);
-                    doc.save(fileName);
                 }
-            } else {
-                // 默认保存方式
+            }
+            
+            // 尝试使用pdf.save()
+            try {
                 doc.save(fileName);
+                console.log('PDF已通过pdf.save()保存');
+                return true;
+            } catch (saveErr) {
+                console.log('pdf.save()错误:', saveErr);
+            }
+            
+            // 降级方案：使用Blob和URL.createObjectURL
+            try {
+                const pdfBlob = doc.output('blob');
+                const url = URL.createObjectURL(pdfBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                console.log('PDF已通过Blob降级方案保存');
+                return true;
+            } catch (blobErr) {
+                console.log('Blob降级方案错误:', blobErr);
+                throw new Error('无法保存PDF文件，请检查浏览器设置或权限');
             }
 
             // 清理临时元素
             document.body.removeChild(tempDiv);
-
         } catch (error) {
             console.error('生成PDF失败:', error);
             alert('生成PDF失败，请重试');
