@@ -798,7 +798,7 @@ class WorkRecordAPI {
     async _uploadImagesToSupabase(images, projectId, recordDate) {
         const uploadedUrls = [];
         const bucketName = 'FYKQ';
-        const folderName = `${projectId}/temporaryworker`;
+        const folderName = `${projectId}/temporaryworker/${recordDate}`;
         const supabaseProjectId = 'oydffrzzulsrbitrrhht';
 
         for (const image of images) {
@@ -829,15 +829,32 @@ class WorkRecordAPI {
                     convertedName = this._convertChineseToEnglish(originalName);
                 }
                 
+                // 不添加时间戳，直接使用转换后的文件名
                 const uniqueFileName = convertedName;
                 const fileName = `${folderName}/${uniqueFileName}.${fileExtension}`;
 
-                await this._uploadFileWithTus(supabaseProjectId, bucketName, fileName, processedImage);
+                // 使用Supabase客户端的存储上传方法
+                const { data, error } = await this.supabase
+                    .storage
+                    .from(bucketName)
+                    .upload(fileName, processedImage, {
+                        cacheControl: '3600',
+                        upsert: true
+                    });
+
+                if (error) {
+                    throw error;
+                }
                 
-                const encodedFileName = encodeURIComponent(fileName);
-                const imageUrl = `https://${supabaseProjectId}.supabase.co/storage/v1/object/public/${bucketName}/${encodedFileName}`;
+                // 获取公开URL
+                const { data: urlData } = this.supabase
+                    .storage
+                    .from(bucketName)
+                    .getPublicUrl(fileName);
                 
-                uploadedUrls.push(imageUrl);
+                if (urlData.publicUrl) {
+                    uploadedUrls.push(urlData.publicUrl);
+                }
             } catch (error) {
                 console.error('上传图片失败:', error);
             }
@@ -861,7 +878,7 @@ class WorkRecordAPI {
                     convertedName = this._convertChineseToEnglish(originalName);
                 }
                 
-                const folderName = `${projectId}/temporaryworker`;
+                const folderName = `${projectId}/temporaryworker/${recordDate}`;
                 const fileName = `${folderName}/${convertedName}.${fileExtension}`;
 
                 const localImageUrl = await this._saveSingleImageToLocal(image, fileName);
@@ -1008,7 +1025,7 @@ class WorkRecordAPI {
 
     async _uploadFileWithTus(supabaseProjectId, bucketName, fileName, file) {
         return new Promise((resolve, reject) => {
-            const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95ZGZmcnp6dWxzcmJpdHJyaGh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0MjcxNDEsImV4cCI6MjA3OTAwMzE0MX0.LFMDgx8eNyE3pVjVYgHqhtvaC--vP4-MtXL8fY3_v-s';
+            const token = 'sb_publishable_l3-6N3-RsAmbns6JCOusHg_XPFd4jf7';
 
             // 移除metadata中的JSON.stringify嵌套，直接使用对象
             // 某些版本的TUS客户端或服务器端可能对嵌套的JSON字符串处理有问题
