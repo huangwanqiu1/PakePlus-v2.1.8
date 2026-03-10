@@ -5785,6 +5785,10 @@
                         let markedEmployeeIds = [];
                         // 直接从本地存储获取已记员工ID，避免依赖workRecordMarker的异步操作
                         try {
+                            // 检查当前是否在记工流水标签页，如果是则跳过工作类型检查
+                            const tabWorkFlow = document.getElementById('tabWorkFlow');
+                            const isWorkFlowTab = tabWorkFlow && tabWorkFlow.checked;
+                            
                             // 获取用户ID，与workRecordMarker保持一致
                             let userId = 'default';
                             const currentUserStr = localStorage.getItem('currentUser');
@@ -5797,8 +5801,13 @@
                             const workDateInput = document.getElementById('workDate');
                             const workDate = workDateInput ? workDateInput.value : new Date().toISOString().split('T')[0];
                             
-                            // 获取当前工作类型
+                            // 获取当前工作类型（仅在记工标签页中需要）
                             const currentWorkType = (() => {
+                                // 如果在记工流水标签页，返回null，因为记工流水不需要工作类型
+                                if (isWorkFlowTab) {
+                                    return null;
+                                }
+                                
                                 // 查找当前激活的工作类型选项
                                 const activeOption = document.querySelector('input[name="workType"] + .work-type-option.active');
                                 if (activeOption) {
@@ -5818,7 +5827,7 @@
                                 return null;
                             })();
                             
-                            if (!currentWorkType) {
+                            if (!currentWorkType && !isWorkFlowTab) {
                                 throw new Error('无法获取当前工作类型');
                             }
                             
@@ -5832,7 +5841,7 @@
                                 const filteredRecords = allRecords.filter(record => 
                                     record.project_id === projectId && 
                                     record.record_date === workDate && 
-                                    record.work_type === currentWorkType
+                                    (isWorkFlowTab || record.work_type === currentWorkType)
                                 );
                                 
                                 // 将过滤后的记录的员工ID添加到已记工集合
