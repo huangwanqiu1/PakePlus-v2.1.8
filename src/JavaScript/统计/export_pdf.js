@@ -150,32 +150,86 @@ async function generatePDF() {
             window.workerStatistic.cachedData) {
             
             try {
-                const totalContainer = document.createElement('div');
-                totalContainer.style.position = 'absolute';
-                totalContainer.style.top = '-10000px';
-                totalContainer.style.left = '0';
-                totalContainer.style.width = element.offsetWidth + 'px';
-                totalContainer.style.zIndex = '-1000';
-                totalContainer.style.background = '#fff';
-                totalContainer.style.padding = '20px';
+                // 获取当前筛选条件
+                const filters = window.workerStatistic.getFilters();
                 
-                document.body.appendChild(totalContainer);
+                // 过滤数据：根据员工、日期、类型进行过滤
+                let filteredData = window.workerStatistic.cachedData;
                 
-                const originalStatContainer = window.workerStatistic.statContainer;
-                window.workerStatistic.statContainer = totalContainer;
-                window.workerStatistic.renderTotalView(window.workerStatistic.cachedData);
+                // 1. 员工过滤
+                if (filters.selectedEmployees && filters.selectedEmployees.length > 0) {
+                    filteredData = filteredData.filter(item => 
+                        filters.selectedEmployees.includes(item.employee_id)
+                    );
+                }
                 
-                totalCanvas = await html2canvas(totalContainer, {
-                    scale: 2,
-                    useCORS: true,
-                    logging: false,
-                    backgroundColor: '#ffffff',
-                    windowWidth: totalContainer.scrollWidth,
-                    windowHeight: totalContainer.scrollHeight
-                });
+                // 2. 日期过滤
+                if (!filters.dateFilter.isAll) {
+                    if (filters.dateFilter.dateRange) {
+                        const [startDate, endDate] = filters.dateFilter.dateRange;
+                        filteredData = filteredData.filter(item => {
+                            const recordDate = item.record_date || item.date;
+                            return recordDate >= startDate && recordDate <= endDate;
+                        });
+                    } else if (filters.dateFilter.singleDate) {
+                        filteredData = filteredData.filter(item => {
+                            const recordDate = item.record_date || item.date;
+                            return recordDate === filters.dateFilter.singleDate;
+                        });
+                    }
+                }
                 
-                window.workerStatistic.statContainer = originalStatContainer;
-                document.body.removeChild(totalContainer);
+                // 3. 类型过滤
+                if (filters.selectedTypes && filters.selectedTypes.length > 0) {
+                    // 定义类型分类
+                    const workTypes = ['点工', '包工', '工量']; // 记工类型
+                    const accountingTypes = ['借支', '扣款', '公司转账', '结算']; // 记账类型
+                    
+                    filteredData = filteredData.filter(item => {
+                        // 检查是否是考勤记录
+                        if (item.work_type) {
+                            return workTypes.includes(item.work_type) && filters.selectedTypes.includes(item.work_type);
+                        }
+                        // 检查是否是结算记录
+                        if (item.record_type) {
+                            return accountingTypes.includes(item.record_type) && filters.selectedTypes.includes(item.record_type);
+                        }
+                        return false;
+                    });
+                }
+
+                // 如果没有过滤后的数据，不显示合计
+                if (filteredData.length === 0) {
+                    console.log('没有符合筛选条件的数据，跳过合计卡片');
+                } else {
+                    const totalContainer = document.createElement('div');
+                    totalContainer.style.position = 'absolute';
+                    totalContainer.style.top = '-10000px';
+                    totalContainer.style.left = '0';
+                    totalContainer.style.width = element.offsetWidth + 'px';
+                    totalContainer.style.zIndex = '-1000';
+                    totalContainer.style.background = '#fff';
+                    totalContainer.style.padding = '20px';
+                    
+                    document.body.appendChild(totalContainer);
+                    
+                    const originalStatContainer = window.workerStatistic.statContainer;
+                    window.workerStatistic.statContainer = totalContainer;
+                    // 使用过滤后的数据渲染合计
+                    window.workerStatistic.renderTotalView(filteredData);
+                    
+                    totalCanvas = await html2canvas(totalContainer, {
+                        scale: 2,
+                        useCORS: true,
+                        logging: false,
+                        backgroundColor: '#ffffff',
+                        windowWidth: totalContainer.scrollWidth,
+                        windowHeight: totalContainer.scrollHeight
+                    });
+                    
+                    window.workerStatistic.statContainer = originalStatContainer;
+                    document.body.removeChild(totalContainer);
+                }
                 
             } catch (e) {
                 console.error('生成合计卡片失败:', e);
@@ -318,6 +372,7 @@ async function generatePDF() {
                 const writable = await fileHandle.createWritable();
                 await writable.write(pdfData);
                 await writable.close();
+                console.log('PDF已通过文件保存对话框保存');
                 return;
             } catch (err) {
                 // 用户取消保存或其他错误，使用默认保存方式
@@ -325,8 +380,32 @@ async function generatePDF() {
             }
         }
         
-        // 默认保存方式
-        pdf.save(fileName);
+        // 尝试使用pdf.save()
+        try {
+            pdf.save(fileName);
+            console.log('PDF已通过pdf.save()保存');
+            return;
+        } catch (saveErr) {
+            console.log('pdf.save()错误:', saveErr);
+        }
+        
+        // 降级方案：使用Blob和URL.createObjectURL
+        try {
+            const pdfBlob = pdf.output('blob');
+            const url = URL.createObjectURL(pdfBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            console.log('PDF已通过Blob降级方案保存');
+            return;
+        } catch (blobErr) {
+            console.log('Blob降级方案错误:', blobErr);
+            throw new Error('无法保存PDF文件，请检查浏览器设置或权限');
+        }
 
     } catch (error) {
         console.error('PDF generation failed:', error);
