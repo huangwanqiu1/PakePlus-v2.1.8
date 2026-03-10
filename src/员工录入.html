@@ -339,6 +339,7 @@
                             console.log('员工数据已成功更新到Supabase');
                             console.log('✅ 员工修改成功！员工信息已更新到云端数据库');
                             showNotification('员工修改成功!', false);
+                            playSuccessSound();
                             
                             // 从数据库查询最新数据，获取正确的时间戳
                             if (employeeUniqueId) {
@@ -370,6 +371,7 @@
                             }
                             console.log('✅ 员工修改成功！员工信息已保存到同步队列，将在网络恢复后自动同步');
                         showNotification('员工修改成功，将在网络恢复后自动同步到云端', false);
+                        playSuccessSound();
                         }
                     } catch (supabaseError) {
                         console.error('Supabase操作异常:', supabaseError);
@@ -378,6 +380,7 @@
                             window.offlineSyncService.addToSyncQueue('update', supabaseEmployee, employeeUniqueId);
                         }
                         showNotification('员工修改成功，将在网络恢复后自动同步到云端', false);
+                        playSuccessSound();
                     }
                 } else {
                     // 离线状态，添加到同步队列
@@ -386,6 +389,7 @@
                     }
                     console.log('✅ 员工修改成功！员工信息已保存到离线同步队列');
                     showNotification('员工修改成功（离线模式），将在网络恢复后自动同步', false);
+                    playSuccessSound();
                 }
             } catch (error) {
                 console.error('处理员工修改时出错:', error);
@@ -400,6 +404,7 @@
                 // 显示本地删除成功通知
                 const isOnline = window.offlineSyncService && window.offlineSyncService.syncStatus.isOnline;
                 showNotification(isOnline ? '员工删除成功' : '员工删除成功（本地保存）', false);
+                playSuccessSound();
 
                 // 然后异步删除云端数据
                 setTimeout(async () => {
@@ -714,6 +719,7 @@
                         const writable = await fileHandle.createWritable();
                         await writable.write(buffer);
                         await writable.close();
+                        console.log('Excel已通过文件保存对话框保存');
                         showNotification('员工信息Excel生成成功', false);
                         
                         // 关闭模态框
@@ -725,12 +731,38 @@
                     }
                 }
                 
-                // 默认保存方式
-                saveAs(blob, defaultFilename);
-                showNotification('员工信息Excel生成成功', false);
-
-                // 关闭模态框
-                document.getElementById('export-choice-modal').style.display = 'none';
+                // 尝试使用saveAs
+                try {
+                    saveAs(blob, defaultFilename);
+                    console.log('Excel已通过saveAs保存');
+                    showNotification('员工信息Excel生成成功', false);
+                    
+                    // 关闭模态框
+                    document.getElementById('export-choice-modal').style.display = 'none';
+                    return;
+                } catch (saveAsErr) {
+                    console.log('saveAs错误:', saveAsErr);
+                }
+                
+                // 降级方案：使用Blob和URL.createObjectURL
+                try {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = defaultFilename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    console.log('Excel已通过Blob降级方案保存');
+                    showNotification('员工信息Excel生成成功', false);
+                    
+                    // 关闭模态框
+                    document.getElementById('export-choice-modal').style.display = 'none';
+                } catch (blobErr) {
+                    console.log('Blob降级方案错误:', blobErr);
+                    throw new Error('无法保存Excel文件，请检查浏览器设置或权限');
+                }
             } catch (e) {
                 showNotification(`生成Excel失败：${e.message}`, true);
             }
@@ -950,6 +982,11 @@
             margin-left: auto;
         }
         
+        .filter-button-container {
+            display: flex;
+            margin-left: auto; /* 让筛选按钮容器靠右 */
+        }
+        
         button {
             padding: 4px 12px;
             border: none;
@@ -983,7 +1020,14 @@
             box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
         }
         
-        #add-btn, #edit-btn, #delete-btn, #filter-btn {
+        #add-btn, #edit-btn, #delete-btn {
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+            color: white;
+            border: 2px solid rgba(100, 116, 139, 0.3);
+            padding: 4px 8px; /* 减小水平内边距以减小宽度 */
+        }
+        
+        #filter-btn {
             background: linear-gradient(135deg, #64748b 0%, #475569 100%);
             color: white;
             border: 2px solid rgba(100, 116, 139, 0.3);
@@ -1588,17 +1632,32 @@
 
         /* 小屏幕适配样式 */
         @media screen and (max-width: 800px) {
-            /* 调整按钮和容器间距 */
+            /* 调整按钮和容器间距，允许换行 */
             .button-frame {
                 padding: 6px 10px;
                 gap: 6px;
                 justify-content: flex-start;
+                flex-wrap: wrap; /* 允许按钮区域换行 */
             }
 
-            /* 调整复选框组大小 */
+            /* 调整复选框组大小，允许项目名称框换行 */
             .checkbox-group {
                 padding: 6px 8px;
                 gap: 8px;
+                flex-wrap: wrap; /* 允许换行，让项目名称框可以换行显示 */
+            }
+            
+            /* 确保隐藏/折叠按钮始终水平排列 */
+            .checkbox-group .checkbox-item {
+                flex-shrink: 0; /* 防止按钮被压缩 */
+            }
+            
+            /* 允许项目名称框在小屏幕上换行 */
+            #project-name {
+                white-space: normal; /* 允许文本换行 */
+                min-width: 100px; /* 设置最小宽度 */
+                max-width: 100%; /* 最大宽度为父容器宽度 */
+                text-align: center; /* 文本居中显示 */
             }
 
             .checkbox-item {
@@ -1637,9 +1696,10 @@
                 height: 28px;
             }
 
-            /* 调整按钮组间距 */
+            /* 调整按钮组间距，允许换行 */
             .button-group, .right-buttons {
                 gap: 4px;
+                flex-wrap: wrap; /* 允许按钮换行显示 */
             }
 
             /* 表格容器样式调整 - 确保出现滚动条 */
@@ -1810,6 +1870,8 @@
                 <button id="add-btn">添加</button>
                 <button id="edit-btn">修改</button>
                 <button id="delete-btn">删除</button>
+            </div>
+            <div class="filter-button-container">
                 <button id="filter-btn">筛选</button>
             </div>
         </div>
@@ -3667,6 +3729,7 @@
                 // 显示本地保存成功通知
                 console.log('✅ 员工更新成功！员工信息已处理完成');
                 showNotification(isOnline ? '员工更新成功' : '员工更新成功（本地保存）', false);
+                playSuccessSound();
 
                 // 然后异步保存到云端
                 setTimeout(async () => {
