@@ -525,8 +525,21 @@ class ConstructionLogAPI {
     async _uploadImagesToSupabase(images, projectId, recordDate) {
         const uploadedUrls = [];
         const bucketName = 'FYKQ';
-        const folderName = `${projectId}/ConstructionDailyLog`;
+        const folderName = `${projectId}/ConstructionDailyLog/${recordDate}`;
         const supabaseProjectId = 'oydffrzzulsrbitrrhht';
+
+        let accessToken = null;
+        try {
+            const { data: { session } } = await this.supabase.auth.getSession();
+            accessToken = session?.access_token;
+        } catch (e) {
+            console.error('获取access_token失败:', e);
+        }
+        
+        if (!accessToken) {
+            console.error('未获取到用户认证token，无法上传图片');
+            throw new Error('用户未登录或会话已过期，请重新登录');
+        }
 
         try {
             for (const image of images) {
@@ -552,7 +565,7 @@ class ConstructionLogAPI {
                 const uniqueFileName = convertedName;
                 const fileName = `${folderName}/${uniqueFileName}.${fileExtension}`;
 
-                await this._uploadFileWithTus(supabaseProjectId, bucketName, fileName, processedImage);
+                await this._uploadFileWithTus(supabaseProjectId, accessToken, bucketName, fileName, processedImage);
 
                 const encodedFileName = encodeURIComponent(fileName);
                 const imageUrl = `https://${supabaseProjectId}.supabase.co/storage/v1/object/public/${bucketName}/${encodedFileName}`;
@@ -588,7 +601,7 @@ class ConstructionLogAPI {
                     convertedName = this._convertChineseToEnglish(originalName);
                 }
 
-                const folderName = `${projectId}/ConstructionDailyLog`;
+                const folderName = `${projectId}/ConstructionDailyLog/${recordDate}`;
                 const fileName = `${folderName}/${convertedName}.${fileExtension}`;
 
                 const localImageUrl = await this._saveSingleImageToLocal(image, fileName);
@@ -651,21 +664,46 @@ class ConstructionLogAPI {
     /**
      * 使用tus-js-client上传文件到Supabase
      */
-    async _uploadFileWithTus(supabaseProjectId, bucketName, fileName, file) {
+    async _uploadFileWithTus(supabaseProjectId, accessToken, bucketName, fileName, file) {
+        let uploadFile = file;
+        
+        if (typeof file === 'string' && file.startsWith('data:image/')) {
+            try {
+                const response = await fetch(file);
+                uploadFile = await response.blob();
+            } catch (error) {
+                console.error('转换base64图片失败:', error);
+                throw new Error('Failed to convert base64 string to Blob');
+            }
+        } else if (!(file instanceof File || file instanceof Blob)) {
+            throw new Error('source object may only be an instance of File, Blob, or Reader in this environment');
+        }
+        
         return new Promise((resolve, reject) => {
-            const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95ZGZmcnp6dWxzcmJpdHJyaGh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0MjcxNDEsImV4cCI6MjA3OTAwMzE0MX0.LFMDgx8eNyE3pVjVYgHqhtvaC--vP4-MtXL8fY3_v-s';
+            if (typeof window.tus === 'undefined') {
+                console.error('tus-js-client未加载');
+                reject(new Error('tus-js-client未加载'));
+                return;
+            }
+            
+            if (!window.tus.isSupported) {
+                console.error('当前环境不支持tus-js-client');
+                reject(new Error('当前环境不支持tus-js-client'));
+                return;
+            }
 
-            const upload = new window.tus.Upload(file, {
+            const upload = new window.tus.Upload(uploadFile, {
                 endpoint: `https://${supabaseProjectId}.supabase.co/storage/v1/upload/resumable`,
                 retryDelays: [0, 3000, 5000, 10000, 20000],
                 headers: {
-                    authorization: `Bearer ${token}`,
+                    'apikey': accessToken,
+                    authorization: `Bearer ${accessToken}`,
                     'x-upsert': 'true',
                 },
                 metadata: {
                     bucketName: bucketName,
                     objectName: fileName,
-                    contentType: file.type || 'image/png',
+                    contentType: uploadFile.type || 'image/png',
                     cacheControl: '3600',
                 },
                 uploadDataDuringCreation: true,
@@ -679,7 +717,6 @@ class ConstructionLogAPI {
                     reject(error);
                 },
                 onProgress: (bytesUploaded, bytesTotal) => {
-                    // 上传进度已移除
                 }
             });
 
@@ -687,9 +724,11 @@ class ConstructionLogAPI {
                 if (previousUploads.length) {
                     upload.resumeFromPreviousUpload(previousUploads[0]);
                 }
+                upload.start();
+            }).catch(function (error) {
+                console.error('查找之前的上传失败:', error);
+                upload.start();
             });
-
-            upload.start();
         });
     }
 
