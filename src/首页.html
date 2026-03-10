@@ -2364,6 +2364,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
+                // 检查Supabase客户端是否可用
+                if (!window.supabase) {
+                    console.error('[密码修改] Supabase客户端未初始化');
+                    showNotification('密码修改系统不可用，请稍后再试', true);
+                    return;
+                }
+                
                 // 获取当前用户信息
                 const currentUser = localStorage.getItem('currentUser');
                 if (!currentUser) {
@@ -2374,94 +2381,60 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 const userData = JSON.parse(currentUser);
                 
-                // 从用户数据中获取user_id作为查询条件
-                const userId = userData.user_id;
+                // 第一步：验证当前密码是否正确（通过重新登录验证）
+                console.log('[密码修改] 第一步：验证当前密码');
                 
-                if (!userId) {
-                    console.error('[密码修改] 用户信息中缺少user_id');
-                    showNotification('获取用户标识失败，请重新登录', true);
+                // 从用户数据中获取邮箱
+                const userEmail = userData.email;
+                
+                if (!userEmail) {
+                    console.error('[密码修改] 用户信息中缺少email');
+                    showNotification('获取用户邮箱失败，请重新登录', true);
                     window.redirectToLogin();
                     return;
                 }
                 
-                // 只使用Supabase验证旧密码
-                if (window.supabase && typeof window.supabase.from === 'function') {
-                    try {
-                        // 查询用户的密码进行验证
-                        const { data: userFromDb, error: queryError } = await window.supabase
-                            .from('users')
-                            .select('password')
-                            .eq('user_id', userId)
-                            .single();
-                        
-                        if (queryError) {
-                            console.error('[密码修改] Supabase查询用户密码失败:', queryError);
-                            showNotification('验证旧密码失败，用户不存在或系统错误', true);
-                            return;
-                        }
-                        
-                        // 处理可能是数组的返回数据，获取第一个元素（参考登录逻辑）
-                        const userInfo = Array.isArray(userFromDb) && userFromDb.length > 0 ? userFromDb[0] : userFromDb;
-                        
-                        // 安全比较密码，去除可能的空格并确保字段存在
-                        const dbPassword = userInfo?.password ? String(userInfo.password).trim() : '';
-                        const inputPassword = String(currentPassword).trim();
-                        
-                        // 验证旧密码
-                        if (userInfo && dbPassword === inputPassword) {
-                            console.log('[密码修改] Supabase验证旧密码成功');
-                            
-                            try {
-                                // 验证通过，更新密码
-                                // 创建北京时间（UTC+8）的时间戳
-                                const now = new Date();
-                                const beijingTime = new Date(now.getTime() + 8 * 60 * 60 * 1000); // UTC+8
-                                
-                                const { error: updateError } = await window.supabase
-                                    .from('users')
-                                    .update({ 
-                                        password: newPassword,
-                                        updated_at: beijingTime.toISOString() // 使用统一的updated_at字段
-                                    })
-                                    .eq('user_id', userId);
-                                
-                                if (updateError) {
-                                    console.error('[密码修改] Supabase更新密码失败:', updateError);
-                                    showNotification('密码修改失败，请联系管理员', true);
-                                } else {
-                                    console.log('[密码修改] Supabase密码更新成功');
-                                    
-                                    // 确保用户数据对象结构完整
-                                    const formattedUserData = {
-                                        ...userData,
-                                        password: newPassword,
-                                        updated_at: beijingTime.toISOString(),
-                                        user_id: userId // 确保使用新的主键字段名
-                                    };
-                                    
-                                    // 更新本地存储的用户信息
-                                    localStorage.setItem('currentUser', JSON.stringify(formattedUserData));
-                                    
-                                    showNotification('密码修改成功！');
-                                    closeChangePasswordModal();
-                                    console.log('密码修改流程正常完成');
-                                }
-                            } catch (updateException) {
-                                console.error('[密码修改] 更新密码过程中发生异常:', updateException);
-                                showNotification('密码修改过程中发生异常，请稍后再试', true);
-                            }
-                        } else {
-                            console.log('[密码修改] Supabase密码验证失败');
-                            showNotification('旧密码不正确，请重新输入', true);
-                        }
-                    } catch (queryException) {
-                        console.error('[密码修改] 查询密码过程中发生异常:', queryException);
-                        showNotification('网络异常，无法验证密码，请检查网络连接', true);
-                    }
-                } else {
-                    console.error('[密码修改] Supabase不可用或缺少用户标识');
-                    showNotification('密码验证系统不可用，请稍后再试', true);
+                // 使用当前密码尝试登录以验证
+                const { data: authData, error: authError } = await window.supabase.auth.signInWithPassword({
+                    email: userEmail,
+                    password: currentPassword
+                });
+                
+                if (authError) {
+                    console.log('[密码修改] 当前密码验证失败:', authError);
+                    showNotification('当前密码不正确，请重新输入', true);
+                    return;
                 }
+                
+                console.log('[密码修改] 当前密码验证成功');
+                
+                // 第二步：使用Supabase Auth API更新密码
+                console.log('[密码修改] 第二步：更新密码');
+                
+                const { data: updateData, error: updateError } = await window.supabase.auth.updateUser({
+                    password: newPassword
+                });
+                
+                if (updateError) {
+                    console.error('[密码修改] 更新密码失败:', updateError);
+                    showNotification('密码修改失败：' + updateError.message, true);
+                    return;
+                }
+                
+                console.log('[密码修改] 密码更新成功');
+                
+                // 更新本地存储的用户信息（不存储密码）
+                const formattedUserData = {
+                    ...userData,
+                    user_id: userData.user_id || updateData.user.id
+                };
+                
+                localStorage.setItem('currentUser', JSON.stringify(formattedUserData));
+                
+                showNotification('密码修改成功！');
+                closeChangePasswordModal();
+                console.log('密码修改流程正常完成');
+                
             } catch (error) {
                 console.error('[密码修改] 修改密码失败:', error);
                 showNotification('修改密码失败，请重试', true);
