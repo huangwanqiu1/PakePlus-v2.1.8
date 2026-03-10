@@ -140,6 +140,12 @@ class ProjectFinanceDetail {
             console.log('未知类型，不加载数据:', this.currentType);
         }
         
+        // 数据加载完成后，调整表格容器高度
+        setTimeout(() => {
+            if (typeof window.adjustTableContainerHeight === 'function') {
+                window.adjustTableContainerHeight();
+            }
+        }, 100);
     }
 
     clearTable() {
@@ -1014,6 +1020,16 @@ class ProjectFinanceDetail {
         // 确认删除事件
         if (confirmBtn) {
             confirmBtn.addEventListener('click', async () => {
+                // 检查网络状态
+                const isOnline = navigator.onLine;
+                if (!isOnline) {
+                    // 先关闭密码输入框
+                    closeModal();
+                    // 然后弹出提示
+                    this.showNotification('请联网后再删除', true);
+                    return;
+                }
+                
                 // 获取输入的密码
                 const password = passwordInput?.value || '';
                 
@@ -1048,28 +1064,50 @@ class ProjectFinanceDetail {
         }
     }
     
-    // 验证密码 - 不管是否在线，只验证本地的登录密码
+    // 验证密码 - 使用与首页修改密码相同的逻辑
     async verifyPassword(password) {
         try {
+            console.log('[密码验证] 开始密码验证流程');
+            
             // 获取当前登录用户信息
             const currentUserStr = localStorage.getItem('currentUser');
             if (!currentUserStr) {
-                console.error('未找到当前登录用户信息');
+                console.error('[密码验证] 未找到当前登录用户信息');
                 return false;
             }
             
-            const currentUser = JSON.parse(currentUserStr);
-            const phone = currentUser.phone || currentUser.login_name;
+            const userData = JSON.parse(currentUserStr);
             
-            if (!phone) {
-                console.error('当前登录用户没有电话信息');
+            // 从用户数据中获取邮箱
+            const userEmail = userData.email;
+            
+            if (!userEmail) {
+                console.error('[密码验证] 用户信息中缺少email');
                 return false;
             }
             
-            // 不管是否在线，只使用本地存储的登录信息验证
-            return this.verifyOfflinePassword(phone, password);
+            // 检查Supabase客户端是否可用
+            if (!this.supabase) {
+                console.error('[密码验证] Supabase客户端未初始化');
+                return false;
+            }
+            
+            // 使用当前密码尝试登录以验证（与首页修改密码相同的逻辑）
+            console.log('[密码验证] 使用Supabase Auth验证密码');
+            const { data: authData, error: authError } = await this.supabase.auth.signInWithPassword({
+                email: userEmail,
+                password: password
+            });
+            
+            if (authError) {
+                console.log('[密码验证] 密码验证失败:', authError);
+                return false;
+            }
+            
+            console.log('[密码验证] 密码验证成功');
+            return true;
         } catch (error) {
-            console.error('密码验证失败:', error);
+            console.error('[密码验证] 密码验证失败:', error);
             return false;
         }
     }
@@ -1445,7 +1483,7 @@ class ProjectFinanceDetail {
         }
     }
     
-    showImagePreview(imageUrl) {
+    async showImagePreview(imageUrl) {
         let modal = document.getElementById('imagePreviewModal');
         if (!modal) {
             modal = document.createElement('div');
@@ -1454,10 +1492,36 @@ class ProjectFinanceDetail {
             document.body.appendChild(modal);
         }
 
+        let displayUrl = imageUrl;
+        
+        try {
+            if (imageUrl.includes('supabase.co/storage/v1/object/public/')) {
+                const urlParts = imageUrl.split('supabase.co/storage/v1/object/public/');
+                if (urlParts.length > 1) {
+                    const pathParts = urlParts[1].split('/');
+                    const bucketName = pathParts[0];
+                    const fileName = pathParts.slice(1).join('/');
+                    
+                    if (this.supabase) {
+                        const { data, error } = await this.supabase
+                            .storage
+                            .from(bucketName)
+                            .download(fileName);
+                        
+                        if (!error && data) {
+                            displayUrl = URL.createObjectURL(data);
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('下载图片失败，直接使用原始URL:', error);
+        }
+
         modal.innerHTML = `
             <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2001;" 
                  onclick="if(event.target === this) document.getElementById('imagePreviewModal').style.display='none'">
-                <img id="previewDraggableImage" src="${imageUrl}" 
+                <img id="previewDraggableImage" src="${displayUrl}" 
                      style="max-width: 90%; max-height: 90%; position: absolute; cursor: move; top: 50%; left: 50%; transform: translate(-50%, -50%);"
                      ondragstart="return false;">
                 <button onclick="document.getElementById('imagePreviewModal').style.display='none'" 
@@ -1572,8 +1636,8 @@ class ProjectFinanceDetail {
             
             // 修改序号表头，添加筛选框
             serialNumberTh.innerHTML = `
-                序号 <span id="recordTypeFilterArrow" style="cursor: pointer; margin-left: 4px;">▼</span>
-                <select id="recordTypeFilter" style="margin-left: 8px; padding: 2px 5px; font-size: 12px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.9); color: #333; opacity: 0; position: absolute; pointer-events: none; transition: all 0.3s ease;">
+                <span id="recordTypeFilterArrow" style="cursor: pointer; margin-right: 4px; position: relative;">▼</span>序号
+                <select id="recordTypeFilter" style="padding: 2px 5px; font-size: 12px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.9); color: #333; opacity: 0; position: absolute; left: 0; top: 100%; margin-top: 4px; pointer-events: none; transition: all 0.3s ease; z-index: 1001;">
                     <option value="">全部</option>
                     <option value="project_expenses">项目支出</option>
                     <option value="settlement_records">结算借支</option>
@@ -1976,107 +2040,86 @@ class ProjectFinanceDetail {
     
     // 从在线获取图片
     tryGetImageFromOnline(url, index) {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             // 处理本地URL
             if (url.startsWith('local://')) {
                 reject(new Error('本地URL不使用在线获取'));
                 return;
             }
             
-            // 处理blob URL
-            if (url.startsWith('blob:')) {
-                // 验证blob URL是否有效
-                try {
-                    // 尝试创建URL对象来验证有效性
-                    const testUrl = new URL(url);
-                    if (!testUrl.pathname || url.includes('null/') || url.includes('undefined/')) {
-                        reject(new Error('无效的blob URL'));
-                        return;
+            try {
+                let imageBlob;
+                let originalName;
+                
+                // 检查是否是 Supabase Storage URL
+                if (url.includes('supabase.co/storage/v1/object/public/')) {
+                    // 从URL中解析 bucketName 和 fileName
+                    const urlParts = url.split('supabase.co/storage/v1/object/public/');
+                    if (urlParts.length > 1) {
+                        const pathParts = urlParts[1].split('/');
+                        const bucketName = pathParts[0];
+                        const fileName = pathParts.slice(1).join('/');
+                        
+                        // 解码文件名
+                        originalName = decodeURIComponent(fileName.split('/').pop());
+                        
+                        try {
+                            // 使用 Supabase Storage API 下载图片（带认证）
+                            if (this.supabase) {
+                                const { data, error } = await this.supabase
+                                    .storage
+                                    .from(bucketName)
+                                    .download(fileName);
+                                
+                                if (error) {
+                                    console.error('使用 Supabase API 下载图片失败:', error);
+                                    throw error;
+                                }
+                                
+                                imageBlob = data;
+                            } else {
+                                throw new Error('Supabase 客户端未初始化');
+                            }
+                        } catch (supabaseError) {
+                            console.error('Supabase Storage 下载失败，尝试使用公开 URL:', supabaseError);
+                            // 如果 Supabase API 失败，回退到使用公开 URL
+                            throw new Error('Supabase Storage 下载失败');
+                        }
+                    } else {
+                        throw new Error('无法解析 Supabase Storage URL');
                     }
-                } catch (e) {
-                    reject(new Error('格式错误的blob URL'));
-                    return;
+                } else {
+                    // 非 Supabase URL，使用传统方式下载
+                    originalName = url.split('/').pop().split('?')[0].split('#')[0];
+                    
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    imageBlob = await response.blob();
                 }
                 
-                // 将blob URL转换为File对象
-                fetch(url)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('网络响应不正常');
-                        }
-                        return response.blob();
-                    })
-                    .then(blob => {
-                        // 生成文件名 - 尝试从原始URL中提取文件名，如果无法提取则使用默认命名
-                        let fileName = `image_${Date.now()}_${index}.jpg`;
-                        
-                        // 创建File对象
-                        const file = new File([blob], fileName, { type: blob.type || 'image/jpeg' });
-                        
-                        // 添加到全局图片数组
-                        if (!window.selectedImages) {
-                            window.selectedImages = [];
-                        }
-                        window.selectedImages.push(file);
-
-                        
-                        // 创建图片预览
-                        this.createImagePreview(file, window.selectedImages.length - 1);
-                        
-                        resolve(file);
-                    })
-                    .catch(error => {
-                        reject(error);
-                    });
-                return;
-            }
-            
-            // 处理普通HTTP/HTTPS URL
-            fetch(url)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('网络响应不正常');
-                    }
-                    return response.blob();
-                })
-                .then(blob => {
-                    // 生成文件名 - 从URL中提取原始文件名，避免路径重复
-                    let fileName;
-                    try {
-                        // 从URL中提取最后一个斜杠后的部分作为文件名
-                        const urlObj = new URL(url);
-                        const pathParts = urlObj.pathname.split('/');
-                        const lastPart = pathParts[pathParts.length - 1];
-                        if (lastPart && lastPart.includes('.')) {
-                            // 包含文件名和扩展名
-                            fileName = decodeURIComponent(lastPart);
-                        } else {
-                            // 无法提取有效文件名，使用默认命名
-                            fileName = `image_${Date.now()}_${index}.jpg`;
-                        }
-                    } catch (error) {
-                        // URL解析失败，使用默认命名
-                        fileName = `image_${Date.now()}_${index}.jpg`;
-                    }
-                    
-                    // 创建File对象
-                    const file = new File([blob], fileName, { type: blob.type || 'image/jpeg' });
-                    
-                    // 添加到全局图片数组
-                    if (!window.selectedImages) {
-                        window.selectedImages = [];
-                    }
-                    window.selectedImages.push(file);
-
-                    
-                    // 创建图片预览
-                    this.createImagePreview(file, window.selectedImages.length - 1);
-                    
-                    resolve(file);
-                })
-                .catch(error => {
-                    reject(error);
+                // 创建带有原始文件名的File对象
+                const file = new File([imageBlob], originalName, {
+                    type: imageBlob.type || 'image/jpeg',
+                    lastModified: Date.now()
                 });
+                
+                // 添加到全局图片数组
+                if (!window.selectedImages) {
+                    window.selectedImages = [];
+                }
+                window.selectedImages.push(file);
+                
+                // 创建图片预览
+                this.createImagePreview(file, window.selectedImages.length - 1);
+                
+                resolve(file);
+                
+            } catch (error) {
+                console.error('下载图片失败:', url, error);
+                reject(error);
+            }
         });
     }
     
