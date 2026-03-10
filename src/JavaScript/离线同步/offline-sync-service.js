@@ -59,7 +59,6 @@ class OfflineSyncService {
         
         // 由于实时订阅是在首页初始化的，其他页面可能无法直接访问realtimeSyncService
         // 因此直接处理同步队列，不再依赖实时订阅状态检查
-        console.log('✅ 直接处理同步队列...');
         this.processSyncQueue();
     }
 
@@ -179,7 +178,6 @@ class OfflineSyncService {
                     operation.status = 'completed';
                     operation.result = result; // 保存操作结果
                     results.success++;
-                    console.log(`✅ 操作 ${operation.operation} 成功，${operation.dataType}ID: ${operation.record_id}`);
                 } else if (result.conflict) {
                     operation.status = 'conflict';
                     operation.result = result; // 保存操作结果
@@ -432,12 +430,15 @@ class OfflineSyncService {
             
             // 清理重复的路径部分
             const pathParts = fullPath.split('/');
-            if (pathParts.length > 3) {
-                // 保留前两部分（projectId和folderName）和最后一部分（文件名）
+            if (pathParts.length > 4) {
+                // 路径格式应该是：projectId/attendance/dateStr/filename
+                // 如果超过4个部分，说明有重复，需要清理
+                // 保留前3部分（projectId, attendance, dateStr）和最后一部分（文件名）
                 const projectId = pathParts[0];
                 const folderName = pathParts[1];
+                const dateStr = pathParts[2];
                 const fileName = pathParts[pathParts.length - 1];
-                fullPath = `${projectId}/${folderName}/${fileName}`;
+                fullPath = `${projectId}/${folderName}/${dateStr}/${fileName}`;
             }
 
             // 确保file.name不包含路径，只包含文件名
@@ -1102,7 +1103,6 @@ class OfflineSyncService {
             }
             
             // 删除成功后，清理本地记录
-            console.log(`✅ ${table}记录删除成功，开始清理本地记录`);
             if (table === 'settlement_records') {
                 await this.removeSettlementRecordFromLocalStorage(record_id, data);
             } else if (table === 'project_expenses') {
@@ -1511,7 +1511,7 @@ class OfflineSyncService {
                 endpoint: `https://${projectId}.supabase.co/storage/v1/upload/resumable`,
                 retryDelays: [0, 3000, 5000, 10000, 20000],
                 headers: {
-                    authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95ZGZmcnp6dWxzcmJpdHJyaGh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0MjcxNDEsImV4cCI6MjA3OTAwMzE0MX0.LFMDgx8eNyE3pVjVYgHqhtvaC--vP4-MtXL8fY3_v-s`,
+                    authorization: `Bearer ${accessToken}`,
                     'x-upsert': 'true',
                 },
                 uploadDataDuringCreation: true,
@@ -3471,7 +3471,6 @@ class OfflineSyncService {
      */
     async removeSettlementRecordFromLocalStorage(localRecordId, localRecord) {
         try {
-            console.log(`🔍 开始清理结算借支本地记录: ${localRecordId}`);
             
             const localStorageKeys = ['settlement_records_cache', 'settlementRecords', 'offline_settlement_records'];
             
@@ -3534,8 +3533,6 @@ class OfflineSyncService {
                     console.error(`解析${key}失败:`, parseError);
                 }
             }
-            
-            console.log(`✅ 结算借支本地记录清理完成`);
         } catch (error) {
             console.error('清理结算借支本地记录失败:', error);
         }
