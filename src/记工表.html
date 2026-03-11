@@ -503,6 +503,27 @@
             scroll-behavior: smooth;
         }
         
+        /* 移动端适配：减小类型和总计列的宽度 */
+        @media screen and (max-width: 768px) {
+            /* 类型列在移动端减小宽度 */
+            .timesheet-table th.fixed-col-3,
+            .timesheet-table td.fixed-col-3 {
+                min-width: 40px !important;
+                max-width: 40px !important;
+                left: 100px !important;
+                padding: 8px 2px !important;
+            }
+            
+            /* 总计列在移动端宽度 */
+            .timesheet-table th.fixed-col-4,
+            .timesheet-table td.fixed-col-4 {
+                min-width: 70px !important;
+                max-width: 70px !important;
+                left: 140px !important;
+                padding: 8px 2px !important;
+            }
+        }
+        
         /* 表格内容样式 */
         .timesheet-table .total-row {
             background-color: #f0f0f0;
