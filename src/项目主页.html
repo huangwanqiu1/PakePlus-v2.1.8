@@ -50,6 +50,79 @@
                 flex-direction: row;
             }
         }
+        
+        /* 小屏幕设备优化 */
+        @media (max-width: 480px) {
+            .calendar-container {
+                max-width: 100%;
+            }
+            
+            .calendar-section {
+                max-width: 100%;
+                min-width: 260px;
+            }
+            
+            .calendar-table {
+                width: calc(100% - 20px);
+                margin: 0 10px 5px 10px;
+            }
+            
+            .calendar-header-row th {
+                padding: 6px 2px;
+                font-size: 12px;
+                min-width: 35px;
+            }
+            
+            .calendar-day-cell {
+                min-height: 40px;
+                min-width: 35px;
+                padding: 3px;
+            }
+            
+            .day-number {
+                font-size: 12px;
+                width: 18px;
+                height: 18px;
+                line-height: 18px;
+            }
+            
+            .day-tasks {
+                min-height: 25px;
+                gap: 3px;
+            }
+            
+            .task-text {
+                font-size: 10px;
+            }
+            
+            .action-button {
+                width: 100px;
+                font-size: 12px;
+                padding: 6px 12px;
+            }
+            
+            .actions-grid {
+                grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+                gap: 10px;
+            }
+            
+            .action-card {
+                padding: 6px;
+            }
+            
+            .action-icon {
+                width: 40px;
+                height: 40px;
+            }
+            
+            .action-icon i {
+                font-size: 20px;
+            }
+            
+            .action-text {
+                font-size: 12px;
+            }
+        }
 
         /* 日历看板容器 */
         .calendar-container {
@@ -228,7 +301,7 @@
             width: calc(100% - 30px);
             margin: 0 15px 5px 15px;
             border-collapse: collapse;
-            table-layout: auto;
+            table-layout: fixed;
         }
 
         /* 月份选择器样式 */
