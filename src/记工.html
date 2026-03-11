@@ -310,9 +310,13 @@
                 gap: 10px;
             }
             .employee-list {
-                grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+                grid-template-columns: repeat(5, 1fr);
                 gap: 2px;
                 padding: 5px;
+            }
+            .employee-item {
+                width: 100%;
+                min-width: auto;
             }
             .header {
                 font-size: 20px;
@@ -434,9 +438,13 @@
                 gap: 10px;
             }
             .employee-list {
-                grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+                grid-template-columns: repeat(5, 1fr);
                 gap: 2px;
                 padding: 5px;
+            }
+            .employee-item {
+                width: 100%;
+                min-width: auto;
             }
             .header {
                 font-size: 20px;
@@ -478,8 +486,12 @@
                 padding: 0 8px;
             }
             .employee-list {
-                grid-template-columns: repeat(auto-fill, minmax(45px, 1fr));
+                grid-template-columns: repeat(5, 1fr);
                 font-size: 12px;
+            }
+            .employee-item {
+                width: 100%;
+                min-width: auto;
             }
             .work-type {
                 flex-direction: column;
@@ -593,7 +605,7 @@
         }
         .employee-list {
             min-height: auto;
-            max-height: none;
+            max-height: 300px;
             overflow-y: auto;
             padding: 10px 15px;
             display: grid;
@@ -615,9 +627,9 @@
             transition: all 0.2s ease;
             position: relative;
             font-size: 14px;
-            aspect-ratio: 1/1;
             background: none;
             margin: 0;
+            height: calc((300px - 20px - 3px) / 4);
         }
         .employee-item:hover {
             transform: scale(1.03);
@@ -3269,7 +3281,7 @@
                         employeeList.style.width = '100%';
                         employeeList.style.flexWrap = 'wrap';
                         employeeList.style.gap = '3px';
-                        employeeList.style.maxHeight = 'none';
+                        employeeList.style.maxHeight = '300px';
                         employeeList.style.overflowY = 'auto';
                         employeeList.style.padding = '5px 10px';
                     }
@@ -5365,7 +5377,7 @@
             
             // 在编辑模式下调整员工列表容器高度，与结算借支页面保持一致
             if (employeeList) {
-                employeeList.style.maxHeight = 'none';
+                employeeList.style.maxHeight = '300px';
                 employeeList.style.minHeight = 'auto';
                 employeeList.style.width = '100%';
                 employeeList.style.boxSizing = 'border-box';
