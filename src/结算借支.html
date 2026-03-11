@@ -573,6 +573,7 @@
         }
         .employee-list {
             min-height: auto;
+            max-height: 300px;
             overflow-y: auto;
             padding: 10px 15px;
             display: flex;
@@ -598,6 +599,7 @@
             min-width: 60px;
             background: none;
             margin: 0;
+            height: calc((300px - 20px - 30px) / 4);
         }
         .employee-item:hover {
             transform: scale(1.03);
@@ -797,6 +799,11 @@
                 padding: 5px;
                 align-items: center;
             }
+            .employee-item {
+                width: calc((100% - 20px) / 5);
+                min-width: auto;
+                height: calc((300px - 10px - 15px) / 4);
+            }
             /* 标签页导航在手机界面时保持横向排列 */
             .work-type.tab-navigation {
                 flex-direction: row;
@@ -858,6 +865,11 @@
                 gap: 3px;
                 font-size: 12px;
                 align-items: center;
+            }
+            .employee-item {
+                width: calc((100% - 12px) / 5);
+                min-width: auto;
+                height: calc((300px - 10px - 9px) / 4);
             }
             .work-type {
                 flex-direction: column;
@@ -1800,7 +1812,7 @@
             
             const employeeList = document.getElementById('employeeList');
             if (employeeList) {
-                employeeList.style.maxHeight = 'none';
+                employeeList.style.maxHeight = '300px';
                 employeeList.style.minHeight = 'auto';
                 employeeList.style.width = '100%';
                 employeeList.style.boxSizing = 'border-box';
@@ -1896,7 +1908,7 @@
                 // 在编辑模式下员工列表容器高度根据内容自动调整
                 const employeeList = document.getElementById('employeeList');
                 if (employeeList) {
-                    employeeList.style.maxHeight = 'none';
+                    employeeList.style.maxHeight = '300px';
                     employeeList.style.minHeight = 'auto';
                     employeeList.style.width = '100%';
                     employeeList.style.boxSizing = 'border-box';
@@ -1905,7 +1917,7 @@
                 // 非编辑模式下，员工列表高度根据内容自动调整
                 const employeeList = document.getElementById('employeeList');
                 if (employeeList) {
-                    employeeList.style.maxHeight = 'none';
+                    employeeList.style.maxHeight = '300px';
                     employeeList.style.minHeight = 'auto';
                 }
             }
