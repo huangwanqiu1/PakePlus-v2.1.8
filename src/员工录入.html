@@ -1640,11 +1640,45 @@
                 flex-wrap: wrap; /* 允许按钮区域换行 */
             }
 
-            /* 调整复选框组大小，允许项目名称框换行 */
-            .checkbox-group {
+            /* 调整复选框组大小，确保项目名称框和折叠按钮在同一行显示 */
+            .button-frame .checkbox-group {
                 padding: 6px 8px;
                 gap: 8px;
-                flex-wrap: wrap; /* 允许换行，让项目名称框可以换行显示 */
+                flex-wrap: nowrap; /* 不允许换行，保持在同一行显示 */
+                align-items: center;
+            }
+
+            /* 筛选模态框中的复选框组保持换行显示 */
+            .filter-modal-content .checkbox-group {
+                flex-wrap: wrap;
+                align-items: flex-start;
+                padding: 10px;
+                gap: 10px;
+            }
+
+            /* 调整筛选模态框中复选框项的样式 */
+            .filter-modal-content .checkbox-item {
+                flex: 1;
+                min-width: 80px;
+                max-width: 100%;
+                padding: 4px 8px;
+                box-sizing: border-box;
+            }
+
+            /* 调整筛选模态框中复选框容器的样式 */
+            .filter-modal-content #filter-status-group > div {
+                display: flex;
+                gap: 10px;
+                flex-wrap: wrap;
+                width: 100%;
+            }
+
+            /* 调整筛选模态框中复选框标签的样式 */
+            .filter-modal-content .checkbox-group label {
+                font-size: 12px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
             }
             
             /* 确保隐藏/折叠按钮始终水平排列 */
@@ -1652,11 +1686,11 @@
                 flex-shrink: 0; /* 防止按钮被压缩 */
             }
             
-            /* 允许项目名称框在小屏幕上换行 */
+            /* 允许项目名称框在小屏幕上自动延伸到容器边 */
             #project-name {
                 white-space: normal; /* 允许文本换行 */
                 min-width: 100px; /* 设置最小宽度 */
-                max-width: 100%; /* 最大宽度为父容器宽度 */
+                flex: 1; /* 自动延伸到容器边 */
                 text-align: center; /* 文本居中显示 */
             }
 
@@ -1746,6 +1780,91 @@
                 padding: 10px 16px;
                 font-size: 14px;
                 height: auto;
+            }
+
+            /* 底部固定按钮容器在移动端的调整 */
+            .bottom-fixed-buttons {
+                position: static;
+                margin-top: 10px;
+                margin-bottom: 10px;
+                padding: 8px 12px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                border: 1px solid rgba(226, 232, 240, 0.8);
+                cursor: default;
+                user-select: none;
+                display: flex;
+                gap: 6px;
+                background: rgba(255, 255, 255, 0.95);
+            }
+
+            /* 调整按钮组布局，将字体和记工表按钮放在删除按钮右边 */
+            .button-frame {
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+
+            /* 第一行：隐藏/折叠开关和项目选择 */
+            .button-frame .checkbox-group {
+                width: 100%;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+
+            /* 第二行：操作按钮、字体/记工表按钮和筛选按钮 */
+            .button-frame .button-group {
+                display: flex;
+                gap: 6px;
+                flex-wrap: nowrap;
+                align-items: center;
+            }
+
+            /* 字体和记工表按钮样式 */
+            #font-btn, #attendance-btn {
+                padding: 4px 12px;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 10px;
+                font-weight: 600;
+                transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                position: relative;
+                overflow: hidden;
+                box-shadow: 0 1px 6px rgba(0, 0, 0, 0.03);
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border: 2px solid rgba(102, 126, 234, 0.3);
+            }
+
+            /* 确保第二行所有按钮在同一行显示 */
+            .button-frame > div:nth-child(2) {
+                display: flex;
+                gap: 6px;
+                align-items: center;
+                width: 100%;
+                flex-wrap: nowrap;
+            }
+
+            /* 让按钮组在同一行显示并铺满屏幕宽度 */
+            .button-frame .button-group {
+                flex: 1;
+                display: flex;
+                gap: 6px;
+                align-items: center;
+                flex-wrap: nowrap;
+                justify-content: space-between;
+            }
+
+            /* 确保按钮组中的按钮自动调整大小并铺满屏幕宽度 */
+            .button-group button {
+                flex: 1;
+                min-width: 0;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                overflow: hidden;
             }
         }
 
@@ -1870,8 +1989,8 @@
                 <button id="add-btn">添加</button>
                 <button id="edit-btn">修改</button>
                 <button id="delete-btn">删除</button>
-            </div>
-            <div class="filter-button-container">
+                <button id="font-btn">字体</button>
+                <button id="attendance-btn" onclick="openAttendanceSheet()">导出</button>
                 <button id="filter-btn">筛选</button>
             </div>
         </div>
@@ -1903,11 +2022,7 @@
         </div>
     </div>
 
-    <!-- 底部固定按钮容器 -->
-    <div class="bottom-fixed-buttons">
-        <button id="font-btn">字体</button>
-        <button id="attendance-btn" onclick="openAttendanceSheet()">记工表</button>
-    </div>
+
 
     <style>
     .form-row { display: flex; gap: 10px; margin-bottom: 15px; }
@@ -2991,13 +3106,26 @@
             attendanceBtn.addEventListener('mouseenter', function(e) {
                 attendanceTooltip = document.createElement('div');
                 attendanceTooltip.className = 'custom-tooltip';
-                attendanceTooltip.textContent = '生成记工表格或员工信息';
+                attendanceTooltip.textContent = '导出记工表格或员工信息';
                 document.body.appendChild(attendanceTooltip);
                 
                 const rect = e.target.getBoundingClientRect();
                 // 先添加到DOM中再计算实际宽度，确保位置准确
-                attendanceTooltip.style.left = (rect.right + 10) + 'px'; // 显示在按钮右侧
-                attendanceTooltip.style.top = (rect.top - 30) + 'px'; // 显示在按钮上方
+                
+                // 检查是否为移动端
+                const isMobile = window.innerWidth <= 800;
+                
+                if (isMobile) {
+                    // 移动端：水平居中显示
+                    const tooltipWidth = attendanceTooltip.offsetWidth;
+                    const centerX = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+                    attendanceTooltip.style.left = Math.max(10, centerX) + 'px'; // 确保不超出左边界
+                    attendanceTooltip.style.top = (rect.top - 30) + 'px'; // 显示在按钮上方
+                } else {
+                    // 桌面端：显示在按钮右侧
+                    attendanceTooltip.style.left = (rect.right + 10) + 'px';
+                    attendanceTooltip.style.top = (rect.top - 30) + 'px';
+                }
                 
                 setTimeout(() => {
                     if (attendanceTooltip) {
