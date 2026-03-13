@@ -67,6 +67,12 @@ function switchToLogin() {
         pageTitle.textContent = '登录';
     }
     
+    // 显示描述文字
+    const authDescription = document.getElementById('auth-description');
+    if (authDescription) {
+        authDescription.style.display = 'block';
+    }
+    
     console.log('切换到登录表单完成');
 }
 
@@ -93,6 +99,12 @@ function switchToRegister() {
     const pageTitle = document.querySelector('.login-page-title');
     if (pageTitle) {
         pageTitle.textContent = '注册';
+    }
+    
+    // 隐藏描述文字
+    const authDescription = document.getElementById('auth-description');
+    if (authDescription) {
+        authDescription.style.display = 'none';
     }
     
     console.log('切换到注册表单完成');
