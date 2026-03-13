@@ -1,0 +1,1209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>飞鱼工地考勤系统 - 帮助文档</title>
+    <style>
+        /* 全局样式 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+        }
+        
+        body {
+            background-color: #f8f9fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        /* 在iframe中显示时的样式 */
+        body.in-iframe .mode-switcher {
+            display: none;
+        }
+
+        body.in-iframe .container {
+            max-width: 100%;
+            box-shadow: none;
+        }
+
+        body.in-iframe .content {
+            padding: 20px;
+        }
+
+        body.in-iframe .section-title {
+            font-size: 24px;
+        }
+
+        /* 在iframe中且是移动端时隐藏侧边栏 */
+        @media (max-width: 768px) {
+            body.in-iframe .sidebar {
+                display: none;
+            }
+        }
+        
+        /* 模式切换按钮容器 */
+        .mode-switcher {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            gap: 10px;
+            background: white;
+            padding: 8px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        .mode-btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f1f5f9;
+            color: #64748b;
+        }
+        
+        .mode-btn:hover {
+            background: #e2e8f0;
+            transform: translateY(-1px);
+        }
+        
+        .mode-btn.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        /* 模式容器 */
+        .mode-container {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .mode-container.active {
+            display: block;
+            opacity: 1;
+        }
+        
+        /* ==================== 功能说明模式样式 ==================== */
+        .container {
+            display: flex;
+            min-height: 100vh;
+            max-width: 1400px;
+            margin: 0 auto;
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+        }
+        
+        .sidebar {
+            width: 280px;
+            background-color: #2c5282;
+            color: white;
+            padding: 20px 0;
+            overflow-y: auto;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+        }
+        
+        .sidebar-title {
+            padding: 0 20px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            margin-bottom: 20px;
+        }
+        
+        .sidebar-title h1 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .sidebar-nav {
+            list-style: none;
+        }
+        
+        .nav-item {
+            margin-bottom: 5px;
+        }
+        
+        .nav-link {
+            display: block;
+            padding: 10px 20px;
+            color: #e2e8f0;
+            text-decoration: none;
+            font-size: 14px;
+            transition: background 0.3s;
+            border-left: 3px solid transparent;
+        }
+        
+        .nav-link:hover {
+            background-color: #2a4365;
+            color: white;
+        }
+        
+        .nav-link.active {
+            background-color: #1a365d;
+            border-left-color: #38b2ac;
+            color: white;
+        }
+        
+        .content {
+            flex: 1;
+            padding: 40px;
+            background-color: white;
+            overflow-y: auto;
+        }
+        
+        .section {
+            margin-bottom: 60px;
+        }
+        
+        .section-title {
+            font-size: 28px;
+            color: #2c5282;
+            margin-bottom: 30px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        
+        .sub-section {
+            margin-bottom: 40px;
+        }
+        
+        .sub-section-title {
+            font-size: 20px;
+            color: #2d3748;
+            margin: 25px 0 15px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .sub-section-title::before {
+            content: "";
+            display: inline-block;
+            width: 4px;
+            height: 20px;
+            background-color: #38b2ac;
+            margin-right: 10px;
+        }
+        
+        .sub-sub-section {
+            margin-bottom: 25px;
+            margin-left: 20px;
+        }
+        
+        .sub-sub-section-title {
+            font-size: 16px;
+            color: #4a5568;
+            margin: 20px 0 10px;
+            font-weight: 600;
+        }
+        
+        .feature-list {
+            list-style: none;
+            margin-left: 15px;
+        }
+        
+        .feature-item {
+            margin-bottom: 8px;
+            padding-left: 20px;
+            position: relative;
+            font-size: 15px;
+            color: #4a5568;
+        }
+        
+        .feature-item::before {
+            content: "✓";
+            color: #38b2ac;
+            position: absolute;
+            left: 0;
+            font-weight: 600;
+        }
+        
+        .card {
+            background-color: #f7fafc;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2c5282;
+        }
+        
+        .meta-section {
+            background-color: #e8f4f8;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 30px 0;
+        }
+        
+        .meta-title {
+            font-size: 18px;
+            color: #2c5282;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        
+        .footer-slogan {
+            text-align: center;
+            margin-top: 60px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+            color: #2c5282;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        /* ==================== 软件简介模式样式 ==================== */
+        .ppt-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding-top: 60px;
+        }
+        
+        .slide {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 40px;
+            margin-bottom: 30px;
+            min-height: 600px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .slide h1 {
+            color: #0f5ba7;
+            font-size: 36px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .slide h2 {
+            color: #0f5ba7;
+            font-size: 28px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e0e6ed;
+            padding-bottom: 10px;
+        }
+        
+        .slide h3 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        
+        .slide p {
+            font-size: 18px;
+            color: #555;
+            line-height: 1.8;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .slide ul {
+            list-style: none;
+            padding-left: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .slide li {
+            font-size: 20px;
+            color: #444;
+            line-height: 2;
+            margin-bottom: 10px;
+            padding-left: 25px;
+            position: relative;
+        }
+        
+        .slide li::before {
+            content: "✓";
+            color: #0f5ba7;
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+        }
+        
+        .slide table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        .slide th, .slide td {
+            border: 1px solid #ddd;
+            padding: 15px;
+            text-align: left;
+            font-size: 18px;
+        }
+        
+        .slide th {
+            background-color: #0f5ba7;
+            color: white;
+            font-weight: normal;
+        }
+        
+        .slide tr:nth-child(even) {
+            background-color: #f9fafc;
+        }
+        
+        .toc li::before {
+            content: "";
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            background-color: #0f5ba7;
+            color: white;
+            text-align: center;
+            line-height: 24px;
+            border-radius: 50%;
+            margin-right: 10px;
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        
+        .toc li:nth-child(1)::before {content: "1";}
+        .toc li:nth-child(2)::before {content: "2";}
+        .toc li:nth-child(3)::before {content: "3";}
+        .toc li:nth-child(4)::before {content: "4";}
+        .toc li:nth-child(5)::before {content: "5";}
+        .toc li:nth-child(6)::before {content: "6";}
+        
+        .pain-points li::before {
+            content: "⚠";
+            color: #e64340;
+        }
+        
+        .cover-bottom {
+            text-align: center;
+            margin-top: 50px;
+        }
+        
+        .cover-bottom h1 {
+            margin-bottom: 30px;
+        }
+        
+        /* 响应式适配 */
+        @media (max-width: 768px) {
+            .mode-switcher {
+                top: 10px;
+                right: 10px;
+                padding: 6px;
+            }
+            
+            .mode-btn {
+                padding: 8px 16px;
+                font-size: 12px;
+            }
+            
+            .container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .section-title {
+                font-size: 24px;
+            }
+            
+            .ppt-container {
+                padding-top: 80px;
+            }
+            
+            .slide {
+                padding: 20px;
+            }
+            
+            .slide h1 {
+                font-size: 28px;
+            }
+            
+            .slide h2 {
+                font-size: 24px;
+            }
+            
+            .slide li {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 模式切换按钮 -->
+    <div class="mode-switcher">
+        <button class="mode-btn active" onclick="switchMode('feature')">功能说明</button>
+        <button class="mode-btn" onclick="switchMode('intro')">软件简介</button>
+    </div>
+
+    <!-- ==================== 功能说明模式 ==================== -->
+    <div id="feature-mode" class="mode-container active">
+        <div class="container">
+            <!-- 左侧导航栏 -->
+            <div class="sidebar">
+                <div class="sidebar-title">
+                    <h1>飞鱼工地考勤系统</h1>
+                </div>
+                <ul class="sidebar-nav">
+                    <li class="nav-item"><a href="#auth" class="nav-link">一、用户认证系统</a></li>
+                    <li class="nav-item"><a href="#project" class="nav-link">二、项目管理模块</a></li>
+                    <li class="nav-item"><a href="#employee" class="nav-link">三、员工管理模块</a></li>
+                    <li class="nav-item"><a href="#work-record" class="nav-link">四、记工管理模块</a></li>
+                    <li class="nav-item"><a href="#finance" class="nav-link">五、财务管理模块</a></li>
+                    <li class="nav-item"><a href="#statistics" class="nav-link">六、统计分析模块</a></li>
+                    <li class="nav-item"><a href="#construction-log" class="nav-link">七、施工日志模块</a></li>
+                    <li class="nav-item"><a href="#cloud-album" class="nav-link">八、云相册模块</a></li>
+                    <li class="nav-item"><a href="#tools" class="nav-link">九、辅助工具</a></li>
+                    <li class="nav-item"><a href="#system" class="nav-link">十、系统管理</a></li>
+                    <li class="nav-item"><a href="#tech" class="nav-link">十一、技术特性</a></li>
+                    <li class="nav-item"><a href="#requirements" class="nav-link">系统要求</a></li>
+                    <li class="nav-item"><a href="#version" class="nav-link">版本信息</a></li>
+                    <li class="nav-item"><a href="#support" class="nav-link">联系支持</a></li>
+                </ul>
+            </div>
+
+            <!-- 右侧内容区 -->
+            <div class="content">
+                <!-- 标题 -->
+                <h1 class="section-title">飞鱼工地考勤系统 - 功能说明</h1>
+
+                <!-- 一、用户认证系统 -->
+                <div id="auth" class="section">
+                    <h2 class="sub-section-title">一、用户认证系统</h2>
+                    <div class="sub-sub-section">
+                        <h3 class="sub-sub-section-title">1.1 用户注册</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">手机号、邮箱联合注册</li>
+                            <li class="feature-item">手机号登录</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 二、项目管理模块 -->
+                <div id="project" class="section">
+                    <h2 class="sub-section-title">二、项目管理模块</h2>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">2.1 项目列表</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">项目卡片式展示</li>
+                            <li class="feature-item">项目状态筛选（在建、已完工）</li>
+                            <li class="feature-item">项目快速搜索</li>
+                            <li class="feature-item">项目统计概览</li>
+                            <li class="feature-item">员工数量显示</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">2.2 项目主页</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">项目详细信息展示</li>
+                            <li class="feature-item">项目成员管理</li>
+                            <li class="feature-item">项目数据统计</li>
+                            <li class="feature-item">快捷功能入口</li>
+                            <li class="feature-item">项目进度跟踪</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">2.3 项目创建与编辑</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">项目基本信息设置（项目名称、编号）</li>
+                            <li class="feature-item">项目工期管理（开始日期、结束日期）</li>
+                            <li class="feature-item">项目预算设置</li>
+                            <li class="feature-item">项目状态跟踪</li>
+                            <li class="feature-item">项目描述信息</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">2.4 项目统计</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">项目员工统计</li>
+                            <li class="feature-item">项目工时统计</li>
+                            <li class="feature-item">项目收支统计</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 三、员工管理模块 -->
+                <div id="employee" class="section">
+                    <h2 class="sub-section-title">三、员工管理模块</h2>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">3.1 员工录入</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">员工基本信息录入（姓名、工号、电话）</li>
+                            <li class="feature-item">员工状态管理（在职、离职、隐藏、结清）</li>
+                            <li class="feature-item">批量导出功能</li>
+                            <li class="feature-item">员工信息编辑</li>
+                            <li class="feature-item">员工删除功能</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">3.2 员工搜索与筛选</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">按工号快速搜索</li>
+                            <li class="feature-item">按姓名快速搜索</li>
+                            <li class="feature-item">按状态筛选员工</li>
+                            <li class="feature-item">员工列表排序（按工号升序）</li>
+                            <li class="feature-item">全选/取消全选功能</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">3.3 带班设置</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">指定项目带班人员</li>
+                            <li class="feature-item">带班权限管理</li>
+                            <li class="feature-item">带班人员列表</li>
+                            <li class="feature-item">带班人员添加/删除</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">3.4 员工状态管理</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">在职状态</li>
+                            <li class="feature-item">离职状态</li>
+                            <li class="feature-item">隐藏状态</li>
+                            <li class="feature-item">结清状态</li>
+                            <li class="feature-item">状态切换功能</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 四、记工管理模块 -->
+                <div id="work-record" class="section">
+                    <h2 class="sub-section-title">四、记工管理模块</h2>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">4.1 日常记工</h3>
+                        <div style="margin-left: 20px;">
+                            <h4 style="font-size: 15px; margin: 15px 0 10px; color: #718096;">点工记录</h4>
+                            <ul class="feature-list">
+                                <li class="feature-item">按小时记录工时</li>
+                                <li class="feature-item">工作日期选择</li>
+                                <li class="feature-item">工作时长输入</li>
+                                <li class="feature-item">工作内容备注</li>
+                                <li class="feature-item">工作照片上传</li>
+                                <li class="feature-item">多人同时记工</li>
+                            </ul>
+                            
+                            <h4 style="font-size: 15px; margin: 15px 0 10px; color: #718096;">包工记录</h4>
+                            <ul class="feature-list">
+                                <li class="feature-item">按项目或任务记录</li>
+                                <li class="feature-item">包工金额设置</li>
+                                <li class="feature-item">工作量记录</li>
+                                <li class="feature-item">完成情况标记</li>
+                                <li class="feature-item">备注信息</li>
+                            </ul>
+                            
+                            <h4 style="font-size: 15px; margin: 15px 0 10px; color: #718096;">工量记录</h4>
+                            <ul class="feature-list">
+                                <li class="feature-item">按工作量记录</li>
+                                <li class="feature-item">工量单位设置</li>
+                                <li class="feature-item">工量数量输入</li>
+                                <li class="feature-item">单价计算</li>
+                                <li class="feature-item">总金额自动计算</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">4.2 批量记工</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">JSON格式批量导入</li>
+                            <li class="feature-item">批量数据验证</li>
+                            <li class="feature-item">错误提示和修正</li>
+                            <li class="feature-item">快速批量操作</li>
+                            <li class="feature-item">导入模板下载</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">4.3 记工修改</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">记工记录编辑</li>
+                            <li class="feature-item">记工删除（需权限）</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">4.4 点工单管理</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">点工单生成</li>
+                            <li class="feature-item">点工单导出PDF</li>
+                            <li class="feature-item">点工单打印功能</li>
+                            <li class="feature-item">点工单预览</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">4.5 记工表</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">记工记录表格展示</li>
+                            <li class="feature-item">记工数据汇总</li>
+                            <li class="feature-item">记工表导出功能</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 五、财务管理模块 -->
+                <div id="finance" class="section">
+                    <h2 class="sub-section-title">五、财务管理模块</h2>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">5.1 结算借支</h3>
+                        <div style="margin-left: 20px;">
+                            <h4 style="font-size: 15px; margin: 15px 0 10px; color: #718096;">借支记录</h4>
+                            <ul class="feature-list">
+                                <li class="feature-item">员工借支金额记录</li>
+                                <li class="feature-item">借支日期设置</li>
+                                <li class="feature-item">借支原因备注</li>
+                            </ul>
+                            
+                            <h4 style="font-size: 15px; margin: 15px 0 10px; color: #718096;">扣款记录</h4>
+                            <ul class="feature-list">
+                                <li class="feature-item">各种扣款项记录</li>
+                                <li class="feature-item">扣款金额设置</li>
+                                <li class="feature-item">扣款原因说明</li>
+                                <li class="feature-item">扣款日期记录</li>
+                                <li class="feature-item">扣款明细查看</li>
+                            </ul>
+                            
+                            <h4 style="font-size: 15px; margin: 15px 0 10px; color: #718096;">公司转账</h4>
+                            <ul class="feature-list">
+                                <li class="feature-item">公司转账记录</li>
+                                <li class="feature-item">转账金额输入</li>
+                                <li class="feature-item">转账日期设置</li>
+                                <li class="feature-item">转账备注信息</li>
+                                <li class="feature-item">转账凭证上传</li>
+                            </ul>
+                            
+                            <h4 style="font-size: 15px; margin: 15px 0 10px; color: #718096;">结算记录</h4>
+                            <ul class="feature-list">
+                                <li class="feature-item">工资结算记录</li>
+                                <li class="feature-item">结算金额计算</li>
+                                <li class="feature-item">结算日期设置</li>
+                                <li class="feature-item">结算明细展示</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">5.2 项目记账</h3>
+                        <div style="margin-left: 20px;">
+                            <h4 style="font-size: 15px; margin: 15px 0 10px; color: #718096;">项目支出</h4>
+                            <ul class="feature-list">
+                                <li class="feature-item">各类项目支出记录</li>
+                                <li class="feature-item">支出金额输入</li>
+                                <li class="feature-item">支出分类设置</li>
+                                <li class="feature-item">支出日期记录</li>
+                                <li class="feature-item">支出凭证上传</li>
+                                <li class="feature-item">支出说明备注</li>
+                            </ul>
+                            
+                            <h4 style="font-size: 15px; margin: 15px 0 10px; color: #718096;">项目收入</h4>
+                            <ul class="feature-list">
+                                <li class="feature-item">项目收入记录</li>
+                                <li class="feature-item">收入金额输入</li>
+                                <li class="feature-item">收入分类设置</li>
+                                <li class="feature-item">收入日期记录</li>
+                                <li class="feature-item">收入凭证上传</li>
+                                <li class="feature-item">收入说明备注</li>
+                            </ul>
+                            
+                            <h4 style="font-size: 15px; margin: 15px 0 10px; color: #718096;">收支管理</h4>
+                            <ul class="feature-list">
+                                <li class="feature-item">收支明细查询</li>
+                                <li class="feature-item">收支统计分析</li>
+                                <li class="feature-item">收支报表导出</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">5.3 未结管理</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">未结员工统计</li>
+                            <li class="feature-item">未结金额计算</li>
+                            <li class="feature-item">结清状态跟踪</li>
+                            <li class="feature-item">未结明细查看</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 六、统计分析模块 -->
+                <div id="statistics" class="section">
+                    <h2 class="sub-section-title">六、统计分析模块</h2>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">6.1 统计报表</h3>
+                        <div style="margin-left: 20px;">
+                            <h4 style="font-size: 15px; margin: 15px 0 10px; color: #718096;">工人统计</h4>
+                            <ul class="feature-list">
+                                <li class="feature-item">按员工统计工时</li>
+                                <li class="feature-item">按员工统计工量</li>
+                                <li class="feature-item">按员工统计收入</li>
+                                <li class="feature-item">员工工作明细</li>
+                            </ul>
+                            
+                            <h4 style="font-size: 15px; margin: 15px 0 10px; color: #718096;">合计统计</h4>
+                            <ul class="feature-list">
+                                <li class="feature-item">项目整体统计数据</li>
+                                <li class="feature-item">总工时统计</li>
+                                <li class="feature-item">总工量统计</li>
+                                <li class="feature-item">总收支统计</li>
+                            </ul>
+                            
+                            <h4 style="font-size: 15px; margin: 15px 0 10px; color: #718096;">明细统计</h4>
+                            <ul class="feature-list">
+                                <li class="feature-item">详细流水记录</li>
+                                <li class="feature-item">按日期筛选</li>
+                                <li class="feature-item">按员工筛选</li>
+                                <li class="feature-item">按类型筛选</li>
+                                <li class="feature-item">流水明细导出</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">6.2 筛选功能</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">自定义日期范围选择</li>
+                            <li class="feature-item">单选/多选日期模式</li>
+                            <li class="feature-item">月份快速选择</li>
+                            <li class="feature-item">员工多选功能</li>
+                            <li class="feature-item">类型多选功能</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">6.3 数据导出</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">PDF导出功能</li>
+                            <li class="feature-item">Excel导出功能</li>
+                            <li class="feature-item">批量导出功能</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 七、施工日志模块 -->
+                <div id="construction-log" class="section">
+                    <h2 class="sub-section-title">七、施工日志模块</h2>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">7.1 日志记录</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">日常施工日志录入</li>
+                            <li class="feature-item">富文本编辑支持</li>
+                            <li class="feature-item">图片附件上传</li>
+                            <li class="feature-item">施工进度记录</li>
+                            <li class="feature-item">天气情况记录</li>
+                            <li class="feature-item">施工人员记录</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">7.2 日志管理</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">日志查询与筛选</li>
+                            <li class="feature-item">日志编辑与删除</li>
+                            <li class="feature-item">日志导出功能</li>
+                            <li class="feature-item">日志附件管理</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">7.3 日志导出</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">PDF格式导出</li>
+                            <li class="feature-item">Word格式导出</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 八、云相册模块 -->
+                <div id="cloud-album" class="section">
+                    <h2 class="sub-section-title">八、云相册模块</h2>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">8.1 图片管理</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">施工照片上传</li>
+                            <li class="feature-item">照片分类管理</li>
+                            <li class="feature-item">照片批量操作</li>
+                            <li class="feature-item">照片预览与查看</li>
+                            <li class="feature-item">照片编辑功能</li>
+                            <li class="feature-item">照片删除功能</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">8.2 相册功能</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">按日期组织照片</li>
+                            <li class="feature-item">照片分享功能</li>
+                            <li class="feature-item">照片下载</li>
+                            <li class="feature-item">无效图片清理</li>
+                            <li class="feature-item">照片标签管理</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 九、辅助工具 -->
+                <div id="tools" class="section">
+                    <h2 class="sub-section-title">九、辅助工具</h2>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">9.1 计算器</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">内置计算器工具</li>
+                            <li class="feature-item">支持拖拽移动</li>
+                            <li class="feature-item">快捷计算功能</li>
+                            <li class="feature-item">计算历史记录</li>
+                            <li class="feature-item">科学计算功能</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">9.2 数据导出</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">PDF导出功能</li>
+                            <li class="feature-item">Excel导出功能</li>
+                            <li class="feature-item">批量导出功能</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 十、系统管理 -->
+                <div id="system" class="section">
+                    <h2 class="sub-section-title">十、系统管理</h2>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">10.1 权限管理</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">多级权限控制</li>
+                            <li class="feature-item">项目所有者权限</li>
+                            <li class="feature-item">操作权限细分：
+                                <ul style="margin-left: 20px; margin-top: 5px;">
+                                    <li class="feature-item">记工新增、修改、删除权限</li>
+                                    <li class="feature-item">结算新增、修改、删除权限</li>
+                                    <li class="feature-item">项目支出新增、修改、删除权限</li>
+                                    <li class="feature-item">项目收入新增、修改、删除权限</li>
+                                </ul>
+                            </li>
+                            <li class="feature-item">权限验证机制</li>
+                            <li class="feature-item">权限分配管理</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">10.2 数据同步</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">实时数据同步</li>
+                            <li class="feature-item">离线数据缓存</li>
+                            <li class="feature-item">自动同步机制</li>
+                            <li class="feature-item">同步状态指示</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">10.3 用户管理</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">用户信息管理</li>
+                            <li class="feature-item">密码修改</li>
+                            <li class="feature-item">登录状态管理</li>
+                            <li class="feature-item">用户会话管理</li>
+                            <li class="feature-item">多设备登录支持</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 十一、技术特性 -->
+                <div id="tech" class="section">
+                    <h2 class="sub-section-title">十一、技术特性</h2>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">11.1 响应式设计</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">自适应各种屏幕尺寸</li>
+                            <li class="feature-item">移动端优化</li>
+                            <li class="feature-item">触摸操作支持</li>
+                            <li class="feature-item">横竖屏适配</li>
+                            <li class="feature-item">高分辨率屏幕支持</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">11.2 用户体验</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">流畅的动画效果</li>
+                            <li class="feature-item">友好的错误提示</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">11.3 数据安全</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">数据加密传输</li>
+                            <li class="feature-item">权限严格控制</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3 class="sub-sub-section-title">11.4 性能优化</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">数据懒加载</li>
+                            <li class="feature-item">图片压缩上传</li>
+                            <li class="feature-item">缓存策略优化</li>
+                            <li class="feature-item">请求去重</li>
+                            <li class="feature-item">批量操作优化</li>
+                            <li class="feature-item">本地存储优化</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 系统要求 -->
+                <div id="requirements" class="section">
+                    <div class="meta-section">
+                        <h3 class="meta-title">系统要求</h3>
+                        <h4 style="font-size: 15px; margin: 10px 0; color: #4a5568;">网络要求</h4>
+                        <ul class="feature-list">
+                            <li class="feature-item">需要互联网连接（支持离线模式）</li>
+                            <li class="feature-item">建议使用稳定的网络环境</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 版本信息 -->
+                <div id="version" class="section">
+                    <div class="meta-section">
+                        <h3 class="meta-title">版本信息</h3>
+                        <h4 style="font-size: 15px; margin: 10px 0; color: #4a5568;">版本 0313 (2026-03-13)</h4>
+                        <ul class="feature-list">
+                            <li class="feature-item">优化离线同步功能</li>
+                            <li class="feature-item">增强权限管理系统</li>
+                            <li class="feature-item">改进用户界面体验</li>
+                            <li class="feature-item">修复已知问题</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 联系支持 -->
+                <div id="support" class="section">
+                    <div class="meta-section">
+                        <h3 class="meta-title">联系支持</h3>
+                        <p style="font-size: 15px; color: #4a5568;">如有问题或建议，请联系技术支持团队。</p>
+                    </div>
+                </div>
+
+                <!-- 底部标语 -->
+                <div class="footer-slogan">
+                    飞鱼工地考勤系统 - 让工地管理更简单、更高效！
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 软件简介模式 ==================== -->
+    <div id="intro-mode" class="mode-container">
+        <div class="ppt-container">
+            <!-- 第1页：封面 -->
+            <div class="slide">
+                <h1>飞鱼工地考勤系统</h1>
+                <p style="font-size: 24px; margin-top: 30px;">功能特性对比 · 产品价值呈现</p>
+                <p style="font-size: 20px; color: #0f5ba7; margin-top: 50px;">让工地管理更简单、更高效</p>
+            </div>
+
+            <!-- 第2页：目录 -->
+            <div class="slide">
+                <h2>目录</h2>
+                <ul class="toc">
+                    <li>传统工地管理：常见痛点</li>
+                    <li>核心对比：飞鱼系统 VS 传统方式</li>
+                    <li>飞鱼系统：核心功能特性</li>
+                    <li>技术与安全优势</li>
+                    <li>适用场景</li>
+                    <li>总结：管理升级价值</li>
+                </ul>
+            </div>
+
+            <!-- 第3页：传统痛点 -->
+            <div class="slide">
+                <h2>传统工地管理：常见痛点</h2>
+                <ul class="pain-points">
+                    <li>考勤靠手写、点名、纸质登记，易出错、易扯皮</li>
+                    <li>数据无法同步，多人管理混乱</li>
+                    <li>无云端备份，丢失/损坏无法恢复</li>
+                    <li>工时、结算手工核算，成本高、易算错</li>
+                    <li>项目多、人员杂，统计难、追溯难</li>
+                </ul>
+            </div>
+
+            <!-- 第4页：核心对比表 -->
+            <div class="slide">
+                <h2>飞鱼工地考勤系统 VS 传统管理方式</h2>
+                <table>
+                    <tr>
+                        <th>对比维度</th>
+                        <th>传统方式</th>
+                        <th>飞鱼系统</th>
+                    </tr>
+                    <tr>
+                        <td>数据存储</td>
+                        <td>纸质/本地，易丢失</td>
+                        <td>云数据库，安全备份</td>
+                    </tr>
+                    <tr>
+                        <td>多端同步</td>
+                        <td>不同步、数据滞后</td>
+                        <td>实时同步，手机/电脑一致</td>
+                    </tr>
+                    <tr>
+                        <td>离线使用</td>
+                        <td>不支持</td>
+                        <td>支持离线录入，联网自动同步</td>
+                    </tr>
+                    <tr>
+                        <td>考勤结算</td>
+                        <td>手工统计，易出错</td>
+                        <td>自动统计，一键结算</td>
+                    </tr>
+                    <tr>
+                        <td>权限管理</td>
+                        <td>无/粗放</td>
+                        <td>多级精细权限管控</td>
+                    </tr>
+                    <tr>
+                        <td>数据安全</td>
+                        <td>弱，无加密</td>
+                        <td>HTTPS加密+密码加密存储</td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- 第5页：核心功能 -->
+            <div class="slide">
+                <h2>飞鱼系统：核心功能特性</h2>
+                <p style="text-align: left; font-size: 22px; margin-bottom: 20px;">一站式工地管理 · 功能全覆盖</p>
+                <ul>
+                    <li>员工管理 / 班组管理</li>
+                    <li>工地考勤打卡、工时记录</li>
+                    <li>项目记账、工资结算、对账</li>
+                    <li>多项目统一管理</li>
+                    <li>数据实时更新、自动统计</li>
+                    <li>报表查看、数据导出</li>
+                </ul>
+            </div>
+
+            <!-- 第6页：技术与安全优势 -->
+            <div class="slide">
+                <h2>技术与安全优势</h2>
+                <p style="text-align: left; font-size: 22px; margin-bottom: 20px;">稳定可靠 · 安全放心</p>
+                <ul>
+                    <li>云数据库：实时同步、多人协作</li>
+                    <li>响应式设计：手机/平板/电脑全适配</li>
+                    <li>离线模式：断网可用，不耽误工作</li>
+                    <li>实时更新：数据多端即时同步</li>
+                    <li>加密传输+密码加密+权限控制</li>
+                </ul>
+            </div>
+
+            <!-- 第7页：适用场景 -->
+            <div class="slide">
+                <h2>适用场景</h2>
+                <ul>
+                    <li>建筑工地考勤管理</li>
+                    <li>施工队、劳务班组管理</li>
+                    <li>项目财务结算与成本统计</li>
+                    <li>多工地、多项目协同管理</li>
+                </ul>
+            </div>
+
+            <!-- 第8页：总结 -->
+            <div class="slide">
+                <h2>选择飞鱼 = 管理升级</h2>
+                <ul>
+                    <li>更高效：自动统计，减少手工工作量</li>
+                    <li>更准确：数据实时，减少出错与纠纷</li>
+                    <li>更安全：云端存储，加密保护</li>
+                    <li>更简单：上手快，不用培训</li>
+                </ul>
+                <div class="cover-bottom">
+                    <p style="font-size: 22px; color: #0f5ba7; margin-top: 40px;">飞鱼工地考勤系统 —— 让工地管理更简单、更高效</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 页面加载时检查URL参数并自动切换模式
+        document.addEventListener('DOMContentLoaded', function() {
+            // 检查是否在iframe中显示
+            if (window.self !== window.top) {
+                document.body.classList.add('in-iframe');
+            }
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            const mode = urlParams.get('mode');
+            
+            if (mode === 'intro' || mode === 'feature') {
+                switchMode(mode);
+            }
+        });
+
+        // 模式切换函数
+        function switchMode(mode) {
+            const featureMode = document.getElementById('feature-mode');
+            const introMode = document.getElementById('intro-mode');
+            const buttons = document.querySelectorAll('.mode-btn');
+            
+            // 移除所有按钮的active类
+            buttons.forEach(btn => btn.classList.remove('active'));
+            
+            // 切换模式
+            if (mode === 'feature') {
+                featureMode.classList.add('active');
+                introMode.classList.remove('active');
+                buttons[0].classList.add('active');
+            } else {
+                introMode.classList.add('active');
+                featureMode.classList.remove('active');
+                buttons[1].classList.add('active');
+            }
+            
+            // 滚动到顶部
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // 功能说明模式的平滑滚动
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('href');
+                const targetElement = document.querySelector(targetId);
+                
+                // 移除所有active类
+                document.querySelectorAll('.nav-link').forEach(nav => {
+                    nav.classList.remove('active');
+                });
+                // 添加当前active类
+                this.classList.add('active');
+                
+                // 平滑滚动到目标位置
+                targetElement.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            });
+        });
+
+        // 滚动时高亮当前导航
+        window.addEventListener('scroll', function() {
+            const sections = document.querySelectorAll('.section, .meta-section');
+            const navLinks = document.querySelectorAll('.nav-link');
+            
+            let currentSection = '';
+            
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                const sectionHeight = section.clientHeight;
+                if (window.scrollY >= (sectionTop - 100)) {
+                    currentSection = '#' + section.getAttribute('id');
+                }
+            });
+            
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === currentSection) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
