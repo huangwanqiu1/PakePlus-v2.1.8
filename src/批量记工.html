@@ -1,0 +1,1430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON解析为表格</title>
+    <!-- 本地加载完整的Supabase库 -->
+    <script src="./JavaScript/supabase/supabase.min.js"></script>
+    <!-- 加载浏览器环境的Supabase配置 -->
+    <script src="./JavaScript/supabase/supabase-client.js"></script>
+    <!-- 离线同步服务 -->
+    <script src="./JavaScript/离线同步/offline-sync-service.js"></script>
+    <!-- 同步状态指示器 -->
+    <script src="./JavaScript/离线同步/sync-status-indicator.js"></script>
+    <!-- tus-js-client用于大文件上传 -->
+    <script src="./JavaScript/supabase/tus.min.js"></script>
+    <!-- Compressor.js用于图片压缩 -->
+    <script src="./JavaScript/supabase/compressor.min.js"></script>
+    <!-- 中文转拼音库 -->
+    <script src="./JavaScript/supabase/pinyin-pro.js"></script>
+    <!-- 批量记工服务 -->
+    <script src="./JavaScript/批量记工/batch-work-service.js"></script>
+    <!-- 校验服务 -->
+    <script src="./JavaScript/批量记工/validate-work-service.js"></script>
+    <!-- JSON解析服务 -->
+    <script src="./JavaScript/批量记工/json-parser-service.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 5px 0 0 5px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0;
+            margin-left: 0;
+            background-color: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .form-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            padding: 0 15px;
+        }
+        .form-row > div {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .form-row label {
+            margin-bottom: 0;
+            white-space: nowrap;
+            font-weight: bold;
+        }
+        #projectName {
+            background-color: #f8f9fa !important;
+            cursor: not-allowed !important;
+            color: #6c757d !important;
+            border: 1px solid #dee2e6 !important;
+            font-weight: 500;
+            font-size: 16px !important;
+            width: 35%;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        #projectName:focus {
+            outline: none !important;
+            box-shadow: none !important;
+            border-color: #dee2e6 !important;
+        }
+        .required-asterisk {
+            color: #ff0000;
+            font-weight: bold;
+            margin-right: 2px;
+        }
+        .file-input {
+            position: relative;
+            display: inline-block;
+        }
+        .file-input input[type="file"] {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            cursor: pointer;
+        }
+        .file-input .file-label {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .file-input:hover .file-label {
+            background-color: #2980b9;
+        }
+        .file-input .file-name {
+            display: none;
+        }
+        .button-container {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 20px;
+            padding-left: 15px;
+        }
+        .batch-button {
+            padding: 10px 20px;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: none;
+        }
+        .batch-button:hover {
+            background-color: #229954;
+        }
+        .batch-button.show {
+            display: inline-block;
+        }
+        .validate-button {
+            padding: 10px 20px;
+            background-color: #9b59b6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: none;
+        }
+        .validate-button:hover {
+            background-color: #8e44ad;
+        }
+        .validate-button.show {
+            display: inline-block;
+        }
+        .save-button {
+            padding: 10px 20px;
+            background-color: #e67e22;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: none;
+        }
+        .save-button:hover {
+            background-color: #d35400;
+        }
+        .save-button.show {
+            display: inline-block;
+        }
+        .header-info {
+            margin-bottom: 10px;
+            padding: 0;
+            display: none;
+        }
+        .header-info.show {
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+        }
+        .header-info .date {
+            color: #333;
+            font-size: 16px;
+            font-weight: bold;
+            margin-left: 40px;
+        }
+        .header-info .company {
+            color: #333;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .tables-wrapper {
+            display: none;
+            justify-content: flex-start;
+            gap: 25px;
+        }
+        .tables-wrapper.show {
+            display: flex;
+        }
+        .table-container {
+            width: auto;
+            max-height: 600px;
+            overflow-y: auto;
+            border-top: 2px solid #ddd;
+        }
+        table {
+            width: auto;
+            border-collapse: separate;
+            border-spacing: 0;
+            table-layout: auto;
+        }
+        thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background-color: #f2f2f2;
+        }
+        thead th {
+            background-color: #f2f2f2;
+            border-top: none;
+            border-bottom: 2px solid #ddd;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+            line-height: 1.2;
+            white-space: nowrap;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .custom-tooltip {
+            position: absolute;
+            background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-size: 16px;
+            font-weight: bold;
+            white-space: nowrap;
+            z-index: 1000;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4), 0 6px 15px rgba(0, 0, 0, 0.25);
+            pointer-events: none;
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .custom-tooltip.show {
+            opacity: 1;
+            transform: translateY(-3px) scale(1.02);
+        }
+        .success-message {
+            color: green;
+            margin-top: 10px;
+        }
+        .error-message {
+            color: red;
+            margin-top: 10px;
+        }
+        .notification {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 18px 28px;
+            border-radius: 20px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            box-shadow: 0 15px 40px rgba(16, 185, 129, 0.4), 0 8px 20px rgba(16, 185, 129, 0.2);
+            display: none;
+            z-index: 10000;
+            font-weight: bold;
+            font-size: 16px;
+            min-width: 200px;
+            text-align: center;
+        }
+        @keyframes notificationPop {
+            0% {
+                transform: translate(-50%, -50%) scale(0.8);
+                opacity: 0;
+            }
+            80% {
+                transform: translate(-50%, -50%) scale(1.05);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+            }
+        }
+        .notification.error {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            box-shadow: 0 15px 40px rgba(239, 68, 68, 0.4), 0 8px 20px rgba(239, 68, 68, 0.2);
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 9998;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 500px;
+            max-width: 90%;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+        }
+        .modal-content h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        .form-buttons {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .form-buttons button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+        }
+        
+        @media screen and (max-width: 768px) {
+            #projectName {
+                width: calc(100% - 100px) !important;
+                max-width: none !important;
+            }
+            #remark {
+                width: calc(100% - 60px) !important;
+                max-width: none !important;
+            }
+            .button-container {
+                flex-wrap: wrap;
+            }
+            .tables-wrapper {
+                flex-direction: column;
+            }
+            .table-container:last-child {
+                display: none !important;
+            }
+            .table-container:first-child {
+                width: 100%;
+            }
+            #input-content-modal {
+                padding: 0 !important;
+            }
+            #input-content-modal .modal-content {
+                width: 100% !important;
+                height: 100% !important;
+                max-width: none !important;
+                max-height: none !important;
+                margin: 0 !important;
+                border-radius: 0 !important;
+                padding: 15px !important;
+                box-sizing: border-box !important;
+                display: flex !important;
+                flex-direction: column !important;
+            }
+            #jsonContentInput {
+                flex: 1 !important;
+                height: auto !important;
+                min-height: 200px !important;
+            }
+            #doubao-iframe-container {
+                height: 100% !important;
+            }
+        }
+        
+        #jsonContentInput::placeholder {
+            font-size: 15px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="notification" id="notification"></div>
+    <div class="container">
+        <div class="form-row">
+            <div>
+                <label for="projectName"><span class="required-asterisk">*</span>项目名称：</label>
+                <input type="text" id="projectName" readonly disabled>
+            </div>
+        </div>
+
+        <div class="button-container">
+            <div class="file-input" id="fileInput" style="cursor: pointer;">
+                <input type="file" id="jsonFile" accept=".json" style="display: none;">
+                <span class="file-label" id="selectBtnLabel">AI</span>
+                <span class="file-name" id="fileName"></span>
+                <div id="message"></div>
+            </div>
+            <button class="save-button" id="saveButton">保存</button>
+            <button class="batch-button">批量记工</button>
+            <button class="validate-button">校验</button>
+        </div>
+        
+        <div class="header-info">
+            <div class="company" ondblclick="makeEditable(this)" style="cursor: pointer;"></div>
+            <div class="date" ondblclick="makeEditable(this)" style="cursor: pointer;"></div>
+        </div>
+        
+        <div class="tables-wrapper">
+            <div class="table-container">
+                <table id="dataTable1">
+                    <thead>
+                        <tr>
+                            <th style="width: 30px;"></th>
+                            <th ondblclick="toggleIdEditable()" style="cursor: pointer;" id="idHeader1">工号</th>
+                            <th ondblclick="toggleNameEditable()" style="cursor: pointer;" id="nameHeader1">姓名</th>
+                            <th>上午</th>
+                            <th>下午</th>
+                            <th>加班</th>
+                            <th>包工</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody1">
+                    </tbody>
+                </table>
+            </div>
+            <div class="table-container">
+                <table id="dataTable2">
+                    <thead>
+                        <tr>
+                            <th style="width: 30px;"></th>
+                            <th ondblclick="toggleIdEditable()" style="cursor: pointer;" id="idHeader2">工号</th>
+                            <th ondblclick="toggleNameEditable()" style="cursor: pointer;" id="nameHeader2">姓名</th>
+                            <th>上午</th>
+                            <th>下午</th>
+                            <th>加班</th>
+                            <th>包工</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody2">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="form-row" style="margin-top: 15px;">
+            <div style="flex: 1; display: flex; align-items: center; gap: 10px;">
+                <label for="remark" style="margin-bottom: 0; white-space: nowrap; font-weight: bold;">备注：</label>
+                <textarea id="remark" style="width: 40%; min-height: 55px; height: 55px; border: 1px solid #ddd; border-radius: 4px; padding: 8px; font-size: 16px; font-weight: bold; resize: both;" placeholder="请输入备注"></textarea>
+            </div>
+        </div>
+
+        <div class="form-group" style="padding: 0 15px; margin-bottom: 15px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <label style="font-weight: bold;">图片：</label>
+                <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+            </div>
+            <div id="imageModal" style="display: none;"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="select-choice-modal" style="display: none;">
+        <div class="modal-content" style="text-align: center; width: 320px; padding: 15px;">
+            <h3 style="color: #3498db; margin-bottom: 15px; font-size: 18px;">选择导入类型</h3>
+            <div style="display: flex; gap: 15px; justify-content: center; margin-bottom: 15px;">
+                <div style="flex: 1; padding: 15px 10px; border: 2px solid #e2e8f0; border-radius: 8px; cursor: pointer; transition: all 0.3s; background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);" id="json-option" onmouseover="this.style.borderColor='#3498db'; this.style.boxShadow='0 8px 20px rgba(52, 152, 219, 0.2)';" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none';">
+                    <div style="font-size: 36px; margin-bottom: 8px; color: #3498db;">📄</div>
+                    <div style="font-size: 14px; font-weight: bold; color: #374151; margin-bottom: 4px;">选择JSON</div>
+                    <div style="font-size: 11px; color: #64748b;">导入JSON格式</div>
+                </div>
+                <div style="flex: 1; padding: 15px 10px; border: 2px solid #e2e8f0; border-radius: 8px; cursor: pointer; transition: all 0.3s; background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);" id="input-option" onmouseover="this.style.borderColor='#10b981'; this.style.boxShadow='0 8px 20px rgba(16, 185, 129, 0.2)';" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none';">
+                    <div style="font-size: 36px; margin-bottom: 8px; color: #10b981;">🤖</div>
+                    <div style="font-size: 14px; font-weight: bold; color: #374151; margin-bottom: 4px;">AI识别</div>
+                    <div style="font-size: 11px; color: #64748b;">智能识别表格</div>
+                </div>
+            </div>
+            <div class="form-buttons">
+                <button id="cancel-select-btn" style="background-color: #64748b;" onmouseover="this.style.backgroundColor='#475569'" onmouseout="this.style.backgroundColor='#64748b'" onclick="document.getElementById('select-choice-modal').style.display='none'">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="input-content-modal" style="display: none;">
+        <div class="modal-content" style="width: 500px; padding: 20px;">
+            <h3 style="color: #10b981; margin-bottom: 15px; font-size: 18px;">AI识别</h3>
+            <textarea id="jsonContentInput" style="width: 100%; height: 450px; border: 1px solid #ddd; border-radius: 8px; padding: 10px; font-family: monospace; font-size: 14px; resize: vertical;" placeholder="第一步：识别&#13;&#10;第二步：上传图片&#13;&#10;第三步：输入“识别表格”发送&#13;&#10;第四步：输入“转换为JSON”发送&#13;&#10;第五步：复制代码，关闭Ai识别&#13;&#10;第六步：粘贴代码。确定"></textarea>
+            <div class="form-buttons" style="margin-top: 15px;">
+                <button id="cancel-input-btn" style="background: linear-gradient(135deg, #64748b 0%, #475569 100%); border: none; color: white; padding: 10px 24px; border-radius: 20px; cursor: pointer; font-size: 14px; font-weight: 600; box-shadow: 0 3px 8px rgba(100,116,139,0.3); transition: all 0.2s ease;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 5px 15px rgba(100,116,139,0.4)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 3px 8px rgba(100,116,139,0.3)';" onclick="document.getElementById('input-content-modal').style.display='none'">取消</button>
+                <button id="recognize-btn" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border: none; color: white; padding: 10px 24px; border-radius: 20px; cursor: pointer; font-size: 14px; font-weight: 600; box-shadow: 0 3px 8px rgba(59,130,246,0.3); transition: all 0.2s ease;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 5px 15px rgba(59,130,246,0.4)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 3px 8px rgba(59,130,246,0.3)';">识别</button>
+                <button id="confirm-input-btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; color: white; padding: 10px 24px; border-radius: 20px; cursor: pointer; font-size: 14px; font-weight: 600; box-shadow: 0 3px 8px rgba(16,185,129,0.3); transition: all 0.2s ease;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 5px 15px rgba(16,185,129,0.4)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 3px 8px rgba(16,185,129,0.3)';">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="doubao-iframe-container" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; height: 100%; z-index: 10000; background: white;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white;">
+            <span style="font-weight: bold; font-size: 14px;">豆包AI识别</span>
+            <button id="close-doubao-iframe" style="background: rgba(255,255,255,0.95); border: none; color: #3b82f6; padding: 4px 14px; border-radius: 15px; cursor: pointer; font-size: 12px; font-weight: 600; box-shadow: 0 2px 6px rgba(0,0,0,0.15); transition: all 0.2s ease;" onmouseover="this.style.background='#fff'; this.style.transform='scale(1.05)'; this.style.boxShadow='0 3px 10px rgba(0,0,0,0.2)';" onmouseout="this.style.background='rgba(255,255,255,0.95)'; this.style.transform='scale(1)'; this.style.boxShadow='0 2px 6px rgba(0,0,0,0.15)';">关闭</button>
+        </div>
+        <iframe id="doubao-iframe" style="width: 100%; height: calc(100% - 35px); border: none;" src=""></iframe>
+    </div>
+
+    <script>
+        // 压缩图片函数
+        function processImage(file) {
+            return new Promise((resolve, reject) => {
+                new Compressor(file, {
+                    quality: 0.7,
+                    maxWidth: 1920,
+                    maxHeight: 1920,
+                    convertSize: 500000,
+                    success(result) {
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            resolve({
+                                blob: result,
+                                dataURL: e.target.result
+                            });
+                        };
+                        reader.readAsDataURL(result);
+                    },
+                    error(err) {
+                        reject(err);
+                    }
+                });
+            });
+        }
+        window.processImage = processImage;
+        
+        // 中文转英文的辅助函数 - 使用pinyin-pro库将中文转为拼音
+        function convertChineseToEnglish(str) {
+            if (!str) {
+                return 'image';
+            }
+            
+            let result = str;
+            
+            try {
+                // 检查pinyin-pro库是否可用
+                // 修复：pinyin-pro库的正确调用方式是pinyinPro.pinyin()
+                if (typeof window.pinyinPro !== 'undefined' && typeof window.pinyinPro.pinyin === 'function') {
+                    // 使用正确的调用方式：pinyinPro.pinyin()
+                    result = window.pinyinPro.pinyin(result, {
+                        tone: false,  // 不带声调
+                        type: 'string',  // 返回字符串
+                        separator: ''  // 空分隔符，生成连续的拼音
+                    });
+                    // 手动移除声调符号（库参数tone:false可能不生效）
+                    result = result
+                        .replace(/[āáǎà]/g, 'a')
+                        .replace(/[ōóǒò]/g, 'o')
+                        .replace(/[ēéěè]/g, 'e')
+                        .replace(/[īíǐì]/g, 'i')
+                        .replace(/[ūúǔù]/g, 'u')
+                        .replace(/[ǖǘǚǜü]/g, 'v')
+                        .replace(/[^a-zA-Z0-9_.-]/g, '_');
+                } else {
+                    // 如果pinyinPro库不可用，使用简单的中文转拼音映射
+                    const pinyinMap = {
+                        '你': 'ni', '好': 'hao',
+                        '图': 'tu', '片': 'pian',
+                        '考': 'kao', '勤': 'qin',
+                        '记': 'ji', '工': 'gong',
+                        '一': 'yi', '二': 'er', '三': 'san',
+                        '四': 'si', '五': 'wu',
+                        '六': 'liu', '七': 'qi',
+                        '八': 'ba', '九': 'jiu', '十': 'shi'
+                    };
+                    
+                    // 替换中文汉字为拼音
+                    let pinyinResult = '';
+                    for (let char of result) {
+                        if (pinyinMap[char]) {
+                            pinyinResult += pinyinMap[char] + '_';
+                        } else {
+                            pinyinResult += char;
+                        }
+                    }
+                    // 移除末尾的下划线
+                    result = pinyinResult.replace(/_$/, '');
+                }
+            } catch (error) {
+                console.error('中文转拼音失败:', error);
+            }
+            
+            // 移除连续的下划线
+            result = result.replace(/_+/g, '_');
+            
+            // 移除开头和结尾的下划线
+            result = result.replace(/^_|_$/g, '');
+            
+            // 确保生成的文件名不为空
+            if (!result || result.trim() === '') {
+                result = 'image';
+            }
+            
+            return result;
+        }
+        window.convertChineseToEnglish = convertChineseToEnglish;
+        
+        // 初始化全局图片数组
+        window.selectedImages = [];
+        
+        // 清除图片函数
+        window.clearImage = function() {
+            window.selectedImages = [];
+            const container = document.getElementById('imageUploadContainer');
+            if (container) {
+                const items = container.querySelectorAll('.image-preview-item');
+                items.forEach(item => item.remove());
+            }
+            document.getElementById('imageUpload').value = '';
+            document.getElementById('imageModal').style.display = 'none';
+        }
+        
+        // 全局标志
+        window.imageUploadInitialized = false;
+        
+        // 初始化图片上传功能
+        function initImageUpload() {
+            if (window.imageUploadInitialized) return;
+            if (document.getElementById('imageUploadContainer')) {
+                window.imageUploadInitialized = true;
+                return;
+            }
+            
+            const labels = document.querySelectorAll('label');
+            let formGroup = null;
+            for (let label of labels) {
+                if (label.textContent.includes('图片')) {
+                    formGroup = label.closest('div');
+                    break;
+                }
+            }
+            if (!formGroup) return;
+            
+            const container = document.createElement('div');
+            container.id = 'imageUploadContainer';
+            container.style.display = 'flex';
+            container.style.gap = '10px';
+            container.style.flexWrap = 'wrap';
+            container.style.marginTop = '10px';
+            
+            const initialItem = document.createElement('div');
+            initialItem.className = 'image-upload-item';
+            initialItem.innerHTML = `
+                <label for="imageUpload" style="display: block; width: 100px; height: 100px; border: 1px dashed #ddd; border-radius: 4px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                    <span style="font-size: 24px; color: #999;">+</span>
+                </label>
+            `;
+            
+            container.appendChild(initialItem);
+            formGroup.appendChild(container);
+            
+            const imageUpload = document.getElementById('imageUpload');
+            if (!imageUpload) return;
+            
+            imageUpload.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    // 获取原始文件名，将中文转为拼音
+                    const originalName = file.name;
+                    const nameWithoutExt = originalName.substring(0, originalName.lastIndexOf('.'));
+                    const ext = originalName.substring(originalName.lastIndexOf('.'));
+                    const pinyinName = convertChineseToEnglish(nameWithoutExt) + ext;
+                    
+                    // 创建一个新的File对象，使用拼音文件名
+                    const fileWithPinyinName = new File([file], pinyinName, {
+                        type: file.type,
+                        lastModified: file.lastModified
+                    });
+                    
+                    // 添加到全局图片数组
+                    window.selectedImages.push(fileWithPinyinName);
+                    
+                    processImage(fileWithPinyinName).then(compressed => {
+                        // 给压缩后的blob添加拼音文件名
+                        const blobWithPinyinName = new File([compressed.blob], pinyinName, {
+                            type: compressed.blob.type
+                        });
+                        
+                        // 替换全局数组中的原始文件为压缩后的带拼音文件名的blob
+                        window.selectedImages[window.selectedImages.length - 1] = blobWithPinyinName;
+                        
+                        const previewItem = document.createElement('div');
+                        previewItem.className = 'image-preview-item';
+                        previewItem.style.position = 'relative';
+                        previewItem.style.width = '100px';
+                        previewItem.style.height = '100px';
+                        previewItem.style.borderRadius = '4px';
+                        previewItem.style.overflow = 'hidden';
+                        previewItem.style.border = '1px solid #ddd';
+                        previewItem.dataset.fileIndex = window.selectedImages.length - 1;
+                        
+                        const previewImg = document.createElement('img');
+                        previewImg.src = compressed.dataURL;
+                        previewImg.style.width = '100%';
+                        previewImg.style.height = '100%';
+                        previewImg.style.objectFit = 'cover';
+                        previewImg.style.cursor = 'pointer';
+                        
+                        previewImg.addEventListener('click', function() {
+                            const modal = document.getElementById('imageModal');
+                            modal.innerHTML = `
+                                <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2001;" 
+                                     onclick="if(event.target === this) document.getElementById('imageModal').style.display='none'">
+                                    <img id="draggableImage" src="${compressed.dataURL}" 
+                                         style="max-width: 90%; max-height: 90%; position: absolute; cursor: move; top: 50%; left: 50%; transform: translate(-50%, -50%);"
+                                         ondragstart="return false;">
+                                    <button onclick="document.getElementById('imageModal').style.display='none'" 
+                                            style="position: fixed; top: 20px; right: 20px; background: #f5222d; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; z-index: 2002;">×</button>
+                                </div>
+                            `;
+                            modal.style.display = 'block';
+                            
+                            // 图片拖动功能
+                            const img = document.getElementById('draggableImage');
+                            let isDragging = false;
+                            let offsetX, offsetY;
+                            let scale = 1;
+                            let hasDragged = false;
+                            
+                            img.addEventListener('mousedown', function(e) {
+                                isDragging = true;
+                                
+                                // 如果是第一次拖动，需要将图片从居中位置转换为绝对位置
+                                if (!hasDragged) {
+                                    hasDragged = true;
+                                    const rect = img.getBoundingClientRect();
+                                    const modalRect = img.parentElement.getBoundingClientRect();
+                                    
+                                    // 计算图片在界面中的绝对位置
+                                    offsetX = e.clientX - rect.left;
+                                    offsetY = e.clientY - rect.top;
+                                    
+                                    // 设置绝对位置
+                                    img.style.left = rect.left - modalRect.left + 'px';
+                                    img.style.top = rect.top - modalRect.top + 'px';
+                                    img.style.transform = `scale(${scale})`;
+                                } else {
+                                    offsetX = e.clientX - img.getBoundingClientRect().left;
+                                    offsetY = e.clientY - img.getBoundingClientRect().top;
+                                }
+                                
+                                img.style.cursor = 'grabbing';
+                            });
+                            
+                            document.addEventListener('mousemove', function(e) {
+                                if (!isDragging) return;
+                                img.style.left = (e.clientX - offsetX) + 'px';
+                                img.style.top = (e.clientY - offsetY) + 'px';
+                            });
+                            
+                            document.addEventListener('mouseup', function() {
+                                isDragging = false;
+                                img.style.cursor = 'move';
+                            });
+                            
+                            // 鼠标滚轮缩放功能
+                            img.addEventListener('wheel', function(e) {
+                                e.preventDefault();
+                                
+                                // 获取当前缩放值
+                                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                                scale *= delta;
+                                
+                                // 限制缩放范围
+                                scale = Math.min(Math.max(0.5, scale), 3);
+                                
+                                // 同时应用 translate 和 scale，保持居中
+                                img.style.transform = `translate(-50%, -50%) scale(${scale})`;
+                            });
+                        });
+                        
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.textContent = '×';
+                        deleteBtn.style.position = 'absolute';
+                        deleteBtn.style.top = '5px';
+                        deleteBtn.style.right = '5px';
+                        deleteBtn.style.background = 'rgba(245, 34, 45, 0.9)';
+                        deleteBtn.style.color = 'white';
+                        deleteBtn.style.border = 'none';
+                        deleteBtn.style.borderRadius = '50%';
+                        deleteBtn.style.width = '24px';
+                        deleteBtn.style.height = '24px';
+                        deleteBtn.style.fontSize = '16px';
+                        deleteBtn.style.cursor = 'pointer';
+                        deleteBtn.style.display = 'flex';
+                        deleteBtn.style.alignItems = 'center';
+                        deleteBtn.style.justifyContent = 'center';
+                        deleteBtn.style.padding = '0';
+                        
+                        deleteBtn.addEventListener('click', function() {
+                            const fileIndex = parseInt(previewItem.dataset.fileIndex);
+                            if (!isNaN(fileIndex) && fileIndex >= 0 && fileIndex < window.selectedImages.length) {
+                                window.selectedImages.splice(fileIndex, 1);
+                                const previewItems = container.querySelectorAll('.image-preview-item');
+                                previewItems.forEach((item, idx) => {
+                                    if (idx >= fileIndex) {
+                                        item.dataset.fileIndex = idx;
+                                    }
+                                });
+                            }
+                            previewItem.remove();
+                        });
+                        
+                        previewItem.appendChild(previewImg);
+                        previewItem.appendChild(deleteBtn);
+                        container.insertBefore(previewItem, initialItem);
+                    }).catch(err => {
+                        console.error('图片压缩失败:', err);
+                    });
+                }
+                imageUpload.value = '';
+            });
+            
+            window.imageUploadInitialized = true;
+        }
+        
+        function initProjectName() {
+            const projectNameFromStorage = localStorage.getItem('currentProjectName');
+            if (projectNameFromStorage) {
+                document.getElementById('projectName').value = projectNameFromStorage;
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            initProjectName();
+            initImageUpload();
+            initSelectChoiceModal();
+            initInputContentModal();
+            
+            // 通知父页面更新标题为"批量记工"
+            if (window.parent && window.parent !== window) {
+                const targetOrigin = window.location.origin || '*';
+                window.parent.postMessage({
+                    type: 'updateTitle',
+                    page: '批量记工'
+                }, targetOrigin);
+            }
+        });
+        
+        function initSelectChoiceModal() {
+            const fileInput = document.getElementById('fileInput');
+            const selectBtnLabel = document.getElementById('selectBtnLabel');
+            const selectChoiceModal = document.getElementById('select-choice-modal');
+            const jsonOption = document.getElementById('json-option');
+            const inputOption = document.getElementById('input-option');
+            
+            selectBtnLabel.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                selectChoiceModal.style.display = 'flex';
+            });
+            
+            fileInput.addEventListener('click', function(e) {
+                if (e.target === fileInput) {
+                    e.preventDefault();
+                    selectChoiceModal.style.display = 'flex';
+                }
+            });
+            
+            jsonOption.addEventListener('click', function() {
+                selectChoiceModal.style.display = 'none';
+                document.getElementById('jsonFile').click();
+            });
+            
+            inputOption.addEventListener('click', function() {
+                selectChoiceModal.style.display = 'none';
+                document.getElementById('input-content-modal').style.display = 'flex';
+            });
+        }
+        
+        function initInputContentModal() {
+            const confirmInputBtn = document.getElementById('confirm-input-btn');
+            const jsonContentInput = document.getElementById('jsonContentInput');
+            const recognizeBtn = document.getElementById('recognize-btn');
+            
+            recognizeBtn.addEventListener('click', function() {
+                const doubaoWebUrl = 'https://www.doubao.com';
+                const iframeContainer = document.getElementById('doubao-iframe-container');
+                const doubaoIframe = document.getElementById('doubao-iframe');
+                
+                if (iframeContainer.style.display === 'none' || iframeContainer.style.display === '') {
+                    doubaoIframe.src = doubaoWebUrl;
+                    iframeContainer.style.display = 'block';
+                } else {
+                    iframeContainer.style.display = 'none';
+                    doubaoIframe.src = '';
+                }
+            });
+            
+            document.getElementById('close-doubao-iframe').addEventListener('click', function() {
+                const iframeContainer = document.getElementById('doubao-iframe-container');
+                const doubaoIframe = document.getElementById('doubao-iframe');
+                iframeContainer.style.display = 'none';
+                doubaoIframe.src = '';
+            });
+            
+            confirmInputBtn.addEventListener('click', function() {
+                const content = jsonContentInput.value.trim();
+                if (!content) {
+                    showNotification('请输入JSON内容', true);
+                    return;
+                }
+                
+                try {
+                    var data = JSON.parse(content);
+                    JsonParserService.renderTable(data);
+                    document.getElementById('input-content-modal').style.display = 'none';
+                    jsonContentInput.value = '';
+                    showNotification('JSON内容已成功解析', false);
+                } catch (error) {
+                    showNotification('JSON格式错误，请检查内容', true);
+                    console.error('Error parsing JSON:', error);
+                }
+            });
+        }
+        
+        document.getElementById('jsonFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            // 更新文件名显示
+            document.getElementById('fileName').textContent = file.name;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    var data = JSON.parse(e.target.result);
+                    JsonParserService.renderTable(data);
+                } catch (error) {
+                    document.getElementById('message').innerHTML = '<div class="error-message">JSON文件格式错误，请检查文件内容。</div>';
+                    console.error('Error parsing JSON:', error);
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        // 显示通知消息
+        function showNotification(message, isError = false) {
+            const notification = document.getElementById('notification');
+            if (!notification) {
+                console.error('未找到notification元素!');
+                alert('提示框元素未找到: ' + message);
+                return;
+            }
+            
+            // 设置文本和样式
+            notification.textContent = message;
+            notification.className = isError ? 'notification error' : 'notification';
+            
+            // 强制显示 - 确保所有样式属性都正确设置
+            notification.style.cssText = `
+                display: block;
+                visibility: visible;
+                opacity: 1;
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                padding: 16px 24px;
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                color: white;
+                border-radius: 8px;
+                box-shadow: 0 15px 40px rgba(16, 185, 129, 0.4), 0 8px 20px rgba(16, 185, 129, 0.2);
+                z-index: 9999;
+                font-weight: 700;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                font-size: 16px;
+                min-width: 200px;
+                text-align: center;
+                animation: notificationPop 0.3s ease-out;
+            `;
+            
+            // 如果是错误消息，覆盖背景和阴影颜色
+            if (isError) {
+                notification.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+                notification.style.boxShadow = '0 15px 40px rgba(239, 68, 68, 0.4), 0 8px 20px rgba(239, 68, 68, 0.2)';
+            }
+            
+            // 3秒后隐藏
+            setTimeout(() => {
+                notification.style.transition = 'opacity 0.3s ease-out';
+                notification.style.opacity = '0';
+                setTimeout(() => {
+                    notification.style.display = 'none';
+                }, 300);
+            }, 3000);
+        }
+        
+        // 选择按钮自定义tooltip
+        let fileInputTooltip = null;
+        let fileInputTooltipTimer = null;
+        
+        function setupFileInputTooltip() {
+            const fileInput = document.getElementById('fileInput');
+            if (!fileInput) return;
+            
+            fileInput.addEventListener('mouseenter', function(e) {
+                // 清除之前的定时器
+                if (fileInputTooltipTimer) {
+                    clearTimeout(fileInputTooltipTimer);
+                    fileInputTooltipTimer = null;
+                }
+                
+                // 如果tooltip已存在，直接显示
+                if (fileInputTooltip) {
+                    fileInputTooltip.classList.add('show');
+                    return;
+                }
+                
+                fileInputTooltip = document.createElement('div');
+                fileInputTooltip.className = 'custom-tooltip';
+                fileInputTooltip.textContent = 'AI识别或选择';
+                document.body.appendChild(fileInputTooltip);
+                
+                const rect = e.target.getBoundingClientRect();
+                fileInputTooltip.style.left = (rect.left + 10) + 'px';
+                fileInputTooltip.style.top = (rect.bottom + 5) + 'px';
+                
+                setTimeout(() => {
+                    if (fileInputTooltip) {
+                        fileInputTooltip.classList.add('show');
+                    }
+                }, 10);
+            });
+            
+            fileInput.addEventListener('mouseleave', function() {
+                if (fileInputTooltip) {
+                    fileInputTooltip.classList.remove('show');
+                    fileInputTooltipTimer = setTimeout(() => {
+                        if (fileInputTooltip && fileInputTooltip.parentNode) {
+                            fileInputTooltip.parentNode.removeChild(fileInputTooltip);
+                        }
+                        fileInputTooltip = null;
+                        fileInputTooltipTimer = null;
+                    }, 300);
+                }
+            });
+        }
+        
+        // 工号列是否可编辑的标志
+        let idEditable = false;
+        
+        // 双击标题行的工号时解锁/锁定工号列
+        function toggleIdEditable() {
+            idEditable = !idEditable;
+            const idCells = document.querySelectorAll('.id-cell');
+            idCells.forEach(cell => {
+                cell.contentEditable = idEditable;
+            });
+            
+            // 提示用户
+            if (idEditable) {
+                showNotification('工号列已解锁，可以修改！', false);
+            } else {
+                showNotification('工号列已锁定，不可修改！', false);
+            }
+        }
+        
+        // 姓名列是否可编辑的标志
+        let nameEditable = false;
+        
+        // 双击标题行的姓名时解锁/锁定姓名列
+        function toggleNameEditable() {
+            nameEditable = !nameEditable;
+            const nameCells = document.querySelectorAll('.name-cell');
+            nameCells.forEach(cell => {
+                // 对所有姓名列都改变状态
+                cell.contentEditable = nameEditable;
+            });
+            
+            // 提示用户
+            if (nameEditable) {
+                showNotification('姓名列已解锁，可以修改！', false);
+            } else {
+                showNotification('姓名列已锁定，不可修改！', false);
+            }
+        }
+        
+        // 双击使元素可编辑
+        function makeEditable(element) {
+            const currentText = element.textContent;
+            element.contentEditable = true;
+            element.focus();
+            
+            // 选中所有文本
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            
+            // 失去焦点时退出编辑模式
+            element.onblur = function() {
+                element.contentEditable = false;
+                element.onblur = null;
+            };
+            
+            // 按Enter键退出编辑模式
+            element.onkeydown = function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    element.blur();
+                }
+            };
+        }
+        
+        // 工号标题自定义tooltip
+        let idHeaderTooltip = null;
+        let nameHeaderTooltip = null;
+        
+        function setupIdHeaderTooltip() {
+            const idHeader1 = document.getElementById('idHeader1');
+            const idHeader2 = document.getElementById('idHeader2');
+            const nameHeader1 = document.getElementById('nameHeader1');
+            const nameHeader2 = document.getElementById('nameHeader2');
+            
+            [idHeader1, idHeader2].forEach(header => {
+                if (!header) return;
+                
+                header.addEventListener('mouseenter', function(e) {
+                    idHeaderTooltip = document.createElement('div');
+                    idHeaderTooltip.className = 'custom-tooltip';
+                    // 根据当前状态显示不同的提示信息
+                    idHeaderTooltip.textContent = idEditable ? '双击锁定工号修改' : '双击解锁工号修改';
+                    document.body.appendChild(idHeaderTooltip);
+                    
+                    const rect = e.target.getBoundingClientRect();
+                    idHeaderTooltip.style.left = (rect.left + 10) + 'px';
+                    idHeaderTooltip.style.top = (rect.bottom + 5) + 'px';
+                    
+                    setTimeout(() => {
+                        if (idHeaderTooltip) {
+                            idHeaderTooltip.classList.add('show');
+                        }
+                    }, 10);
+                });
+                
+                header.addEventListener('mouseleave', function() {
+                    if (idHeaderTooltip) {
+                        idHeaderTooltip.classList.remove('show');
+                        setTimeout(() => {
+                            if (idHeaderTooltip && idHeaderTooltip.parentNode) {
+                                idHeaderTooltip.parentNode.removeChild(idHeaderTooltip);
+                            }
+                            idHeaderTooltip = null;
+                        }, 300);
+                    }
+                });
+            });
+            
+            [nameHeader1, nameHeader2].forEach(header => {
+                if (!header) return;
+                
+                header.addEventListener('mouseenter', function(e) {
+                    nameHeaderTooltip = document.createElement('div');
+                    nameHeaderTooltip.className = 'custom-tooltip';
+                    // 根据当前状态显示不同的提示信息
+                    nameHeaderTooltip.textContent = nameEditable ? '双击锁定姓名修改' : '双击解锁姓名修改';
+                    document.body.appendChild(nameHeaderTooltip);
+                    
+                    const rect = e.target.getBoundingClientRect();
+                    nameHeaderTooltip.style.left = (rect.left + 10) + 'px';
+                    nameHeaderTooltip.style.top = (rect.bottom + 5) + 'px';
+                    
+                    setTimeout(() => {
+                        if (nameHeaderTooltip) {
+                            nameHeaderTooltip.classList.add('show');
+                        }
+                    }, 10);
+                });
+                
+                header.addEventListener('mouseleave', function() {
+                    if (nameHeaderTooltip) {
+                        nameHeaderTooltip.classList.remove('show');
+                        setTimeout(() => {
+                            if (nameHeaderTooltip && nameHeaderTooltip.parentNode) {
+                                nameHeaderTooltip.parentNode.removeChild(nameHeaderTooltip);
+                            }
+                            nameHeaderTooltip = null;
+                        }, 300);
+                    }
+                });
+            });
+        }
+        
+        // 页面加载完成后设置tooltip
+        document.addEventListener('DOMContentLoaded', function() {
+            setupIdHeaderTooltip();
+            setupFileInputTooltip();
+            setupSaveButtonTooltip();
+            setupValidateButtonTooltip();
+        });
+        
+        // 保存按钮tooltip
+        let saveButtonTooltip = null;
+        let saveButtonTooltipTimer = null;
+        
+        function setupSaveButtonTooltip() {
+            const saveButton = document.getElementById('saveButton');
+            if (!saveButton) return;
+            
+            saveButton.addEventListener('mouseenter', function(e) {
+                if (saveButtonTooltipTimer) {
+                    clearTimeout(saveButtonTooltipTimer);
+                    saveButtonTooltipTimer = null;
+                }
+                
+                if (saveButtonTooltip) {
+                    saveButtonTooltip.classList.add('show');
+                    return;
+                }
+                
+                saveButtonTooltip = document.createElement('div');
+                saveButtonTooltip.className = 'custom-tooltip';
+                saveButtonTooltip.textContent = '保存当前表格';
+                document.body.appendChild(saveButtonTooltip);
+                
+                const rect = e.target.getBoundingClientRect();
+                saveButtonTooltip.style.left = (rect.left + 10) + 'px';
+                saveButtonTooltip.style.top = (rect.bottom + 5) + 'px';
+                
+                setTimeout(() => {
+                    if (saveButtonTooltip) {
+                        saveButtonTooltip.classList.add('show');
+                    }
+                }, 10);
+            });
+            
+            saveButton.addEventListener('mouseleave', function() {
+                if (saveButtonTooltip) {
+                    saveButtonTooltip.classList.remove('show');
+                    saveButtonTooltipTimer = setTimeout(() => {
+                        if (saveButtonTooltip && saveButtonTooltip.parentNode) {
+                            saveButtonTooltip.parentNode.removeChild(saveButtonTooltip);
+                        }
+                        saveButtonTooltip = null;
+                        saveButtonTooltipTimer = null;
+                    }, 300);
+                }
+            });
+        }
+        
+        // 校验按钮tooltip
+        let validateButtonTooltip = null;
+        let validateButtonTooltipTimer = null;
+        
+        function setupValidateButtonTooltip() {
+            const validateButton = document.querySelector('.validate-button');
+            if (!validateButton) return;
+            
+            validateButton.addEventListener('mouseenter', function(e) {
+                if (validateButtonTooltipTimer) {
+                    clearTimeout(validateButtonTooltipTimer);
+                    validateButtonTooltipTimer = null;
+                }
+                
+                if (validateButtonTooltip) {
+                    validateButtonTooltip.classList.add('show');
+                    return;
+                }
+                
+                validateButtonTooltip = document.createElement('div');
+                validateButtonTooltip.className = 'custom-tooltip';
+                validateButtonTooltip.textContent = '检查表格与批量记工是否正确';
+                document.body.appendChild(validateButtonTooltip);
+                
+                const rect = e.target.getBoundingClientRect();
+                const tooltipRect = validateButtonTooltip.getBoundingClientRect();
+                const windowWidth = window.innerWidth;
+                
+                let leftPos = rect.left + 10;
+                if (leftPos + tooltipRect.width > windowWidth - 10) {
+                    leftPos = windowWidth - tooltipRect.width - 10;
+                }
+                
+                validateButtonTooltip.style.left = leftPos + 'px';
+                validateButtonTooltip.style.top = (rect.bottom + 5) + 'px';
+                
+                setTimeout(() => {
+                    if (validateButtonTooltip) {
+                        validateButtonTooltip.classList.add('show');
+                    }
+                }, 10);
+            });
+            
+            validateButton.addEventListener('mouseleave', function() {
+                if (validateButtonTooltip) {
+                    validateButtonTooltip.classList.remove('show');
+                    validateButtonTooltipTimer = setTimeout(() => {
+                        if (validateButtonTooltip && validateButtonTooltip.parentNode) {
+                            validateButtonTooltip.parentNode.removeChild(validateButtonTooltip);
+                        }
+                        validateButtonTooltip = null;
+                        validateButtonTooltipTimer = null;
+                    }, 300);
+                }
+            });
+        }
+        
+        // 点击图标时当前行表格内数字变成蓝色
+        function toggleRowColor(iconCell) {
+            const row = iconCell.parentElement;
+            const cells = row.querySelectorAll('td');
+            
+            // 检查当前行是否已经是蓝色
+            const isBlue = row.classList.contains('blue-row');
+            
+            if (isBlue) {
+                // 如果已经是蓝色，恢复原色
+                row.classList.remove('blue-row');
+                // 将图标从蓝色改为黑色
+                iconCell.textContent = '⚫';
+                cells.forEach((cell, index) => {
+                    // 跳过图标列
+                    if (index !== 0) {
+                        cell.style.color = '';
+                        // 根据data-editable属性恢复编辑状态
+                        const editable = cell.getAttribute('data-editable');
+                        cell.contentEditable = editable === 'true';
+                    }
+                });
+            } else {
+                // 如果不是蓝色，变成蓝色
+                row.classList.add('blue-row');
+                // 将图标从黑色改为蓝色
+                iconCell.textContent = '🔵';
+                cells.forEach((cell, index) => {
+                    // 跳过图标列
+                    if (index !== 0) {
+                        cell.style.color = 'blue';
+                        // 设置为不可编辑状态
+                        cell.contentEditable = false;
+                    }
+                });
+            }
+        }
+        
+        // 保存按钮点击事件
+        document.getElementById('saveButton').addEventListener('click', function() {
+            const tableBody1 = document.getElementById('tableBody1');
+            const tableBody2 = document.getElementById('tableBody2');
+            
+            // 获取表格上方的项目名称和日期
+            const companyName = document.querySelector('.header-info .company')?.textContent || '';
+            const dateText = document.querySelector('.header-info .date')?.textContent || '';
+            
+            const saveData = {
+                headerInfo: {
+                    company: companyName,
+                    date: dateText
+                },
+                data: []
+            };
+            
+            // 收集第一个表格的数据
+            const rows1 = tableBody1.querySelectorAll('tr');
+            rows1.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length >= 7) {
+                    const isBlue = row.classList.contains('blue-row');
+                    saveData.data.push({
+                        id: cells[1].textContent.trim(),
+                        name: cells[2].textContent.trim(),
+                        morning: cells[3].textContent.trim(),
+                        afternoon: cells[4].textContent.trim(),
+                        overtime: cells[5].textContent.trim(),
+                        contract: cells[6].textContent.trim(),
+                        isBlue: isBlue,
+                        iconColor: cells[0].textContent.trim()
+                    });
+                }
+            });
+            
+            // 收集第二个表格的数据
+            const rows2 = tableBody2.querySelectorAll('tr');
+            rows2.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length >= 7) {
+                    const isBlue = row.classList.contains('blue-row');
+                    saveData.data.push({
+                        id: cells[1].textContent.trim(),
+                        name: cells[2].textContent.trim(),
+                        morning: cells[3].textContent.trim(),
+                        afternoon: cells[4].textContent.trim(),
+                        overtime: cells[5].textContent.trim(),
+                        contract: cells[6].textContent.trim(),
+                        isBlue: isBlue,
+                        iconColor: cells[0].textContent.trim()
+                    });
+                }
+            });
+            
+            // 创建JSON文件并下载
+            const jsonStr = JSON.stringify(saveData, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            // 获取表格上方的项目名称和日期作为默认文件名
+            const defaultFileName = (companyName || '未知项目') + (dateText ? '-' + dateText : '') + '.json';
+            
+            a.download = defaultFileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+    </script>
+</body>
+</html>
