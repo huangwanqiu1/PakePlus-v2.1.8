@@ -2059,11 +2059,14 @@
                 }
 
                 // 更新统计数量
-                const totalPhotos = filteredRecords.reduce((sum, record) => {
-                    return sum + (record.image_ids ? record.image_ids.length : 0);
-                }, 0);
+                const allImageIds = new Set();
+                filteredRecords.forEach(record => {
+                    if (record.image_ids) {
+                        record.image_ids.forEach(id => allImageIds.add(id));
+                    }
+                });
                 if (categoryCount) {
-                    categoryCount.textContent = totalPhotos;
+                    categoryCount.textContent = allImageIds.size;
                 }
 
             } catch (error) {
@@ -2121,11 +2124,14 @@
                 }
 
                 // 更新统计数量
-                const totalPhotos = filteredRecords.reduce((sum, record) => {
-                    return sum + (record.image_ids ? record.image_ids.length : 0);
-                }, 0);
+                const allImageIds = new Set();
+                filteredRecords.forEach(record => {
+                    if (record.image_ids) {
+                        record.image_ids.forEach(id => allImageIds.add(id));
+                    }
+                });
                 if (categoryCount) {
-                    categoryCount.textContent = totalPhotos;
+                    categoryCount.textContent = allImageIds.size;
                 }
 
             } catch (error) {
@@ -2425,11 +2431,14 @@
                 }
 
                 // 更新统计数量
-                const totalPhotos = filteredRecords.reduce((sum, record) => {
-                    return sum + (record.image_ids ? record.image_ids.length : 0);
-                }, 0);
+                const allImageIds = new Set();
+                filteredRecords.forEach(record => {
+                    if (record.image_ids) {
+                        record.image_ids.forEach(id => allImageIds.add(id));
+                    }
+                });
                 if (categoryCount) {
-                    categoryCount.textContent = totalPhotos;
+                    categoryCount.textContent = allImageIds.size;
                 }
 
             } catch (error) {
@@ -2488,11 +2497,14 @@
                 }
 
                 // 更新统计数量
-                const totalPhotos = filteredRecords.reduce((sum, record) => {
-                    return sum + (record.image_ids ? record.image_ids.length : 0);
-                }, 0);
+                const allImageIds = new Set();
+                filteredRecords.forEach(record => {
+                    if (record.image_ids) {
+                        record.image_ids.forEach(id => allImageIds.add(id));
+                    }
+                });
                 if (categoryCount) {
-                    categoryCount.textContent = totalPhotos;
+                    categoryCount.textContent = allImageIds.size;
                 }
 
             } catch (error) {
@@ -3413,11 +3425,14 @@
                 }
 
                 // 更新统计数量
-                const totalPhotos = filteredRecords.reduce((sum, record) => {
-                    return sum + (record.image_ids ? record.image_ids.length : 0);
-                }, 0);
+                const allImageIds = new Set();
+                filteredRecords.forEach(record => {
+                    if (record.image_ids) {
+                        record.image_ids.forEach(id => allImageIds.add(id));
+                    }
+                });
                 if (categoryCount) {
-                    categoryCount.textContent = totalPhotos;
+                    categoryCount.textContent = allImageIds.size;
                 }
 
             } catch (error) {
@@ -3668,9 +3683,13 @@
                                 const records = Array.isArray(parsedData) ? parsedData : (parsedData.records || parsedData.construction_logs || []);
                                 const projectRecords = records.filter(r => r.project_id === projectId);
                                 const filteredRecords = filterConstructionLogs(projectRecords);
-                                return filteredRecords.reduce((sum, record) => {
-                                    return sum + (record.image_ids ? record.image_ids.length : 0);
-                                }, 0);
+                                const allImageIds = new Set();
+                                filteredRecords.forEach(record => {
+                                    if (record.image_ids) {
+                                        record.image_ids.forEach(id => allImageIds.add(id));
+                                    }
+                                });
+                                return allImageIds.size;
                             } catch (e) {
                                 continue;
                             }
@@ -3706,9 +3725,13 @@
                     .filter(record => record.image_ids && record.image_ids.length > 0);
                 const filteredRecords = filterConstructionLogs(records);
 
-                return filteredRecords.reduce((sum, record) => {
-                    return sum + (record.image_ids ? record.image_ids.length : 0);
-                }, 0);
+                const allImageIds = new Set();
+                filteredRecords.forEach(record => {
+                    if (record.image_ids) {
+                        record.image_ids.forEach(id => allImageIds.add(id));
+                    }
+                });
+                return allImageIds.size;
             } catch (error) {
                 console.error('获取施工日志照片数量失败:', error);
                 return 0;
@@ -3761,9 +3784,13 @@
                         const parsedData = JSON.parse(savedData);
                         const records = parsedData.records || [];
                         const filteredRecords = filterAttendanceRecords(records);
-                        return filteredRecords.reduce((sum, record) => {
-                            return sum + (record.image_ids ? record.image_ids.length : 0);
-                        }, 0);
+                        const allImageIds = new Set();
+                        filteredRecords.forEach(record => {
+                            if (record.image_ids) {
+                                record.image_ids.forEach(id => allImageIds.add(id));
+                            }
+                        });
+                        return allImageIds.size;
                     }
                     return 0;
                 }
@@ -3793,9 +3820,13 @@
 
                 const records = data || [];
                 const filteredRecords = filterAttendanceRecords(records);
-                return filteredRecords.reduce((sum, record) => {
-                    return sum + (record.image_ids ? record.image_ids.length : 0);
-                }, 0);
+                const allImageIds = new Set();
+                filteredRecords.forEach(record => {
+                    if (record.image_ids) {
+                        record.image_ids.forEach(id => allImageIds.add(id));
+                    }
+                });
+                return allImageIds.size;
             } catch (error) {
                 console.error('获取记工照片数量失败:', error);
                 return 0;
@@ -3855,9 +3886,13 @@
                 const allRecords = [...expenseRecords, ...incomeRecords];
                 const filteredRecords = filterAccountRecords(allRecords);
 
-                return filteredRecords.reduce((sum, record) => {
-                    return sum + (record.image_ids ? record.image_ids.length : 0);
-                }, 0);
+                const allImageIds = new Set();
+                filteredRecords.forEach(record => {
+                    if (record.image_ids) {
+                        record.image_ids.forEach(id => allImageIds.add(id));
+                    }
+                });
+                return allImageIds.size;
             } catch (error) {
                 console.error('获取记账照片数量失败:', error);
                 return 0;
@@ -3883,9 +3918,13 @@
                                 const records = Array.isArray(parsedData) ? parsedData : (parsedData.records || parsedData.settlement_records || []);
                                 const projectRecords = records.filter(r => r.project_id === projectId);
                                 const filteredRecords = filterSettlementRecords(projectRecords);
-                                return filteredRecords.reduce((sum, record) => {
-                                    return sum + (record.image_ids ? record.image_ids.length : 0);
-                                }, 0);
+                                const allImageIds = new Set();
+                                filteredRecords.forEach(record => {
+                                    if (record.image_ids) {
+                                        record.image_ids.forEach(id => allImageIds.add(id));
+                                    }
+                                });
+                                return allImageIds.size;
                             } catch (e) {
                                 continue;
                             }
@@ -3926,9 +3965,13 @@
                     .filter(record => record.image_ids && record.image_ids.length > 0);
                 const filteredRecords = filterSettlementRecords(records);
 
-                return filteredRecords.reduce((sum, record) => {
-                    return sum + (record.image_ids ? record.image_ids.length : 0);
-                }, 0);
+                const allImageIds = new Set();
+                filteredRecords.forEach(record => {
+                    if (record.image_ids) {
+                        record.image_ids.forEach(id => allImageIds.add(id));
+                    }
+                });
+                return allImageIds.size;
             } catch (error) {
                 console.error('获取借支照片数量失败:', error);
                 return 0;
@@ -3954,9 +3997,13 @@
                                 const records = Array.isArray(parsedData) ? parsedData : (parsedData.records || parsedData.work_records || []);
                                 const projectRecords = records.filter(r => r.project_id === projectId);
                                 const filteredRecords = filterWorkOrderRecords(projectRecords);
-                                return filteredRecords.reduce((sum, record) => {
-                                    return sum + (record.image_ids ? record.image_ids.length : 0);
-                                }, 0);
+                                const allImageIds = new Set();
+                                filteredRecords.forEach(record => {
+                                    if (record.image_ids) {
+                                        record.image_ids.forEach(id => allImageIds.add(id));
+                                    }
+                                });
+                                return allImageIds.size;
                             } catch (e) {
                                 continue;
                             }
@@ -3991,9 +4038,13 @@
                     .filter(record => record.image_ids && record.image_ids.length > 0);
                 const filteredRecords = filterWorkOrderRecords(records);
 
-                return filteredRecords.reduce((sum, record) => {
-                    return sum + (record.image_ids ? record.image_ids.length : 0);
-                }, 0);
+                const allImageIds = new Set();
+                filteredRecords.forEach(record => {
+                    if (record.image_ids) {
+                        record.image_ids.forEach(id => allImageIds.add(id));
+                    }
+                });
+                return allImageIds.size;
             } catch (error) {
                 return 0;
             }
