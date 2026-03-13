@@ -453,10 +453,18 @@ class OfflineSyncService {
             // 使用tus-js-client上传图片，使用完整路径作为objectName，与在线时一致
             await this.uploadImageWithTus(data.projectId, session?.access_token, data.bucketName, fullPath, file);
             
+            // 获取正确的Supabase URL
+            let supabaseUrl = 'https://oydffrzzulsrbitrrhht.supabase.co';
+            if (window.supabase && window.supabase.supabaseUrl) {
+                supabaseUrl = window.supabase.supabaseUrl;
+            } else if (window.supabase && window.supabase.rest) {
+                supabaseUrl = window.supabase.rest.url.replace('/rest/v1', '');
+            }
+            
             // 生成图片URL，使用正确的路径，不包含重复的路径信息
             // 路径格式：${recordProjectId}/${folderName}/${dateStr}/${fileNamePart}
             const encodedFullPath = encodeURIComponent(fullPath);
-            const imageUrl = `https://${data.projectId}.supabase.co/storage/v1/object/public/${data.bucketName}/${encodedFullPath}`;
+            const imageUrl = `${supabaseUrl}/storage/v1/object/public/${data.bucketName}/${encodedFullPath}`;
             
             // 更新所有使用此本地图片的记录
             await this.updateRecordsWithImageUrl(data.localPath, imageUrl);
@@ -1493,7 +1501,7 @@ class OfflineSyncService {
      * 使用tus-js-client上传图片
      */
     async uploadImageWithTus(projectId, accessToken, bucketName, fileName, file) {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             // 检查tus是否可用
             if (typeof window.tus === 'undefined') {
                 reject(new Error('tus-js-client未加载'));
@@ -1506,9 +1514,19 @@ class OfflineSyncService {
                 return;
             }
             
+            // 获取正确的Supabase URL
+            let supabaseUrl = 'https://oydffrzzulsrbitrrhht.supabase.co';
+            
+            // 尝试从window.supabase获取URL
+            if (window.supabase && window.supabase.supabaseUrl) {
+                supabaseUrl = window.supabase.supabaseUrl;
+            } else if (window.supabase && window.supabase.rest) {
+                supabaseUrl = window.supabase.rest.url.replace('/rest/v1', '');
+            }
+            
             // 创建tus上传实例
             const upload = new window.tus.Upload(file, {
-                endpoint: `https://${projectId}.supabase.co/storage/v1/upload/resumable`,
+                endpoint: `${supabaseUrl}/storage/v1/upload/resumable`,
                 retryDelays: [0, 3000, 5000, 10000, 20000],
                 headers: {
                     authorization: `Bearer ${accessToken}`,
