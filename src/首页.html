@@ -1058,6 +1058,11 @@
                 letter-spacing: 0.3px;
             }
 
+            /* 隐藏计算器按钮 */
+            .calculator-button {
+                display: none;
+            }
+
             /* 主内容区域调整 */
             .main-content {
                 margin-left: 0;
@@ -1281,6 +1286,582 @@
                 -webkit-overflow-scrolling: touch;
             }
         }
+
+        /* 关于模态框样式 */
+        .about-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .about-modal-overlay.active {
+            display: flex;
+        }
+
+        .about-modal {
+            background: linear-gradient(135deg, #ffffff, #f8fafc);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 90%;
+            max-width: 480px;
+            max-height: 85vh;
+            overflow-y: auto;
+            position: relative;
+            animation: scaleIn 0.3s ease;
+        }
+
+        @media (min-width: 769px) {
+            .about-modal {
+                max-height: 90vh;
+            }
+        }
+
+        .about-modal::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+        }
+
+        .about-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px 28px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .about-modal-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0;
+        }
+
+        .about-modal-close {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #94a3b8;
+            transition: all 0.3s ease;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            padding: 0;
+        }
+
+        .about-modal-close:hover {
+            color: #ef4444;
+            background-color: #fee2e2;
+            transform: rotate(90deg);
+        }
+
+        .about-modal-body {
+            padding: 28px;
+        }
+
+        .about-content {
+            text-align: center;
+        }
+
+        .about-logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            color: white;
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .about-app-name {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0 0 8px 0;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .about-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .about-app-name {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .about-version {
+            font-size: 14px;
+            color: #64748b;
+            margin: 0;
+            font-weight: 500;
+        }
+
+        .about-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .about-action-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            color: #475569;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .about-action-btn:hover {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-color: #667eea;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .about-action-btn i {
+            font-size: 16px;
+            transition: color 0.3s ease;
+        }
+
+        .about-action-btn:hover i {
+            color: white;
+        }
+
+        .about-description {
+            font-size: 15px;
+            color: #475569;
+            line-height: 1.6;
+            margin: 0 0 24px 0;
+        }
+
+        .about-features {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin: 0 0 24px 0;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+            border-radius: 10px;
+            font-size: 14px;
+            color: #475569;
+            transition: all 0.3s ease;
+        }
+
+        .feature-item:hover {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .feature-item i {
+            color: #667eea;
+            font-size: 16px;
+            transition: color 0.3s ease;
+        }
+
+        .feature-item:hover i {
+            color: white;
+        }
+
+        .about-copyright {
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .about-copyright p {
+            font-size: 13px;
+            color: #94a3b8;
+            margin: 0;
+        }
+
+        .about-sponsor {
+            margin-top: 30px;
+            padding: 24px;
+            background: linear-gradient(135deg, #fff5f5, #fff0f5);
+            border-radius: 16px;
+            border: 2px solid #fecaca;
+            text-align: center;
+        }
+
+        .sponsor-title {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 20px;
+            font-weight: 700;
+            color: #e11d48;
+            margin-bottom: 16px;
+        }
+
+        .sponsor-title i {
+            font-size: 24px;
+            animation: heartbeat 1.5s ease-in-out infinite;
+        }
+
+        @keyframes heartbeat {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .sponsor-text {
+            font-size: 14px;
+            color: #6b7280;
+            line-height: 1.8;
+            margin-bottom: 20px;
+        }
+
+        .sponsor-icons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .sponsor-icon-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 16px 24px;
+            background: white;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            min-width: 100px;
+        }
+
+        .sponsor-icon-item:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        .sponsor-icon-item:active {
+            transform: translateY(-2px);
+        }
+
+        .sponsor-icon-item i {
+            font-size: 32px;
+            transition: color 0.3s ease;
+        }
+
+        .sponsor-icon-item:first-child i {
+            color: #07c160;
+        }
+
+        .sponsor-icon-item:last-child i {
+            color: #1677ff;
+        }
+
+        .sponsor-icon-item:hover i {
+            transform: scale(1.1);
+        }
+
+        .sponsor-icon-item span {
+            font-size: 13px;
+            font-weight: 600;
+            color: #475569;
+        }
+
+        /* 作者微信样式 */
+        .sponsor-author-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 16px 24px;
+            background: white;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            min-width: 100px;
+        }
+
+        .sponsor-author-item:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        .author-img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #e2e8f0;
+            transition: all 0.3s ease;
+        }
+
+        .sponsor-author-item:hover .author-img {
+            transform: scale(1.05);
+            border-color: #667eea;
+        }
+
+        .sponsor-author-item span {
+            font-size: 13px;
+            font-weight: 600;
+            color: #475569;
+        }
+
+        /* 二维码模态框样式 */
+        .qr-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .qr-modal-overlay.active {
+            display: flex;
+        }
+
+        .qr-modal {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 90%;
+            max-width: 400px;
+            position: relative;
+            animation: scaleIn 0.3s ease;
+        }
+
+        .qr-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px 28px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .qr-modal-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0;
+        }
+
+        .qr-modal-close {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #94a3b8;
+            transition: all 0.3s ease;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            padding: 0;
+        }
+
+        .qr-modal-close:hover {
+            color: #ef4444;
+            background-color: #fee2e2;
+            transform: rotate(90deg);
+        }
+
+        .qr-modal-body {
+            padding: 32px;
+            text-align: center;
+        }
+
+        .qr-code-img {
+            width: 280px;
+            height: 280px;
+            object-fit: contain;
+            border-radius: 8px;
+            border: 2px solid #e2e8f0;
+            margin-bottom: 20px;
+        }
+
+        .qr-tip {
+            font-size: 15px;
+            color: #64748b;
+            margin: 0;
+        }
+
+        @media (max-width: 768px) {
+            .about-modal {
+                width: 95%;
+                max-width: 380px;
+            }
+
+            .about-modal-header {
+                padding: 20px;
+            }
+
+            .about-modal-title {
+                font-size: 18px;
+            }
+
+            .about-modal-body {
+                padding: 20px;
+            }
+
+            .about-logo {
+                width: 60px;
+                height: 60px;
+                font-size: 30px;
+                margin-bottom: 16px;
+            }
+
+            .about-header {
+                gap: 8px;
+                margin-bottom: 16px;
+            }
+
+            .about-app-name {
+                font-size: 22px;
+            }
+
+            .about-version {
+                font-size: 13px;
+            }
+
+            .about-description {
+                font-size: 14px;
+            }
+
+            .about-features {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+            }
+
+            .feature-item {
+                font-size: 13px;
+                padding: 10px 12px;
+            }
+
+            .about-sponsor {
+                padding: 20px;
+                margin-top: 24px;
+            }
+
+            .sponsor-title {
+                font-size: 18px;
+            }
+
+            .sponsor-text {
+                font-size: 13px;
+            }
+
+            .sponsor-icons {
+                gap: 12px;
+            }
+
+            .sponsor-icon-item {
+                padding: 12px 16px;
+                min-width: 80px;
+            }
+
+            .sponsor-icon-item i {
+                font-size: 28px;
+            }
+
+            .sponsor-icon-item span {
+                font-size: 12px;
+            }
+
+            .sponsor-author-item {
+                padding: 12px 16px;
+                min-width: 80px;
+            }
+
+            .author-img {
+                width: 50px;
+                height: 50px;
+            }
+
+            .sponsor-author-item span {
+                font-size: 12px;
+            }
+
+            .qr-modal {
+                width: 95%;
+                max-width: 320px;
+            }
+
+            .qr-modal-header {
+                padding: 20px;
+            }
+
+            .qr-modal-title {
+                font-size: 18px;
+            }
+
+            .qr-modal-body {
+                padding: 20px;
+            }
+
+            .qr-code-img {
+                width: 200px;
+                height: 200px;
+            }
+
+            .qr-tip {
+                font-size: 13px;
+            }
+        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -1307,9 +1888,13 @@
             </div>
             <div class="sidebar-text">未结</div>
         </div>
-        <div class="sidebar-item" onclick="toggleCalculatorModal()">
+        <div class="sidebar-item calculator-button" onclick="toggleCalculatorModal()">
             <div class="sidebar-icon"><i class="fas fa-calculator"></i></div>
             <div class="sidebar-text">计算器</div>
+        </div>
+        <div class="sidebar-item" onclick="toggleAboutModal()">
+            <div class="sidebar-icon"><i class="fas fa-info-circle"></i></div>
+            <div class="sidebar-text">关于</div>
         </div>
     </div>
 
@@ -1424,6 +2009,123 @@
         </div>
     </div>
 
+    <!-- 关于模态框 -->
+    <div class="about-modal-overlay" id="aboutModal" onclick="closeAboutModal(event)">
+        <div class="about-modal" onclick="event.stopPropagation()">
+
+            <div class="about-modal-body">
+                <div class="about-content">
+                    <div class="about-logo">
+                        <i class="fas fa-fish"></i>
+                    </div>
+                    <div class="about-header">
+                        <h3 class="about-app-name">飞鱼记工</h3>
+                        <p class="about-version">版本 6.3.13</p>
+                    </div>
+                    <div class="about-actions">
+                        <button class="about-action-btn" onclick="openHelpDoc('intro')">
+                            <i class="fas fa-book"></i>
+                            <span>软件简介</span>
+                        </button>
+                        <button class="about-action-btn" onclick="openHelpDoc('feature')">
+                            <i class="fas fa-list"></i>
+                            <span>功能说明</span>
+                        </button>
+                    </div>
+                    <p class="about-description">
+                        飞鱼记工是一款专业的工程项目考勤管理系统，帮助企业高效管理员工考勤、工资结算和项目数据。
+                    </p>
+                    <div class="about-features">
+                        <div class="feature-item">
+                            <i class="fas fa-check-circle"></i>
+                            <span>员工考勤管理</span>
+                        </div>
+                        <div class="feature-item">
+                            <i class="fas fa-check-circle"></i>
+                            <span>工资结算系统</span>
+                        </div>
+                        <div class="feature-item">
+                            <i class="fas fa-check-circle"></i>
+                            <span>项目数据统计</span>
+                        </div>
+                        <div class="feature-item">
+                            <i class="fas fa-check-circle"></i>
+                            <span>实时数据同步</span>
+                        </div>
+                    </div>
+                    <div class="about-sponsor">
+                        <div class="sponsor-title">
+                            <i class="fas fa-heart"></i>
+                            <span>赞助我们</span>
+                        </div>
+                        <p class="sponsor-text">
+                            如果你也喜欢我们的飞鱼考勤，欢迎赞助我们，我们会继续开发和维护。您的支持是我们前进的动力。赞助时请务必填写留言（手机号或邮箱号），以便我们收录到赞助名单中，感谢您的支持与鼓励！
+                        </p>
+                        <div class="sponsor-icons">
+                            <div class="sponsor-author-item" onclick="openAuthorQr()">
+                                <img src="JavaScript/登录注册/作者.jpg" alt="作者" class="author-img">
+                                <span>作者微信</span>
+                            </div>
+                            <div class="sponsor-icon-item" onclick="openWechatPay()">
+                                <i class="fab fa-weixin"></i>
+                                <span>微信支付</span>
+                            </div>
+                            <div class="sponsor-icon-item" onclick="openAlipay()">
+                                <i class="fab fa-alipay"></i>
+                                <span>支付宝</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="about-copyright">
+                        <p>&copy; 2026 飞鱼科技 版权所有</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 作者微信二维码模态框 -->
+    <div class="qr-modal-overlay" id="authorQrModal" onclick="closeQrModal('authorQrModal')">
+        <div class="qr-modal">
+            <div class="qr-modal-header">
+                <h3 class="qr-modal-title">作者微信</h3>
+                <button class="qr-modal-close" onclick="closeQrModal('authorQrModal')">&times;</button>
+            </div>
+            <div class="qr-modal-body">
+                <img src="JavaScript/登录注册/作者.jpg" alt="作者微信二维码" class="qr-code-img">
+                <p class="qr-tip">请使用微信扫描二维码添加作者微信</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 微信支付二维码模态框 -->
+    <div class="qr-modal-overlay" id="wechatQrModal" onclick="closeQrModal('wechatQrModal')">
+        <div class="qr-modal">
+            <div class="qr-modal-header">
+                <h3 class="qr-modal-title">微信支付</h3>
+                <button class="qr-modal-close" onclick="closeQrModal('wechatQrModal')">&times;</button>
+            </div>
+            <div class="qr-modal-body">
+                <img src="JavaScript/登录注册/微信.jpg" alt="微信支付二维码" class="qr-code-img">
+                <p class="qr-tip">请使用微信扫描二维码进行支付</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 支付宝二维码模态框 -->
+    <div class="qr-modal-overlay" id="alipayQrModal" onclick="closeQrModal('alipayQrModal')">
+        <div class="qr-modal">
+            <div class="qr-modal-header">
+                <h3 class="qr-modal-title">支付宝</h3>
+                <button class="qr-modal-close" onclick="closeQrModal('alipayQrModal')">&times;</button>
+            </div>
+            <div class="qr-modal-body">
+                <img src="JavaScript/登录注册/支付宝.jpg" alt="支付宝二维码" class="qr-code-img">
+                <p class="qr-tip">请使用支付宝扫描二维码进行支付</p>
+            </div>
+        </div>
+    </div>
+
     <script>
         // 计算器模态框控制
         function toggleCalculatorModal() {
@@ -1452,6 +2154,61 @@
                 const modal = document.getElementById('calculatorModal');
                 modal.classList.remove('active');
             }
+        }
+
+        // 关于模态框控制
+        function toggleAboutModal() {
+            const modal = document.getElementById('aboutModal');
+            modal.classList.toggle('active');
+        }
+
+        // 关闭关于模态框（点击外部）
+        function closeAboutModal(event) {
+            // 点击遮罩层关闭
+            if (event.target.id === 'aboutModal') {
+                const modal = document.getElementById('aboutModal');
+                modal.classList.remove('active');
+            }
+        }
+
+        // 打开帮助文档
+        function openHelpDoc(mode) {
+            // 关闭关于模态框
+            const modal = document.getElementById('aboutModal');
+            modal.classList.remove('active');
+            
+            // 构建帮助文档URL并添加模式参数
+            const helpUrl = '帮助文档.html?mode=' + mode;
+            
+            // 使用navigateTo函数在功能区显示帮助文档
+            navigateTo(helpUrl, null);
+        }
+
+        // 打开作者微信
+        function openAuthorQr() {
+            // 显示作者微信二维码模态框
+            const qrModal = document.getElementById('authorQrModal');
+            qrModal.classList.add('active');
+        }
+
+        // 打开微信支付
+        function openWechatPay() {
+            // 显示微信支付二维码模态框
+            const qrModal = document.getElementById('wechatQrModal');
+            qrModal.classList.add('active');
+        }
+
+        // 打开支付宝
+        function openAlipay() {
+            // 显示支付宝二维码模态框
+            const qrModal = document.getElementById('alipayQrModal');
+            qrModal.classList.add('active');
+        }
+
+        // 关闭二维码模态框
+        function closeQrModal(modalId) {
+            const modal = document.getElementById(modalId);
+            modal.classList.remove('active');
         }
         
         // 拖拽逻辑实现
@@ -1645,7 +2402,8 @@
                         '项目主页.html': '项目主页',
                         '未结.html': '项目未结',
                         '记工表.html': '记工表',
-                        '施工日志.html': '施工日志'
+                        '施工日志.html': '施工日志',
+                        '帮助文档.html': '帮助文档'
                     };
 
                     // 构建完整标题
@@ -2103,6 +2861,9 @@
             } else if (pageName === '记工.html' || page === '记工.html') {
                 titleText = '记工';
                 titleAttr = '记工';
+            } else if (pageName === '批量记工.html' || page === '批量记工.html' || pageName === '批量记工' || page === '批量记工') {
+                titleText = '批量记工';
+                titleAttr = '批量记工';
             } else if (pageName === '统计.html' || page === '统计.html') {
                 titleText = '统计';
                 titleAttr = '统计';
@@ -2172,6 +2933,9 @@
             } else if (pageName === '施工日志.html' || page === '施工日志.html' || page === '施工日志') {
                 titleText = '施工日志';
                 titleAttr = '施工日志';
+            } else if (pageName === '帮助文档.html' || page === '帮助文档.html' || page === '帮助文档') {
+                titleText = '帮助文档';
+                titleAttr = '帮助文档';
             } else {
                 // 其他页面优先显示已选择的项目名，否则回退默认
                 const saved = localStorage.getItem('currentProjectName');
