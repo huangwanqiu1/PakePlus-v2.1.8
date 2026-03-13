@@ -2348,10 +2348,14 @@
                             // 选中记工流水标签，折叠中间元素
                             collapsibleContent.style.display = 'none';
                             collapseIcon.textContent = '▶';
+                            // 隐藏批量记工按钮
+                            document.getElementById('batchWorkBtn').style.display = 'none';
                         } else if (this.value === '记工') {
                             // 选中记工标签，展开中间元素
                             collapsibleContent.style.display = 'block';
                             collapseIcon.textContent = '▼';
+                            // 显示批量记工按钮
+                            document.getElementById('batchWorkBtn').style.display = 'block';
                         }
                     });
             });
@@ -2497,7 +2501,7 @@
         </div>
     </div>
 
-    <div class="bottom-buttons" style="display: flex; justify-content: flex-start; background-color: transparent;">
+    <div class="bottom-buttons" style="display: flex; justify-content: flex-start; gap: 40px; background-color: #f5f5f5; padding: 15px 20px; border-top: 1px solid #e8e8e8; box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);">
         <button id="confirmBtn" style="
             padding: 8px 16px;
             background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
@@ -2510,6 +2514,18 @@
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
         ">确认记工</button>
+        <button id="batchWorkBtn" style="
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #52c41a 0%, #389e0d 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 8px rgba(82, 196, 26, 0.3);
+        ">批量记工</button>
     </div>
 
     <!-- 记工标签页内容结束 -->
@@ -3242,6 +3258,10 @@
                 if (selectAllBtn) selectAllBtn.style.display = 'none';
                 if (selectInverseBtn) selectInverseBtn.style.display = 'none';
                 if (employeeSelectionLabel) employeeSelectionLabel.textContent = '员工：';
+                
+                // 在编辑模式下隐藏批量记工按钮
+                const batchWorkBtn = document.getElementById('batchWorkBtn');
+                if (batchWorkBtn) batchWorkBtn.style.display = 'none';
                 
                 // 在编辑模式下，将"员工："与员工列表水平排列
                 const employeeSelectionDiv = document.querySelector('.form-group:has(#employeeSelectionLabel)');
@@ -5347,6 +5367,13 @@
                     inactiveEmployees: inactiveEmployees
                 });
                 window.workRecordService.confirmWorkRecord();
+            });
+
+            // 批量记工按钮
+            document.getElementById('batchWorkBtn').addEventListener('click', function() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const projectId = urlParams.get('project_id') || localStorage.getItem('currentProjectId') || '';
+                window.location.href = '批量记工.html?project_id=' + encodeURIComponent(projectId);
             });
 
             // 模态框按钮
