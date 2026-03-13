@@ -21,10 +21,27 @@ function clearLocalProjectData() {
             const key = localStorage.key(i);
             // 保留用户登录数据键和 Supabase Auth 相关键（以 sb- 开头）
             if (key && !preservedKeys.includes(key) && !key.startsWith('sb-')) {
-                localStorage.removeItem(key);
-                clearedItems++;
-                // 调整索引，因为我们移除了一个项目
-                i--;
+                // 检查是否为未同步的离线文件，如果是则保留
+                let shouldPreserve = false;
+                try {
+                    const value = localStorage.getItem(key);
+                    if (value) {
+                        const parsed = JSON.parse(value);
+                        // 检查是否包含未同步标记
+                        if (parsed._synced === false || parsed._local === true) {
+                            shouldPreserve = true;
+                        }
+                    }
+                } catch (e) {
+                    // 解析失败，不是JSON数据，可以清除
+                }
+                
+                if (!shouldPreserve) {
+                    localStorage.removeItem(key);
+                    clearedItems++;
+                    // 调整索引，因为我们移除了一个项目
+                    i--;
+                }
             }
         }
         
@@ -36,7 +53,7 @@ function clearLocalProjectData() {
             clearedItems++;
         }
         
-        console.log(`✅ 2.[本地数据清理] 本地数据清理完成（保留用户登录数据和Supabase Auth token），共清除 ${clearedItems} 项`);
+        console.log(`✅ 2.[本地数据清理] 本地数据清理完成（保留用户登录数据、Supabase Auth token和未同步的离线文件），共清除 ${clearedItems} 项`);
         return clearedItems;
     } catch (error) {
         console.error('[本地数据清理] 清除本地数据时发生错误:', error);
